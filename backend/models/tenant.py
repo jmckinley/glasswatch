@@ -5,6 +5,7 @@ Tenant model - Multi-tenant isolation
 from sqlalchemy import Column, String, DateTime, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 
 from db.session import Base
@@ -50,6 +51,10 @@ class Tenant(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    bundles = relationship("Bundle", back_populates="tenant")
+    maintenance_windows = relationship("MaintenanceWindow", back_populates="tenant")
     
     def __repr__(self):
         return f"<Tenant {self.name} ({self.id})>"

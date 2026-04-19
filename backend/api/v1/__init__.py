@@ -5,7 +5,7 @@ Aggregates all v1 API endpoints.
 """
 from fastapi import APIRouter
 
-from backend.api.v1 import vulnerabilities, assets
+from backend.api.v1 import vulnerabilities, assets, goals
 
 # Create main v1 router
 api_router = APIRouter()
@@ -21,6 +21,12 @@ api_router.include_router(
     assets.router,
     prefix="/assets",
     tags=["assets"],
+)
+
+router.include_router(
+    goals.router,
+    prefix="/goals",
+    tags=["goals"],
 )
 
 # Note: We'll uncomment these as we implement them
