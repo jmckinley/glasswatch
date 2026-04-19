@@ -1,5 +1,5 @@
 """
-Executive reporting service for PatchAI.
+Executive reporting service for PatchGuide.
 
 Generates PDF reports, compliance packages, and analytics exports.
 """
@@ -173,8 +173,8 @@ class ReportingService:
                 "notification_process": "Stakeholders notified of all changes",
             },
             "attestation": {
-                "statement": f"PatchAI confirms that {tenant.name} has maintained a systematic vulnerability management program during the audit period.",
-                "generated_by": "PatchAI Reporting Service",
+                "statement": f"PatchGuide confirms that {tenant.name} has maintained a systematic vulnerability management program during the audit period.",
+                "generated_by": "PatchGuide Reporting Service",
                 "timestamp": datetime.utcnow().isoformat(),
             },
         }

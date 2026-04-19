@@ -79,7 +79,7 @@ export default function GoalsPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <Link href="/" className="text-2xl font-bold text-primary">
-                PatchAI
+                PatchGuide
               </Link>
               <span className="ml-3 text-sm text-neutral-400">
                 Intelligent Patch Optimization

@@ -130,7 +130,7 @@ export default function OnboardingPage() {
         {/* Welcome Step */}
         {step === "welcome" && (
           <div className="card p-12 text-center">
-            <h1 className="text-4xl font-bold mb-4">Welcome to PatchAI</h1>
+            <h1 className="text-4xl font-bold mb-4">Welcome to PatchGuide</h1>
             <p className="text-xl text-neutral-400 mb-8">
               Let&apos;s get you set up in just a few minutes
             </p>

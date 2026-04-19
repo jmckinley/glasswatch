@@ -1,4 +1,4 @@
-# PatchAI Session Handoff - April 19, 2026
+# PatchGuide Session Handoff - April 19, 2026
 
 **Context**: 72% usage - time for new session to continue work safely
 
@@ -9,8 +9,8 @@
 - Frontend scaffold done
 - OR-Tools optimization engine complete
 
-### 2. Major Rebrand to PatchAI
-- Changed all references from Glasswatch → PatchAI
+### 2. Major Rebrand to PatchGuide
+- Changed all references from Glasswatch → PatchGuide
 - New positioning: "AI-powered patch optimization platform"
 - Better market differentiation
 
@@ -56,7 +56,7 @@
 ## Current Status
 
 - **GitHub**: https://github.com/jmckinley/glasswatch (all committed)
-- **Last commit**: 9213e63 "Update status and documentation for PatchAI"
+- **Last commit**: 9213e63 "Update status and documentation for PatchGuide"
 - **Sprint 0**: Complete ✅
 - **1.0 Features**: 60% complete (6/10)
 - **Key files**:
@@ -69,10 +69,10 @@
 Copy and paste this exact prompt:
 
 ```
-Continue building PatchAI from ~/glasswatch/SESSION_HANDOFF_PATCHAI.md
+Continue building PatchGuide from ~/glasswatch/SESSION_HANDOFF_PATCHAI.md
 
 Current state:
-- Rebranded from Glasswatch to PatchAI
+- Rebranded from Glasswatch to PatchGuide
 - 6/10 of 1.0 features complete
 - Need to implement: Authentication, Approval Workflows, Rollback Tracking, Patch Simulator
 
@@ -89,7 +89,7 @@ All work is in ~/glasswatch/ (GitHub: jmckinley/glasswatch)
 - **Optimization**: Constraint solver for goal-based scheduling
 - **Multi-tenant**: Built in from day one
 
-## What Makes PatchAI Special
+## What Makes PatchGuide Special
 
 1. **AI-First**: Natural language everything
 2. **Runtime Intelligence**: Snapper integration nobody else has

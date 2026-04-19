@@ -1,8 +1,8 @@
-# PatchAI - Intelligent Patch Optimization Platform
+# PatchGuide.ai - Intelligent Patch Optimization Platform
 
 **Transform business objectives into optimized patch schedules.**
 
-PatchAI is the first AI-powered patch management platform that understands your business goals. Instead of just prioritizing vulnerabilities by severity, Glasswatch uses constraint solving to create optimal patching schedules that balance risk reduction with operational reality.
+PatchGuide.ai is the first AI-powered patch management platform that understands your business goals. Instead of just prioritizing vulnerabilities by severity, PatchGuide uses constraint solving to create optimal patching schedules that balance risk reduction with operational reality.
 
 ## 🎯 The Problem
 
@@ -15,7 +15,7 @@ Security teams are drowning in vulnerabilities:
 
 ## 💡 Our Solution
 
-**AI-driven optimization**: Tell PatchAI your business objective, and it creates the optimal patch schedule.
+**AI-driven optimization**: Tell PatchGuide your business objective, and it creates the optimal patch schedule.
 
 Examples:
 - "Make us audit-ready by July 1st"
@@ -183,10 +183,10 @@ We're in early development. For now:
 
 ## 📄 License
 
-Proprietary - © 2024 PatchAI, Inc.
+Proprietary - © 2024 PatchGuide, Inc.
 
 ---
 
-**Built with ❤️ by the PatchAI team**
+**Built with ❤️ by the PatchGuide team**
 
 *"Stop patching blind. Start patching smart."*

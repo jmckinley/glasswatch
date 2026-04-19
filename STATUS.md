@@ -1,4 +1,4 @@
-# PatchAI Implementation Status
+# PatchGuide Implementation Status
 
 **Last Updated:** 2026-04-19 12:00 UTC
 **GitHub:** https://github.com/jmckinley/glasswatch (to be renamed to patchai)
@@ -90,7 +90,7 @@
 
 #### Rebrand & New Features
 
-12. **Rebranded to PatchAI** ✅
+12. **Rebranded to PatchGuide** ✅
     - Updated all references throughout codebase
     - New positioning as AI-powered platform
     - Better market differentiation

@@ -37,7 +37,7 @@ class NotificationType(str, Enum):
 
 class NotificationService:
     """
-    Central notification service for PatchAI.
+    Central notification service for PatchGuide.
     
     Handles routing notifications to configured channels based on
     tenant preferences and notification type.
@@ -138,8 +138,8 @@ class NotificationService:
                 "title": title,
                 "text": message,
                 "fallback": f"{title}: {message}",
-                "footer": "PatchAI",
-                "footer_icon": "https://patchai.io/icon.png",
+                "footer": "PatchGuide",
+                "footer_icon": "https://patchguide.ai/icon.png",
                 "ts": int(datetime.utcnow().timestamp()),
             }]
         }
@@ -188,7 +188,7 @@ class NotificationService:
             "summary": title,
             "sections": [{
                 "activityTitle": title,
-                "activitySubtitle": "PatchAI Notification",
+                "activitySubtitle": "PatchGuide Notification",
                 "text": message,
                 "markdown": True,
             }],
@@ -251,7 +251,7 @@ class NotificationService:
                     <p>{message}</p>
                     {"<a href='" + data['action_url'] + "' class='button'>" + data.get('action_text', 'View Details') + "</a>" if data and data.get('action_url') else ""}
                     <p style="color: #666; font-size: 12px; margin-top: 20px;">
-                        Sent by PatchAI at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+                        Sent by PatchGuide at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
                     </p>
                 </div>
             </div>

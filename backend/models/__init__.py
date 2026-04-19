@@ -15,6 +15,9 @@ The relationships enable our unique goal-based optimization approach.
 """
 
 from backend.models.tenant import Tenant
+from backend.models.user import User, UserRole
+from backend.models.audit_log import AuditLog
+from backend.models.approval import ApprovalAction, ApprovalStatus
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
@@ -27,6 +30,11 @@ from backend.models.maintenance_window import MaintenanceWindow
 # Export all models
 __all__ = [
     "Tenant",
+    "User",
+    "UserRole",
+    "AuditLog",
+    "ApprovalAction",
+    "ApprovalStatus",
     "Vulnerability", 
     "Asset",
     "AssetVulnerability",

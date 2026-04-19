@@ -115,7 +115,7 @@ export function AIAssistant({ onSendMessage }: AIAssistantProps) {
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">PatchAI Assistant</h3>
+              <h3 className="font-semibold">PatchGuide Assistant</h3>
             </div>
             <button
               onClick={() => setIsOpen(false)}

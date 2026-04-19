@@ -1,8 +1,8 @@
-# PatchAI 1.0 Feature Roadmap
+# PatchGuide 1.0 Feature Roadmap
 
 ## ✅ Completed (Rebrand + Foundation)
 
-- [x] Rename to PatchAI throughout codebase
+- [x] Rename to PatchGuide throughout codebase
 - [x] Core backend structure (models, APIs, scoring)
 - [x] Frontend scaffold with dark theme
 - [x] Goal-based optimization with OR-Tools

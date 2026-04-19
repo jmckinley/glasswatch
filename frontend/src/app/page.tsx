@@ -90,7 +90,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary">PatchAI</h1>
+              <h1 className="text-2xl font-bold text-primary">PatchGuide</h1>
               <span className="ml-3 text-sm text-neutral-400">
                 Intelligent Patch Optimization
               </span>

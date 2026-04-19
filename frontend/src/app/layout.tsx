@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PatchAI - Intelligent Patch Optimization",
+  title: "PatchGuide - Intelligent Patch Optimization",
   description: "AI-powered patch management that understands your business goals",
 };
 

@@ -45,7 +45,7 @@ async def get_current_tenant(
             tenant = Tenant(
                 id=UUID(DEMO_TENANT_ID),
                 name=DEMO_TENANT_NAME,
-                email="demo@glasswatch.io",
+                email="demo@patchguide.ai",
                 region="us-east-1",
                 tier="trial",
                 is_active=True,
