@@ -1,5 +1,7 @@
 # PatchGuide.ai - Scanning & Inventory Integrations
 
+**Domain**: patchguide.ai (owned)
+
 Based on industry best practices and popular open-source tools, here are the scanning and inventory capabilities we should integrate:
 
 ## 1. Container & Image Scanning
