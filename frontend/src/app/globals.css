@@ -77,28 +77,31 @@ body {
 
 /* Card styles */
 .card {
-  @apply bg-card border border-border rounded-lg;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
 }
 
 .card:hover {
-  @apply bg-card-hover border-border-hover;
+  background-color: var(--card-hover);
+  border-color: var(--border-hover);
 }
 
 /* Status colors */
 .status-critical {
-  @apply text-destructive;
+  color: var(--destructive);
 }
 
 .status-high {
-  @apply text-warning;
+  color: var(--warning);
 }
 
 .status-medium {
-  @apply text-secondary;
+  color: var(--secondary);
 }
 
 .status-low {
-  @apply text-success;
+  color: var(--success);
 }
 
 /* Metric cards */
@@ -112,5 +115,16 @@ body {
 
 /* Loading states */
 .skeleton {
-  @apply animate-pulse bg-neutral-800 rounded;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background-color: #27272a;
+  border-radius: 0.25rem;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
