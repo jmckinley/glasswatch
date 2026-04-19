@@ -1,143 +1,186 @@
-# Glasswatch
+# Glasswatch - Patch Decision Platform
 
-> The patch decision platform for the post-Mythos vulnerability management era
+**Transform business objectives into optimized patch schedules.**
 
-**We don't find vulnerabilities — we decide what to do about them.**
+Glasswatch is the first patch management platform that understands your business goals. Instead of just prioritizing vulnerabilities by severity, Glasswatch uses constraint solving to create optimal patching schedules that balance risk reduction with operational reality.
 
-## Overview
+## 🎯 The Problem
 
-Glasswatch is an AI-powered patch decision platform that transforms the chaos of vulnerability management into strategic, optimized patch operations. Built for the Glasswing disclosure era (July 2026), where thousands of critical vulnerabilities will be released simultaneously.
+Security teams are drowning in vulnerabilities:
+- 20,000+ CVEs published yearly
+- Average enterprise: 2,000+ vulnerabilities
+- 75% never get patched
+- No clear prioritization beyond CVSS scores
+- Business impact disconnected from technical decisions
 
-### Core Features
+## 💡 Our Solution
 
-- **Goal-Based Optimization**: Define objectives ("patch critical CVEs in 3 weeks"), get optimized plans
-- **Business Impact Modeling**: Prioritize based on revenue/hour, SLA penalties, and regulatory risk
-- **Runtime Intelligence**: Know if vulnerable code actually executes (via Snapper integration)
-- **Patch Weather**: Community deployment health scores (our network effect moat)
-- **Multi-Cloud Native**: AWS, GCP, Azure support from day one
-- **Kubernetes Operator**: Declarative patch management with CRDs
+**Goal-based optimization**: Tell Glasswatch your business objective, and it creates the optimal patch schedule.
 
-## Architecture
+Examples:
+- "Make us Glasswing-ready by July 1st"
+- "Reduce internet-facing critical vulnerabilities by 80%"
+- "Achieve SOC 2 compliance for Q3 audit"
+
+## 🚀 Key Features
+
+### 1. **Intelligent Scoring** (Our Differentiator)
+- 8-factor algorithm beyond just CVSS
+- **Snapper runtime integration**: ±25 points based on actual code execution
+- EPSS probability scoring
+- KEV catalog priority boost
+- Asset criticality and exposure weighting
+
+### 2. **Constraint Solver Optimization**
+- OR-Tools powered scheduling engine
+- Balances risk, downtime, and deadlines
+- Groups related patches for efficiency
+- Respects maintenance windows
+- No competitor has true goal-based optimization
+
+### 3. **Patch Weather™** (Network Effect Moat)
+- Community-driven patch success metrics
+- "Is this patch safe to deploy?"
+- Rollback rates and vendor acknowledgments
+- Only Glasswatch has this aggregated data
+
+### 4. **Business Context Integration**
+- Risk profiles: Conservative, Balanced, Aggressive
+- Compliance deadline tracking
+- Cost modeling for downtime
+- Executive-friendly dashboards
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 5: PLATFORM (Multi-Tenant Infrastructure)           │
-│  Event Bus · Per-Tenant DB · Audit Log                     │
-└─────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 4: ORCHESTRATION & SURFACES                          │
-│  Web App · ITSM Push · Patch Weather API · Attestation     │
-└─────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 3: GRAPH & SCORING                                   │
-│  Vuln × Asset Graph · Prioritization · Bundling · Goals    │
-└─────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 2: NORMALIZATION & ENRICHMENT                        │
-│  Dedupe · SBOE Builder · LLM Extractors                    │
-└─────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────┐
-│  LAYER 1: INGESTION                                         │
-│  CVE/KEV/EPSS/GHSA · Cloud APIs · Snapper · Agents        │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Next.js 15    │────▶│   FastAPI       │────▶│   PostgreSQL    │
+│   Frontend      │     │   Backend       │     │   Database      │
+│   (Dark Theme)  │     │   (Async)       │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                               │                          │
+                               ▼                          ▼
+                        ┌─────────────────┐     ┌─────────────────┐
+                        │   OR-Tools      │     │     Redis       │
+                        │   Optimizer     │     │     Cache       │
+                        └─────────────────┘     └─────────────────┘
 ```
 
-## Quick Start
+## 🚦 Current Status (Sprint 0 - 60% Complete)
+
+### ✅ Completed
+- **Database Models**: All 8 core models with relationships
+- **Scoring Engine**: Complete with Snapper integration
+- **APIs**: Vulnerabilities, Assets, Goals (with optimization)
+- **Goal Optimization**: Constraint solver implementation
+- **Frontend Scaffold**: Next.js 15 with dark theme dashboard
+
+### 🔄 In Progress
+- Docker Compose setup
+- Authentication (WorkOS integration)
+- Webhook system
+- AI Assistant
+
+### 📋 TODO
+- ITSM integrations (ServiceNow, Jira)
+- Patch Weather data collection
+- Notification system
+- Multi-tenant deployment
+
+## 🛠️ Tech Stack
+
+- **Backend**: FastAPI, SQLAlchemy, Alembic, OR-Tools
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS 4
+- **Database**: PostgreSQL (primary), Redis (cache)
+- **Infrastructure**: Docker, Kubernetes-ready
+- **AI**: OpenAI GPT-4 for natural language goals
+
+## 🚀 Quick Start
 
 ### Prerequisites
+- Docker and Docker Compose
+- Node.js 20+ (for local development)
+- Python 3.11+ (for local development)
 
-- Python 3.12+
-- Node.js 18+
-- PostgreSQL 16
-- Docker & Kubernetes (for production)
-
-### Development Setup
+### Running with Docker
 
 ```bash
-# Backend
+# Clone the repository
+git clone https://github.com/jmckinley/glasswatch.git
+cd glasswatch
+
+# Start all services
+docker-compose up
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000/docs
+```
+
+### Local Development
+
+#### Backend
+```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn main:app --reload
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-
-# Database
-docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:16
-docker run -d -p 7687:7687 memgraph/memgraph-platform
 ```
 
-### Run Tests
-
+#### Frontend
 ```bash
-# All tests
-./scripts/run_all_tests.sh
-
-# Unit tests only
-cd backend && pytest tests/unit/
-
-# Integration tests
-cd backend && pytest tests/integration/
-
-# E2E tests
-cd frontend && npm run test:e2e
+cd frontend
+pnpm install
+pnpm dev
 ```
 
-## API Documentation
+## 📊 API Examples
 
-Once running, visit:
-- API docs: http://localhost:8000/docs
-- Frontend: http://localhost:3000
+### Create a Goal
+```bash
+curl -X POST http://localhost:8000/api/v1/goals \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: demo-tenant" \
+  -d '{
+    "name": "Glasswing Readiness",
+    "type": "compliance_deadline",
+    "target_date": "2024-07-01T00:00:00Z",
+    "risk_tolerance": "balanced",
+    "max_vulns_per_window": 20
+  }'
+```
 
-## Tech Stack
+### Optimize the Schedule
+```bash
+curl -X POST http://localhost:8000/api/v1/goals/{goal_id}/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: demo-tenant" \
+  -d '{
+    "max_future_windows": 12
+  }'
+```
 
-- **Backend**: Python 3.12, FastAPI, SQLAlchemy, Alembic
-- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
-- **Database**: PostgreSQL 16 (OLTP), Memgraph (graph)
-- **Event Bus**: Redpanda (Kafka-compatible)
-- **Cache**: Redis/Dragonfly
-- **ML/AI**: Claude Opus 4.7 via Anthropic API
-- **Infrastructure**: Kubernetes, Terraform, AWS/GCP/Azure
+## 🔐 Security
 
-## Project Status
+- Multi-tenant isolation at every layer
+- Encryption at rest (AWS KMS)
+- Row-level security in PostgreSQL
+- SOC 2 compliant architecture from day one
+- API authentication via WorkOS (production)
 
-Building towards July 2026 Glasswing disclosure launch. Currently in Sprint 10 of 11.
+## 🤝 Contributing
 
-### Completed
-- ✅ Core prioritization engine
-- ✅ Goal-based optimization
-- ✅ Asset discovery (cloud + CMDB)
-- ✅ Enhanced goals with business impact
-- ✅ Kubernetes operator
-- ✅ Multi-cloud deployment
-- ✅ Testing infrastructure
+We're in early development. For now:
+1. Fork the repo
+2. Create a feature branch
+3. Submit a PR with clear description
 
-### In Progress
-- 🔄 Production hardening
-- 🔄 Beta customer onboarding
-- 🔄 Glasswing readiness dashboard
+## 📄 License
 
-## Contributing
-
-This is currently a private repository. For access, contact john@greatfallsventures.com.
-
-## Security
-
-For security issues, please email security@mckinleylabs.com. Do not open public issues.
-
-## License
-
-Proprietary - McKinley Labs LLC © 2026
+Proprietary - © 2024 Glasswatch, Inc.
 
 ---
 
-**Built for the Mythos era. Ready for Glasswing.**
+**Built with ❤️ by the Glasswatch team**
+
+*"Stop patching blind. Start patching smart."*

@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: glasswatch-db
+    environment:
+      POSTGRES_DB: glasswatch
+      POSTGRES_USER: glasswatch
+      POSTGRES_PASSWORD: glasswatch-secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glasswatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: glasswatch-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: glasswatch-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://glasswatch:glasswatch-secret@postgres:5432/glasswatch
+      REDIS_URL: redis://redis:6379/0
+      PYTHONUNBUFFERED: 1
+      ENV: development
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: glasswatch-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: pnpm dev
+
+  # Memgraph (Graph Database for future)
+  # memgraph:
+  #   image: memgraph/memgraph:latest
+  #   container_name: glasswatch-graph
+  #   ports:
+  #     - "7687:7687"
+  #     - "3001:3000"  # Memgraph Lab
+  #   volumes:
+  #     - memgraph_data:/usr/lib/memgraph
+  #   command: ["--log-level", "TRACE"]
+
+volumes:
+  postgres_data:
+  # memgraph_data:
