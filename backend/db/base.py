@@ -1,18 +1,36 @@
 """
-Import all models so Alembic can detect them.
+Database base class and metadata.
 
-This ensures all models are loaded when generating migrations.
+Import all models here to ensure they're registered with SQLAlchemy.
 """
-# Import the base class
-from backend.db.base_class import Base
+from sqlalchemy.orm import declarative_base
 
-# Import all models to ensure they're registered with SQLAlchemy
+# Create base class for models
+Base = declarative_base()
+
+# Import all models to register them
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
 from backend.models.goal import Goal, EnhancedGoal
 from backend.models.patch_bundle import PatchBundle, BundlePatch
+from backend.models.bundle import Bundle
+from backend.models.bundle_item import BundleItem
+from backend.models.maintenance_window import MaintenanceWindow
 
-# Make Base available for Alembic
-__all__ = ["Base"]
+# This ensures all models are available when creating/migrating database
+__all__ = [
+    "Base",
+    "Tenant",
+    "Vulnerability",
+    "Asset",
+    "AssetVulnerability",
+    "Goal",
+    "EnhancedGoal",
+    "PatchBundle",
+    "BundlePatch",
+    "Bundle",
+    "BundleItem",
+    "MaintenanceWindow",
+]

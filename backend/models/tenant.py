@@ -8,7 +8,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
 
-from db.session import Base
+from backend.db.base import Base
 
 
 class Tenant(Base):
