@@ -117,10 +117,10 @@ export default function SchedulePage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <Link href="/" className="text-2xl font-bold text-primary">
-                Glasswatch
+                PatchAI
               </Link>
               <span className="ml-3 text-sm text-neutral-400">
-                Patch Decision Platform
+                Intelligent Patch Optimization
               </span>
             </div>
             <nav className="flex space-x-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AIAssistant } from "@/components/AIAssistant";
 
 interface DashboardStats {
   vulnerabilities: {
@@ -89,9 +90,9 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary">Glasswatch</h1>
+              <h1 className="text-2xl font-bold text-primary">PatchAI</h1>
               <span className="ml-3 text-sm text-neutral-400">
-                Patch Decision Platform
+                Intelligent Patch Optimization
               </span>
             </div>
             <nav className="flex space-x-6">
@@ -293,6 +294,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+      
+      {/* AI Assistant */}
+      <AIAssistant />
     </div>
   );
 }

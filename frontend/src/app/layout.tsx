@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Glasswatch - Patch Decision Platform",
-  description: "Convert business objectives into optimized patch schedules",
+  title: "PatchAI - Intelligent Patch Optimization",
+  description: "AI-powered patch management that understands your business goals",
 };
 
 export default function RootLayout({

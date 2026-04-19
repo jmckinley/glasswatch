@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
     
     # Basic app info
-    PROJECT_NAME: str = "Glasswatch"
+    PROJECT_NAME: str = "PatchAI"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     
