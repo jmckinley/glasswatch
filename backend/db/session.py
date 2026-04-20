@@ -5,20 +5,16 @@ Database session management
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
-    create_async_engine
 )
 from sqlalchemy.orm import declarative_base
 
-from core.config import settings
+from backend.core.config import settings
+from backend.db.pool import create_optimized_engine
 
-# Create async engine
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    future=True,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,  # Verify connections before using
+# Create async engine with optimized connection pool
+engine = create_optimized_engine(
+    database_url=settings.DATABASE_URL,
+    echo=settings.DEBUG,
 )
 
 # Create async session factory

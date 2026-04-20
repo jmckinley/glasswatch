@@ -15,8 +15,10 @@ from backend.core.config import settings
 from backend.core.security_config import get_security_config
 from backend.middleware.security import SecurityHeadersMiddleware, get_security_headers_config
 from backend.middleware.request_validation import RequestValidationMiddleware, get_request_validation_config
+from backend.middleware.performance import PerformanceMiddleware, RequestSizeMiddleware
 from backend.db.session import engine
 from backend.db.base import Base
+from backend.services.cache_service import cache_service
 
 
 @asynccontextmanager
@@ -29,6 +31,9 @@ async def lifespan(app: FastAPI):
     # Startup
     print(f"🚀 Starting {settings.PROJECT_NAME} v{settings.VERSION}")
     
+    # Initialize cache service
+    await cache_service.connect()
+    
     # Create database tables (for development - use Alembic in production)
     # async with engine.begin() as conn:
     #     await conn.run_sync(Base.metadata.create_all)
@@ -36,6 +41,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    await cache_service.disconnect()
     await engine.dispose()
     print("👋 Shutting down Glasswatch")
 
@@ -73,7 +79,11 @@ app.add_middleware(
     **request_validation_config,
 )
 
-# 4. CORS Middleware (must be last middleware before routes)
+# 4. Performance Middleware
+app.add_middleware(PerformanceMiddleware)
+app.add_middleware(RequestSizeMiddleware, max_request_size=10 * 1024 * 1024)  # 10MB
+
+# 5. CORS Middleware (must be last middleware before routes)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=security_config.cors.allow_origins,
@@ -99,23 +109,53 @@ async def root():
     }
 
 
+@app.get("/performance", response_class=JSONResponse)
+async def performance_metrics():
+    """
+    Performance metrics endpoint.
+    """
+    from backend.db.pool import get_pool_stats, get_pool_recommendations
+    from backend.db.optimization import QueryOptimizer
+    
+    pool_stats = await get_pool_stats(engine)
+    recommendations = get_pool_recommendations(pool_stats)
+    
+    return {
+        "database_pool": pool_stats,
+        "recommendations": recommendations,
+        "cache": cache_service.get_metrics(),
+        "queries": QueryOptimizer.get_query_stats()
+    }
+
+
 @app.get("/health", response_class=JSONResponse)
 async def health_check():
     """
     Health check endpoint for monitoring.
     """
-    # TODO: Add database connectivity check
-    # TODO: Add Redis connectivity check
-    # TODO: Add external service checks
+    from backend.db.pool import check_pool_health
+    
+    # Check database pool
+    db_health = await check_pool_health(engine)
+    
+    # Check cache
+    cache_healthy = cache_service.is_available
+    
+    # Overall health
+    overall_healthy = db_health.get("healthy", False) and cache_healthy
     
     return {
-        "status": "healthy",
+        "status": "healthy" if overall_healthy else "degraded",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "checks": {
             "api": "ok",
-            "database": "ok",  # TODO: Implement actual check
-            "redis": "ok",     # TODO: Implement actual check
+            "database": "ok" if db_health.get("healthy") else "error",
+            "redis": "ok" if cache_healthy else "unavailable",
+        },
+        "metrics": {
+            "database_pool": db_health,
+            "cache": cache_service.get_metrics()
         }
     }
 
