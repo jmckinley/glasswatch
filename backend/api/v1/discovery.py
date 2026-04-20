@@ -475,30 +475,115 @@ async def configure_auto_sync(
     Request body:
     {
         "enabled": true,
-        "interval_hours": 24,
+        "schedule": {
+            "type": "interval",
+            "interval_hours": 24
+        },
         "scanners": ["aws", "trivy"],
         "aws_config": {...},
         "trivy_config": {...}
     }
-    
-    TODO: Integrate with job scheduler (Celery, cron, etc.)
     """
+    from backend.services.discovery.auto_sync import get_auto_sync_scheduler
+    
     enabled = config.get("enabled", False)
-    interval_hours = config.get("interval_hours", 24)
+    scanners = config.get("scanners", [])
+    schedule = config.get("schedule", {"type": "interval", "interval_hours": 24})
     
-    if interval_hours < 1:
-        raise HTTPException(
-            status_code=400,
-            detail="Interval must be at least 1 hour"
-        )
+    # Validate schedule
+    schedule_type = schedule.get("type", "interval")
     
-    # TODO: Store in database and integrate with scheduler
+    if schedule_type == "interval":
+        interval_hours = schedule.get("interval_hours", 24)
+        if interval_hours < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Interval must be at least 1 hour"
+            )
+    elif schedule_type == "cron":
+        if not schedule.get("cron_expr"):
+            raise HTTPException(
+                status_code=400,
+                detail="cron_expr required for cron schedule"
+            )
+    
+    # Extract scanner configs
+    scanner_configs = {}
+    for scanner in scanners:
+        config_key = f"{scanner}_config"
+        if config_key in config:
+            scanner_configs[config_key] = config[config_key]
+    
+    # Configure scheduler
+    scheduler = get_auto_sync_scheduler()
+    scheduler.configure(
+        tenant_id=str(tenant.id),
+        enabled=enabled,
+        scanners=scanners,
+        schedule=schedule,
+        scanner_configs=scanner_configs
+    )
+    
+    # Get next run time
+    next_run = scheduler.get_next_run(str(tenant.id))
     
     return {
         "status": "configured",
         "enabled": enabled,
-        "interval_hours": interval_hours,
-        "message": "Auto-sync configuration saved (scheduler integration pending)"
+        "scanners": scanners,
+        "schedule": schedule,
+        "next_run": next_run.isoformat() if next_run else None,
+        "message": "Auto-sync configured successfully"
+    }
+
+
+@router.get("/discovery/auto-sync/status")
+async def get_auto_sync_status(
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Get auto-sync configuration and status.
+    """
+    from backend.services.discovery.auto_sync import get_auto_sync_scheduler
+    
+    scheduler = get_auto_sync_scheduler()
+    config = scheduler.get_config(str(tenant.id))
+    next_run = scheduler.get_next_run(str(tenant.id))
+    
+    if not config:
+        return {
+            "enabled": False,
+            "message": "Auto-sync not configured"
+        }
+    
+    return {
+        "enabled": True,
+        "scanners": config.get("scanners", []),
+        "schedule": config.get("schedule", {}),
+        "next_run": next_run.isoformat() if next_run else None
+    }
+
+
+@router.get("/discovery/auto-sync/jobs")
+async def list_auto_sync_jobs(
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    List all scheduled auto-sync jobs.
+    
+    (Admin-only in production - shows all tenants' jobs)
+    """
+    from backend.services.discovery.auto_sync import get_auto_sync_scheduler
+    
+    scheduler = get_auto_sync_scheduler()
+    jobs = scheduler.list_jobs()
+    
+    # Filter to current tenant (remove this for admin view)
+    tenant_jobs = [j for j in jobs if j["tenant_id"] == str(tenant.id)]
+    
+    return {
+        "jobs": tenant_jobs,
+        "total": len(tenant_jobs)
     }
 
 
