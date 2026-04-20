@@ -18,7 +18,7 @@ from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 
 
 router = APIRouter()

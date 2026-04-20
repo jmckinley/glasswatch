@@ -20,6 +20,7 @@ from backend.models.bundle_item import BundleItem
 from backend.models.maintenance_window import MaintenanceWindow
 from backend.models.comment import Comment, Reaction
 from backend.models.activity import Activity
+from backend.models.approval import ApprovalRequest, ApprovalAction, ApprovalPolicy
 
 # This ensures all models are available when creating/migrating database
 __all__ = [
@@ -38,4 +39,7 @@ __all__ = [
     "Comment",
     "Reaction",
     "Activity",
+    "ApprovalRequest",
+    "ApprovalAction",
+    "ApprovalPolicy",
 ]

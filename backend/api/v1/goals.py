@@ -23,7 +23,7 @@ from backend.models.bundle import Bundle
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.optimization import OptimizationService
 from backend.services.scoring import scoring_service
 

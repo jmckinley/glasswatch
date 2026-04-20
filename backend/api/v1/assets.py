@@ -19,7 +19,7 @@ from backend.db.session import get_db
 from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
 from backend.models.tenant import Tenant
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.scoring import scoring_service
 
 

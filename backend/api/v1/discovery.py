@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_db
 from backend.models.tenant import Tenant
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.discovery.orchestrator import DiscoveryOrchestrator
 from backend.services.discovery.trivy_scanner import TrivyScanner
 from backend.services.discovery.aws_scanner import AWSScanner

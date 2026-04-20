@@ -17,7 +17,7 @@ from backend.db.session import get_db
 from backend.models.maintenance_window import MaintenanceWindow
 from backend.models.bundle import Bundle
 from backend.models.tenant import Tenant
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 
 
 router = APIRouter()

@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from backend.db.session import get_db
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset_vulnerability import AssetVulnerability
-from backend.core.auth import get_current_tenant
+from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.models.tenant import Tenant
 
 
