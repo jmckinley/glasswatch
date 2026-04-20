@@ -5,7 +5,7 @@ Aggregates all v1 API endpoints.
 """
 from fastapi import APIRouter
 
-from backend.api.v1 import vulnerabilities, assets, goals, bundles, maintenance_windows
+from backend.api.v1 import vulnerabilities, assets, goals, bundles, maintenance_windows, discovery
 
 # Create main v1 router
 api_router = APIRouter()
@@ -23,27 +23,26 @@ api_router.include_router(
     tags=["assets"],
 )
 
-router.include_router(
+api_router.include_router(
     goals.router,
     prefix="/goals",
     tags=["goals"],
 )
 
-router.include_router(
+api_router.include_router(
     bundles.router,
     prefix="/bundles",
     tags=["bundles"],
 )
 
-router.include_router(
+api_router.include_router(
     maintenance_windows.router,
     prefix="/maintenance-windows",
     tags=["maintenance-windows"],
 )
 
-# Note: We'll uncomment these as we implement them
-# api_router.include_router(
-#     goals.router,
-#     prefix="/goals",
-#     tags=["goals"],
-# )
+api_router.include_router(
+    discovery.router,
+    prefix="",  # Routes are already prefixed with /discovery
+    tags=["discovery"],
+)

@@ -15,6 +15,11 @@ from backend.core.auth import get_current_tenant
 from backend.services.discovery.orchestrator import DiscoveryOrchestrator
 from backend.services.discovery.trivy_scanner import TrivyScanner
 from backend.services.discovery.aws_scanner import AWSScanner
+from backend.services.discovery.azure_scanner import AzureScanner
+from backend.services.discovery.gcp_scanner import GCPScanner
+from backend.services.discovery.kubescape_scanner import KubescapeScanner
+from backend.services.discovery.servicenow_cmdb import ServiceNowCMDBScanner
+from backend.services.discovery.nmap_scanner import NmapScanner
 
 
 router = APIRouter()
@@ -60,15 +65,35 @@ async def trigger_discovery(
                 scanner = AWSScanner(aws_config)
                 orchestrator.register_scanner(scanner)
             
+            elif scanner_type == "azure":
+                azure_config = config.get("azure_config", {})
+                scanner = AzureScanner(azure_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "gcp":
+                gcp_config = config.get("gcp_config", {})
+                scanner = GCPScanner(gcp_config)
+                orchestrator.register_scanner(scanner)
+            
             elif scanner_type == "trivy":
                 trivy_config = config.get("trivy_config", {})
                 scanner = TrivyScanner(trivy_config)
                 orchestrator.register_scanner(scanner)
             
-            # Add more scanners here as they're implemented
-            # elif scanner_type == "azure":
-            #     scanner = AzureScanner(config.get("azure_config", {}))
-            #     orchestrator.register_scanner(scanner)
+            elif scanner_type == "kubescape":
+                kubescape_config = config.get("kubescape_config", {})
+                scanner = KubescapeScanner(kubescape_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "servicenow":
+                servicenow_config = config.get("servicenow_config", {})
+                scanner = ServiceNowCMDBScanner(servicenow_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "nmap":
+                nmap_config = config.get("nmap_config", {})
+                scanner = NmapScanner(nmap_config)
+                orchestrator.register_scanner(scanner)
             
             else:
                 raise HTTPException(
@@ -221,7 +246,94 @@ async def list_available_scanners(
             "error": str(e)
         })
     
-    # Add more scanners as they're implemented
+    # Check Azure
+    try:
+        azure = AzureScanner()
+        available = await azure.test_connection()
+        scanners.append({
+            "name": "azure",
+            "type": "cloud",
+            "available": available,
+            "description": "Azure infrastructure discovery (VMs, SQL, AKS, App Services)",
+            "requires": ["azure-identity", "azure-mgmt-*"]
+        })
+    except Exception as e:
+        scanners.append({
+            "name": "azure",
+            "type": "cloud",
+            "available": False,
+            "description": "Azure infrastructure discovery",
+            "error": str(e)
+        })
+    
+    # Check GCP
+    try:
+        gcp = GCPScanner()
+        available = await gcp.test_connection()
+        scanners.append({
+            "name": "gcp",
+            "type": "cloud",
+            "available": available,
+            "description": "GCP infrastructure discovery (Compute Engine, Cloud SQL, GKE)",
+            "requires": ["google-cloud-compute", "google-cloud-*"]
+        })
+    except Exception as e:
+        scanners.append({
+            "name": "gcp",
+            "type": "cloud",
+            "available": False,
+            "description": "GCP infrastructure discovery",
+            "error": str(e)
+        })
+    
+    # Check Kubescape
+    try:
+        kubescape = KubescapeScanner()
+        available = await kubescape.test_connection()
+        scanners.append({
+            "name": "kubescape",
+            "type": "kubernetes",
+            "available": available,
+            "description": "Kubernetes security posture scanner (NSA, CIS, MITRE frameworks)",
+            "requires": ["kubescape binary"]
+        })
+    except Exception as e:
+        scanners.append({
+            "name": "kubescape",
+            "type": "kubernetes",
+            "available": False,
+            "description": "Kubernetes security posture scanner",
+            "error": str(e)
+        })
+    
+    # Check Nmap
+    try:
+        nmap = NmapScanner()
+        available = await nmap.test_connection()
+        scanners.append({
+            "name": "nmap",
+            "type": "network",
+            "available": available,
+            "description": "Network discovery scanner (hosts, ports, services, OS detection)",
+            "requires": ["nmap binary"]
+        })
+    except Exception as e:
+        scanners.append({
+            "name": "nmap",
+            "type": "network",
+            "available": False,
+            "description": "Network discovery scanner",
+            "error": str(e)
+        })
+    
+    # ServiceNow requires configuration, so just list it
+    scanners.append({
+        "name": "servicenow",
+        "type": "cmdb",
+        "available": False,
+        "description": "ServiceNow CMDB integration",
+        "requires": ["instance_url", "username", "password or oauth_token"]
+    })
     
     return {
         "scanners": scanners,
@@ -256,8 +368,18 @@ async def test_scanner(
     try:
         if scanner_type == "aws":
             scanner = AWSScanner(scanner_config)
+        elif scanner_type == "azure":
+            scanner = AzureScanner(scanner_config)
+        elif scanner_type == "gcp":
+            scanner = GCPScanner(scanner_config)
         elif scanner_type == "trivy":
             scanner = TrivyScanner(scanner_config)
+        elif scanner_type == "kubescape":
+            scanner = KubescapeScanner(scanner_config)
+        elif scanner_type == "servicenow":
+            scanner = ServiceNowCMDBScanner(scanner_config)
+        elif scanner_type == "nmap":
+            scanner = NmapScanner(scanner_config)
         else:
             raise HTTPException(
                 status_code=400,
