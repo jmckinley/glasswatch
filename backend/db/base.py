@@ -18,6 +18,8 @@ from backend.models.patch_bundle import PatchBundle, BundlePatch
 from backend.models.bundle import Bundle
 from backend.models.bundle_item import BundleItem
 from backend.models.maintenance_window import MaintenanceWindow
+from backend.models.comment import Comment, Reaction
+from backend.models.activity import Activity
 
 # This ensures all models are available when creating/migrating database
 __all__ = [
@@ -33,4 +35,7 @@ __all__ = [
     "Bundle",
     "BundleItem",
     "MaintenanceWindow",
+    "Comment",
+    "Reaction",
+    "Activity",
 ]
