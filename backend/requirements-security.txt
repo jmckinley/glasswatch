@@ -1,0 +1,47 @@
+# Security-related packages for Glasswatch
+
+# Already in requirements.txt (verify versions)
+# python-jose[cryptography]==3.3.0  # JWT token handling
+# passlib[bcrypt]==1.7.4             # Password hashing
+
+# Security scanning and auditing
+pip-audit>=2.7.0                    # Dependency vulnerability scanning
+safety>=3.0.0                       # Security vulnerability checking
+bandit>=1.7.5                       # Python security linter
+
+# Additional security libraries
+cryptography>=42.0.0                # Modern cryptography primitives
+pycryptodome>=3.20.0                # Additional crypto utilities
+pyotp>=2.9.0                        # TOTP/HOTP for 2FA
+argon2-cffi>=23.1.0                 # Modern password hashing (alternative to bcrypt)
+
+# Rate limiting
+slowapi>=0.1.9                      # Rate limiting for FastAPI
+limits>=3.10.0                      # Rate limiting utilities
+
+# Security headers (already handled by middleware)
+# secure>=0.3.0                     # Optional: alternative security headers library
+
+# Request validation and sanitization
+bleach>=6.1.0                       # HTML sanitization
+python-validator>=0.1.0             # Additional validation utilities
+
+# Secrets management
+python-dotenv>=1.0.0                # Already in requirements.txt
+hvac>=2.1.0                         # HashiCorp Vault client (optional)
+
+# Audit logging
+python-json-logger>=2.0.7           # Structured logging for security events
+
+# Testing security
+pytest-security>=0.1.0              # Security testing utilities
+requests-mock>=1.11.0               # Mock HTTP requests for testing
+
+# OWASP dependencies
+owasp-dependency-check>=0.1.0       # OWASP dependency checker (if available)
+
+# Notes:
+# - Verify all versions are compatible with Python 3.11+
+# - Run: pip-audit -r requirements.txt to check main dependencies
+# - Run: bandit -r backend/ to scan code for security issues
+# - Run: safety check to check for known vulnerabilities

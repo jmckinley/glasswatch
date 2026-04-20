@@ -7,10 +7,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.api.v1 import api_router
 from backend.core.config import settings
+from backend.core.security_config import get_security_config
+from backend.middleware.security import SecurityHeadersMiddleware, get_security_headers_config
+from backend.middleware.request_validation import RequestValidationMiddleware, get_request_validation_config
 from backend.db.session import engine
 from backend.db.base import Base
 
@@ -36,6 +40,11 @@ async def lifespan(app: FastAPI):
     print("👋 Shutting down Glasswatch")
 
 
+# Load security configuration
+security_config = get_security_config(env=settings.ENV)
+security_headers_config = get_security_headers_config(env=settings.ENV)
+request_validation_config = get_request_validation_config(env=settings.ENV)
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -44,13 +53,34 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS
+# Add security middlewares (order matters: outermost first)
+# 1. Trusted Host Middleware (validate host header)
+if security_config.enable_trusted_hosts:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=security_config.trusted_hosts,
+    )
+
+# 2. Security Headers Middleware
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    **security_headers_config,
+)
+
+# 3. Request Validation Middleware
+app.add_middleware(
+    RequestValidationMiddleware,
+    **request_validation_config,
+)
+
+# 4. CORS Middleware (must be last middleware before routes)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=security_config.cors.allow_origins,
+    allow_credentials=security_config.cors.allow_credentials,
+    allow_methods=security_config.cors.allow_methods,
+    allow_headers=security_config.cors.allow_headers,
+    max_age=security_config.cors.max_age,
 )
 
 
