@@ -31,8 +31,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://glasswatch:glasswatch-secret@localhost:5432/glasswatch"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
-    DATABASE_POOL_SIZE: int = 20
-    DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
     DATABASE_POOL_RECYCLE: int = 3600
     
@@ -77,6 +75,15 @@ class Settings(BaseSettings):
     OPTIMIZATION_MAX_TIME_SECONDS: int = 30
     OPTIMIZATION_DEFAULT_WINDOWS: int = 12
     
+    @field_validator("DATABASE_URL", mode="before")
+    def normalize_database_url(cls, v: str) -> str:
+        """Railway provides postgresql:// — convert to postgresql+asyncpg:// for SQLAlchemy async."""
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        return v
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
         if isinstance(v, str):
