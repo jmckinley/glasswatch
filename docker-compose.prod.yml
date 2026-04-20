@@ -1,0 +1,271 @@
+version: '3.8'
+
+# Production Docker Compose configuration for Glasswatch
+# This is suitable for single-server deployments
+# For multi-server / HA deployments, use Kubernetes (deploy/k8s/)
+
+services:
+  # PostgreSQL 16 Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: glasswatch-postgres-prod
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-glasswatch}
+      POSTGRES_USER: ${DATABASE_USER:-glasswatch}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Custom PostgreSQL configuration
+      # - ./postgres.conf:/etc/postgresql/postgresql.conf
+    
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-glasswatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    networks:
+      - glasswatch-network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # Redis 7 for caching
+  redis:
+    image: redis:7-alpine
+    container_name: glasswatch-redis-prod
+    restart: unless-stopped
+    
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+    
+    volumes:
+      - redis_data:/data
+    
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - glasswatch-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Glasswatch Backend (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: glasswatch/backend:latest
+    container_name: glasswatch-backend-prod
+    restart: unless-stopped
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    environment:
+      # Application
+      PROJECT_NAME: "Glasswatch"
+      VERSION: "1.0.0"
+      API_V1_STR: "/api/v1"
+      ENV: "production"
+      DEBUG: "false"
+      
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-glasswatch}:${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}@postgres:5432/${DATABASE_NAME:-glasswatch}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      
+      # CORS
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-https://app.glasswatch.example.com}
+      
+      # External APIs
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      EPSS_API_URL: "https://api.first.org/data/v1/epss"
+      
+      # AWS (for S3 backups, KMS, etc.)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      
+      # WorkOS (SSO)
+      WORKOS_API_KEY: ${WORKOS_API_KEY:-}
+      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+      
+      # Features
+      PATCH_WEATHER_ENABLED: "true"
+      PATCH_WEATHER_MIN_REPORTS: "5"
+      
+      # Optimization
+      OPTIMIZATION_MAX_TIME_SECONDS: "30"
+      OPTIMIZATION_DEFAULT_WINDOWS: "12"
+      
+      # Backup
+      BACKUP_DIR: "/var/backups/glasswatch"
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY is required}
+    
+    volumes:
+      - backup_data:/var/backups/glasswatch
+      - ./logs:/app/logs
+    
+    ports:
+      - "127.0.0.1:8000:8000"  # Bind to localhost (nginx will proxy)
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - glasswatch-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: glasswatch-nginx-prod
+    restart: unless-stopped
+    
+    depends_on:
+      - backend
+    
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # SSL certificates
+      - ./logs/nginx:/var/log/nginx
+    
+    ports:
+      - "80:80"    # HTTP (redirects to HTTPS)
+      - "443:443"  # HTTPS
+    
+    networks:
+      - glasswatch-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Backup service (runs scheduled backups)
+  backup:
+    image: glasswatch/backend:latest
+    container_name: glasswatch-backup-prod
+    restart: unless-stopped
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-glasswatch}:${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}@postgres:5432/${DATABASE_NAME:-glasswatch}
+      BACKUP_DIR: "/var/backups/glasswatch"
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY is required}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    
+    volumes:
+      - backup_data:/var/backups/glasswatch
+      - ./crontab:/etc/cron.d/glasswatch-backup:ro
+    
+    command: >
+      sh -c "
+      echo '0 0 * * * python3 /app/scripts/backup_cli.py create --type full' > /etc/cron.d/glasswatch-backup &&
+      echo '0 * * * * python3 /app/scripts/backup_cli.py create --type incremental' >> /etc/cron.d/glasswatch-backup &&
+      echo '0 2 * * 0 python3 /app/scripts/backup_cli.py prune' >> /etc/cron.d/glasswatch-backup &&
+      chmod 0644 /etc/cron.d/glasswatch-backup &&
+      crontab /etc/cron.d/glasswatch-backup &&
+      crond -f -l 2
+      "
+    
+    networks:
+      - glasswatch-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/postgres
+  
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/redis
+  
+  backup_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/backups
+
+networks:
+  glasswatch-network:
+    driver: bridge

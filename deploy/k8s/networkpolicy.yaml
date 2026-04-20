@@ -1,0 +1,129 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: glasswatch-backend-netpol
+  namespace: glasswatch
+spec:
+  podSelector:
+    matchLabels:
+      app: glasswatch
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  
+  # Allow ingress from other backend pods (for internal communication)
+  - from:
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  
+  egress:
+  # Allow egress to PostgreSQL
+  - to:
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow egress to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  
+  # Allow egress to kube-dns for DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow egress to external APIs (internet)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 80   # HTTP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: glasswatch-postgres-netpol
+  namespace: glasswatch
+spec:
+  podSelector:
+    matchLabels:
+      app: glasswatch
+      component: postgres
+  policyTypes:
+  - Ingress
+  
+  ingress:
+  # Allow ingress only from backend and backup pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: backend
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: backup
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: glasswatch-redis-netpol
+  namespace: glasswatch
+spec:
+  podSelector:
+    matchLabels:
+      app: glasswatch
+      component: redis
+  policyTypes:
+  - Ingress
+  
+  ingress:
+  # Allow ingress only from backend pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: glasswatch
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 6379

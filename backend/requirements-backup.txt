@@ -1,0 +1,15 @@
+# Additional dependencies for backup service
+# These should be added to requirements.txt for production deployments
+
+# AWS S3 support for remote backups
+boto3==1.34.51
+
+# Encryption for backups
+cryptography==42.0.5
+
+# CLI interface for backup tool
+click==8.1.7
+tabulate==0.9.0
+
+# Production server
+gunicorn==21.2.0

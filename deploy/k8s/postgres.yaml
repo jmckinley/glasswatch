@@ -1,0 +1,149 @@
+# PostgreSQL StatefulSet
+# Note: For production, consider using a managed database service (RDS, CloudSQL, etc.)
+# or a Postgres operator like Zalando's postgres-operator or Crunchy Data
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: glasswatch-postgres
+  namespace: glasswatch
+  labels:
+    app: glasswatch
+    component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  ports:
+  - port: 5432
+    targetPort: postgres
+    protocol: TCP
+    name: postgres
+  selector:
+    app: glasswatch
+    component: postgres
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: glasswatch-postgres
+  namespace: glasswatch
+  labels:
+    app: glasswatch
+    component: postgres
+spec:
+  serviceName: glasswatch-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glasswatch
+      component: postgres
+  template:
+    metadata:
+      labels:
+        app: glasswatch
+        component: postgres
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999  # Postgres user
+        fsGroup: 999
+      
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: postgres
+          containerPort: 5432
+          protocol: TCP
+        
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: glasswatch-config
+              key: DATABASE_NAME
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: glasswatch-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: glasswatch-secrets
+              key: DATABASE_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        
+        # PostgreSQL configuration
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF8 --locale=C"
+        
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - glasswatch
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - glasswatch
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: fast-ssd
+
+---
+# PostgreSQL PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: glasswatch-postgres-pdb
+  namespace: glasswatch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: glasswatch
+      component: postgres

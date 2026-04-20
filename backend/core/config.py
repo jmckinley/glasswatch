@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://glasswatch:glasswatch-secret@localhost:5432/glasswatch"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
+    DATABASE_POOL_SIZE: int = 20
+    DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
     DATABASE_POOL_RECYCLE: int = 3600
     

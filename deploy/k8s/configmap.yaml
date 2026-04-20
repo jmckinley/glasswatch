@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: glasswatch-config
+  namespace: glasswatch
+data:
+  # Application settings
+  PROJECT_NAME: "Glasswatch"
+  VERSION: "1.0.0"
+  API_V1_STR: "/api/v1"
+  ENV: "production"
+  DEBUG: "false"
+  
+  # Database (host/port only - credentials in secrets)
+  DATABASE_HOST: "glasswatch-postgres"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "glasswatch"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "10"
+  
+  # Redis
+  REDIS_HOST: "glasswatch-redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Security
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  
+  # CORS
+  BACKEND_CORS_ORIGINS: "https://glasswatch.example.com,https://app.glasswatch.example.com"
+  
+  # External APIs
+  EPSS_API_URL: "https://api.first.org/data/v1/epss"
+  AWS_REGION: "us-east-1"
+  
+  # Features
+  PATCH_WEATHER_ENABLED: "true"
+  PATCH_WEATHER_MIN_REPORTS: "5"
+  
+  # Optimization
+  OPTIMIZATION_MAX_TIME_SECONDS: "30"
+  OPTIMIZATION_DEFAULT_WINDOWS: "12"
+  
+  # Backup
+  BACKUP_DIR: "/var/backups/glasswatch"
+  BACKUP_S3_BUCKET: "glasswatch-backups"
