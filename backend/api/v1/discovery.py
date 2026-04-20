@@ -20,6 +20,9 @@ from backend.services.discovery.gcp_scanner import GCPScanner
 from backend.services.discovery.kubescape_scanner import KubescapeScanner
 from backend.services.discovery.servicenow_cmdb import ServiceNowCMDBScanner
 from backend.services.discovery.nmap_scanner import NmapScanner
+from backend.services.discovery.cloudquery_scanner import CloudQueryScanner
+from backend.services.discovery.jira_assets_scanner import JiraAssetsScanner
+from backend.services.discovery.device42_scanner import Device42Scanner
 
 
 router = APIRouter()
@@ -93,6 +96,21 @@ async def trigger_discovery(
             elif scanner_type == "nmap":
                 nmap_config = config.get("nmap_config", {})
                 scanner = NmapScanner(nmap_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "cloudquery":
+                cloudquery_config = config.get("cloudquery_config", {})
+                scanner = CloudQueryScanner(cloudquery_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "jira_assets":
+                jira_config = config.get("jira_assets_config", {})
+                scanner = JiraAssetsScanner(jira_config)
+                orchestrator.register_scanner(scanner)
+            
+            elif scanner_type == "device42":
+                device42_config = config.get("device42_config", {})
+                scanner = Device42Scanner(device42_config)
                 orchestrator.register_scanner(scanner)
             
             else:
@@ -326,13 +344,49 @@ async def list_available_scanners(
             "error": str(e)
         })
     
-    # ServiceNow requires configuration, so just list it
+    # Check CloudQuery
+    try:
+        cloudquery = CloudQueryScanner()
+        available = await cloudquery.test_connection()
+        scanners.append({
+            "name": "cloudquery",
+            "type": "cloud",
+            "available": available,
+            "description": "Unified multi-cloud asset inventory via SQL",
+            "requires": ["cloudquery binary", "config file"]
+        })
+    except Exception as e:
+        scanners.append({
+            "name": "cloudquery",
+            "type": "cloud",
+            "available": False,
+            "description": "Unified multi-cloud asset inventory",
+            "error": str(e)
+        })
+    
+    # CMDB scanners (require configuration)
     scanners.append({
         "name": "servicenow",
         "type": "cmdb",
         "available": False,
         "description": "ServiceNow CMDB integration",
         "requires": ["instance_url", "username", "password or oauth_token"]
+    })
+    
+    scanners.append({
+        "name": "jira_assets",
+        "type": "cmdb",
+        "available": False,
+        "description": "Jira Assets (Insight) CMDB integration",
+        "requires": ["instance_url", "email", "api_token", "workspace_id"]
+    })
+    
+    scanners.append({
+        "name": "device42",
+        "type": "cmdb",
+        "available": False,
+        "description": "Device42 DCIM/IPAM integration",
+        "requires": ["instance_url", "username", "password"]
     })
     
     return {
@@ -380,6 +434,12 @@ async def test_scanner(
             scanner = ServiceNowCMDBScanner(scanner_config)
         elif scanner_type == "nmap":
             scanner = NmapScanner(scanner_config)
+        elif scanner_type == "cloudquery":
+            scanner = CloudQueryScanner(scanner_config)
+        elif scanner_type == "jira_assets":
+            scanner = JiraAssetsScanner(scanner_config)
+        elif scanner_type == "device42":
+            scanner = Device42Scanner(scanner_config)
         else:
             raise HTTPException(
                 status_code=400,
