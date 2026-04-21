@@ -4,7 +4,7 @@ Goal models - the secret sauce of Glasswatch.
 Goals allow users to express objectives like "Be Glasswing-ready by July 1"
 and the system optimizes a patch plan to achieve it.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 from uuid import uuid4
 
@@ -171,7 +171,7 @@ class Goal(Base):
     def days_remaining(self) -> Optional[int]:
         """Calculate days until target completion."""
         if self.target_completion_date:
-            return (self.target_completion_date - datetime.utcnow()).days
+            return (self.target_completion_date - datetime.now(timezone.utc)).days
         return None
     
     @property

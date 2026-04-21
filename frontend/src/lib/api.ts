@@ -217,3 +217,31 @@ export const dashboardApi = {
     };
   },
 };
+
+// Maintenance Windows API
+export const maintenanceWindowsApi = {
+  list: (params?: {
+    active?: boolean;
+    environment?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+    }
+    return apiCall<any>(`/maintenance-windows?${query}`);
+  },
+
+  get: (id: string) => apiCall<any>(`/maintenance-windows/${id}`),
+
+  optimize: () => apiCall<any>("/maintenance-windows/optimize", {
+    method: "POST",
+  }),
+};
+
+export { apiCall };

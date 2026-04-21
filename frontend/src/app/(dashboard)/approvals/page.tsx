@@ -53,10 +53,24 @@ export default function ApprovalsPage() {
   }, [activeTab, token]);
 
   const fetchApprovals = async () => {
-    if (!token) return;
-
     setIsLoading(true);
     try {
+      let authToken = token;
+      
+      // If no token from auth context, fetch demo token
+      if (!authToken) {
+        const demoResponse = await fetch(`${API_BASE_URL}/api/v1/auth/demo-login`);
+        if (demoResponse.ok) {
+          const demoData = await demoResponse.json();
+          authToken = demoData.access_token;
+        }
+      }
+
+      if (!authToken) {
+        setIsLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams();
       if (activeTab !== "all") {
         params.append("status", activeTab);
@@ -66,7 +80,7 @@ export default function ApprovalsPage() {
         `${API_BASE_URL}/api/v1/approvals?${params}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authToken}`,
           },
         }
       );

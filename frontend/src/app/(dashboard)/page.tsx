@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { dashboardApi } from "@/lib/api";
 
 interface DashboardStats {
@@ -232,7 +233,7 @@ export default function DashboardPage() {
         <div className="card p-6">
           <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
           <div className="space-y-3">
-            <button className="w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
+            <Link href="/goals" className="block w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
               <div>
                 <div className="font-medium">Create New Goal</div>
                 <div className="text-sm text-neutral-400">
@@ -242,8 +243,8 @@ export default function DashboardPage() {
               <span className="text-neutral-400 group-hover:text-primary">
                 →
               </span>
-            </button>
-            <button className="w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
+            </Link>
+            <Link href="/approvals" className="block w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
               <div>
                 <div className="font-medium">Review Pending Approvals</div>
                 <div className="text-sm text-neutral-400">
@@ -253,8 +254,9 @@ export default function DashboardPage() {
               <span className="text-neutral-400 group-hover:text-primary">
                 →
               </span>
-            </button>
-            <button className="w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
+            </Link>
+            {/* TODO: Create /assets/import page */}
+            <Link href="/vulnerabilities" className="block w-full text-left p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-between group">
               <div>
                 <div className="font-medium">Import New Assets</div>
                 <div className="text-sm text-neutral-400">
@@ -264,7 +266,7 @@ export default function DashboardPage() {
               <span className="text-neutral-400 group-hover:text-primary">
                 →
               </span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>
