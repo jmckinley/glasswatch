@@ -89,6 +89,11 @@ class Goal(Base):
     tenant = relationship("Tenant", back_populates="goals")
     bundles = relationship("Bundle", back_populates="goal")
     
+    @property
+    def type(self):
+        """Alias for goal_type for API compatibility."""
+        return self.goal_type
+
     @hybrid_property
     def active(self):
         """Whether the goal is currently active."""
