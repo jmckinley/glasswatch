@@ -18,9 +18,17 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from workos import WorkOS
-from workos.types import User as WorkOSUser
-from workos.types import Organization as WorkOSOrganization
+try:
+    from workos import WorkOS
+    from workos.types import User as WorkOSUser
+    from workos.types import Organization as WorkOSOrganization
+    HAS_WORKOS = True
+except (ImportError, AttributeError):
+    # WorkOS SDK v4+ changed API; graceful fallback when not configured
+    WorkOS = None
+    WorkOSUser = None
+    WorkOSOrganization = None
+    HAS_WORKOS = False
 
 from backend.db.session import get_db
 from backend.models.tenant import Tenant
@@ -31,7 +39,7 @@ from backend.core.config import settings
 
 # Initialize WorkOS client
 workos_client = None
-if settings.WORKOS_API_KEY and settings.WORKOS_CLIENT_ID:
+if HAS_WORKOS and settings.WORKOS_API_KEY and settings.WORKOS_CLIENT_ID:
     workos_client = WorkOS(
         api_key=settings.WORKOS_API_KEY,
         client_id=settings.WORKOS_CLIENT_ID,
