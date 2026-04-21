@@ -18,7 +18,8 @@ from alembic import context
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import our models and base
-from backend.db.base import Base  # This imports all models
+from backend.db.base import Base
+import backend.db.models  # noqa: F401 — register all models
 from backend.core.config import get_settings
 
 # this is the Alembic Config object, which provides

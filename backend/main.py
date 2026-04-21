@@ -18,6 +18,7 @@ from backend.middleware.request_validation import RequestValidationMiddleware, g
 from backend.middleware.performance import PerformanceMiddleware, RequestSizeMiddleware
 from backend.db.session import engine
 from backend.db.base import Base
+import backend.db.models  # noqa: F401 — register all models on Base.metadata
 from backend.services.cache_service import cache_service
 
 
