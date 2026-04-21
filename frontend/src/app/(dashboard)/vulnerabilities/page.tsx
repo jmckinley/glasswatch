@@ -77,7 +77,7 @@ export default function VulnerabilitiesPage() {
       if (filters.search) params.search = filters.search;
 
       const data = await vulnerabilitiesApi.list(params);
-      setVulnerabilities(data.items || []);
+      setVulnerabilities(data.vulnerabilities || data.items || []);
       setPagination(prev => ({ ...prev, total: data.total || 0 }));
     } catch (error) {
       console.error("Failed to fetch vulnerabilities:", error);

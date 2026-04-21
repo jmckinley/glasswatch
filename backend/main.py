@@ -87,9 +87,12 @@ app.add_middleware(PerformanceMiddleware)
 app.add_middleware(RequestSizeMiddleware, max_request_size=10 * 1024 * 1024)  # 10MB
 
 # 5. CORS Middleware (must be last middleware before routes)
+# Use BACKEND_CORS_ORIGINS from env if set (Railway), otherwise fall back to security_config
+cors_origins = settings.BACKEND_CORS_ORIGINS if settings.BACKEND_CORS_ORIGINS else security_config.cors.allow_origins
+print(f"🌐 CORS origins: {cors_origins}")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=security_config.cors.allow_origins,
+    allow_origins=cors_origins,
     allow_credentials=security_config.cors.allow_credentials,
     allow_methods=security_config.cors.allow_methods,
     allow_headers=security_config.cors.allow_headers,
