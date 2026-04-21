@@ -62,7 +62,9 @@ app = FastAPI(
 
 # Add security middlewares (order matters: outermost first)
 # 1. Trusted Host Middleware (validate host header)
-if security_config.enable_trusted_hosts:
+# Disabled when BACKEND_CORS_ORIGINS includes wildcards or Railway domains
+# Railway handles host validation at the edge
+if security_config.enable_trusted_hosts and settings.ENV not in ("production", "staging"):
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=security_config.trusted_hosts,
