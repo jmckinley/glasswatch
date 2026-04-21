@@ -8,14 +8,15 @@ interface Vulnerability {
   id: string;
   identifier: string;
   source: string;
+  title: string;
   severity: string;
   cvss_score: number;
   epss_score: number;
   kev_listed: boolean;
   published_at: string;
-  description: string;
-  affected_assets_count: number;
+  exploit_available: boolean;
   patch_available: boolean;
+  is_critical: boolean;
 }
 
 interface VulnStats {
@@ -27,7 +28,9 @@ interface VulnStats {
     LOW: number;
   };
   kev_listed: number;
-  with_patches: number;
+  patches_available: number;
+  exploits_available: number;
+  recent_7d: number;
   total_risk_score: number;
 }
 
@@ -122,7 +125,7 @@ export default function VulnerabilitiesPage() {
             <div className="text-sm text-neutral-400">In KEV Catalog</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-success">{stats.with_patches}</div>
+            <div className="text-2xl font-bold text-success">{stats.patches_available}</div>
             <div className="text-sm text-neutral-400">Patches Available</div>
           </div>
         </div>
@@ -187,7 +190,7 @@ export default function VulnerabilitiesPage() {
                 EPSS
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
-                Affected Assets
+                Status
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
                 Published
@@ -275,7 +278,7 @@ function VulnerabilityRow({ vulnerability }: { vulnerability: Vulnerability }) {
             </span>
           )}
         </div>
-        <div className="text-sm text-neutral-400 mt-1 line-clamp-1">{vuln.description}</div>
+        <div className="text-sm text-neutral-400 mt-1 line-clamp-1">{vuln.title}</div>
       </td>
       <td className="px-6 py-4">
         <span className={`px-2 py-1 text-xs rounded ${SEVERITY_BG[vuln.severity]} ${SEVERITY_COLORS[vuln.severity]}`}>
@@ -289,23 +292,23 @@ function VulnerabilityRow({ vulnerability }: { vulnerability: Vulnerability }) {
         <span className="font-mono">{(vuln.epss_score * 100).toFixed(1)}%</span>
       </td>
       <td className="px-6 py-4">
-        <span className={vuln.affected_assets_count > 0 ? "font-medium" : "text-neutral-400"}>
-          {vuln.affected_assets_count}
-        </span>
+        <div className="flex gap-1">
+          {vuln.exploit_available && (
+            <span className="text-xs px-1.5 py-0.5 bg-warning/20 text-warning rounded">Exploit</span>
+          )}
+          {vuln.patch_available && (
+            <span className="text-xs px-1.5 py-0.5 bg-success/20 text-success rounded">Patch</span>
+          )}
+        </div>
       </td>
       <td className="px-6 py-4 text-sm text-neutral-400">{publishedDate}</td>
       <td className="px-6 py-4">
-        <div className="flex gap-2">
-          <Link
-            href={`/vulnerabilities/${vuln.id}`}
-            className="text-sm text-primary hover:underline"
-          >
-            Details
-          </Link>
-          {vuln.patch_available && (
-            <span className="text-sm text-success">Patch Available</span>
-          )}
-        </div>
+        <Link
+          href={`/vulnerabilities/${vuln.id}`}
+          className="text-sm text-primary hover:underline"
+        >
+          Details
+        </Link>
       </td>
     </tr>
   );

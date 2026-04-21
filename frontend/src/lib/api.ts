@@ -172,7 +172,7 @@ export const dashboardApi = {
     // Aggregate data from multiple endpoints
     const [vulnStats, assetList, goalsList] = await Promise.all([
       vulnerabilitiesApi.stats(),
-      assetsApi.list({ limit: 1 }), // Just for count
+      assetsApi.list({ limit: 100 }), // Need enough to calculate internet_exposed/critical counts
       goalsApi.list({ active_only: true }),
     ]);
 

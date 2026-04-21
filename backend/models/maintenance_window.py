@@ -3,7 +3,7 @@ MaintenanceWindow model for scheduling patch deployments.
 
 Defines when patches can be applied to systems.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 
@@ -97,13 +97,17 @@ class MaintenanceWindow(Base):
     @property
     def is_future(self) -> bool:
         """Check if window is in the future."""
-        return self.start_time > datetime.utcnow()
+        now = datetime.now(timezone.utc)
+        start = self.start_time if self.start_time.tzinfo else self.start_time.replace(tzinfo=timezone.utc)
+        return start > now
     
     @property
     def is_active_now(self) -> bool:
         """Check if window is currently active."""
-        now = datetime.utcnow()
-        return self.start_time <= now <= self.end_time
+        now = datetime.now(timezone.utc)
+        start = self.start_time if self.start_time.tzinfo else self.start_time.replace(tzinfo=timezone.utc)
+        end = self.end_time if self.end_time.tzinfo else self.end_time.replace(tzinfo=timezone.utc)
+        return start <= now <= end
     
     def can_accommodate_bundle(self, bundle_duration_hours: float, asset_count: int) -> bool:
         """Check if bundle fits within window constraints."""
