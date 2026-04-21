@@ -132,33 +132,38 @@ async def performance_metrics():
 @app.get("/health", response_class=JSONResponse)
 async def health_check():
     """
-    Health check endpoint for monitoring.
+    Health check endpoint for Railway/load balancers.
+    Always returns 200 if the process is alive.
+    Use /health/detailed for dependency checks.
     """
-    from backend.db.pool import check_pool_health
-    
-    # Check database pool
-    db_health = await check_pool_health(engine)
-    
-    # Check cache
-    cache_healthy = cache_service.is_available
-    
-    # Overall health
-    overall_healthy = db_health.get("healthy", False) and cache_healthy
-    
     return {
-        "status": "healthy" if overall_healthy else "degraded",
+        "status": "healthy",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "checks": {
-            "api": "ok",
-            "database": "ok" if db_health.get("healthy") else "error",
-            "redis": "ok" if cache_healthy else "unavailable",
-        },
-        "metrics": {
-            "database_pool": db_health,
-            "cache": cache_service.get_metrics()
-        }
     }
+
+
+@app.get("/health/detailed", response_class=JSONResponse)
+async def health_detailed():
+    """Detailed health check with dependency status."""
+    from backend.db.pool import check_pool_health
+    db_health = await check_pool_health(engine)
+    cache_healthy = cache_service.is_available
+    overall_healthy = db_health.get("healthy", False) and cache_healthy
+    status_code = 200 if overall_healthy else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "healthy" if overall_healthy else "degraded",
+            "service": settings.PROJECT_NAME,
+            "version": settings.VERSION,
+            "checks": {
+                "api": "ok",
+                "database": "ok" if db_health.get("healthy") else "error",
+                "redis": "ok" if cache_healthy else "unavailable",
+            },
+        }
+    )
 
 
 # Include API routes
