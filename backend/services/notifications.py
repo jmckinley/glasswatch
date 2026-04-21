@@ -14,6 +14,7 @@ from backend.core.config import settings
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
 from backend.models.bundle import Bundle
+from backend.models.asset import Asset
 
 
 class NotificationChannel(str, Enum):
