@@ -317,4 +317,3 @@ async def search_vulnerabilities(
             "has_patch": has_patch,
         }
     }
-    }
