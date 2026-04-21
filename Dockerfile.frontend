@@ -19,7 +19,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ .
 
-# Build-time env: API URL will be set at runtime via NEXT_PUBLIC_API_URL
+# NEXT_PUBLIC_* vars MUST be present at build time for Next.js to inline them
+ARG NEXT_PUBLIC_API_URL=https://glasswatch-production.up.railway.app
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
