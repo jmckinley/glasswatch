@@ -249,7 +249,7 @@ async def create_goal(
     )
 
 
-@router.get("/", response_model=List[GoalResponse])
+@router.get("", response_model=List[GoalResponse])
 async def list_goals(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
