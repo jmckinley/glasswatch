@@ -24,7 +24,7 @@ limits>=3.10.0                      # Rate limiting utilities
 
 # Request validation and sanitization
 bleach>=6.1.0                       # HTML sanitization
-python-validator>=0.1.0             # Additional validation utilities
+# python-validator removed — package doesn't exist on PyPI at >=0.1.0
 
 # Secrets management
 python-dotenv>=1.0.0                # Already in requirements.txt
