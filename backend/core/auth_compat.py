@@ -22,6 +22,47 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+async def get_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> User:
+    """Get current authenticated user (compat layer)."""
+    user: Optional[User] = None
+
+    if credentials:
+        user = await get_current_user_from_token(credentials=credentials, db=db)
+
+    if not user:
+        api_key = request.headers.get("x-api-key")
+        if api_key:
+            user = await get_current_user_from_api_key(x_api_key=api_key, db=db)
+
+    if not user:
+        # Fallback: create/return demo user in MVP mode
+        if not settings.WORKOS_API_KEY:
+            result = await db.execute(
+                select(User).where(User.email == "demo@patchguide.ai")
+            )
+            user = result.scalar_one_or_none()
+            if not user:
+                from backend.models.user import UserRole
+                user = User(
+                    email="demo@patchguide.ai",
+                    name="Demo User",
+                    tenant_id=UUID(DEMO_TENANT_ID),
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                )
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
+            return user
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return user
+
+
 async def get_current_tenant_compat(
     request: Request,
     db: AsyncSession = Depends(get_db),
