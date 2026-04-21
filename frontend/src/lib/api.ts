@@ -246,39 +246,8 @@ export const dashboardApi = {
   },
 
   getTopRiskPairs: async (limit: number = 5) => {
-    // Get vulnerabilities with their affected assets, sorted by risk
-    const vulns = await vulnerabilitiesApi.list({ limit: 50 });
-    const vulnItems = vulns.items || vulns.vulnerabilities || [];
-    
-    // Build asset-vulnerability pairs with risk scores
-    const pairs: any[] = [];
-    for (const vuln of vulnItems) {
-      if (vuln.affected_assets && vuln.affected_assets.length > 0) {
-        for (const asset of vuln.affected_assets) {
-          pairs.push({
-            vulnerability_id: vuln.id,
-            vulnerability_identifier: vuln.identifier,
-            vulnerability_title: vuln.title,
-            vulnerability_severity: vuln.severity,
-            asset_id: asset.id || asset.asset_id,
-            asset_name: asset.name || asset.asset_name,
-            asset_environment: asset.environment,
-            risk_score: asset.risk_score || vuln.cvss_score * 10,
-            risk_factors: {
-              severity: vuln.severity,
-              kev_listed: vuln.kev_listed,
-              epss_score: vuln.epss_score,
-              exploit_available: vuln.exploit_available,
-              asset_exposure: asset.exposure,
-              asset_criticality: asset.criticality,
-            },
-          });
-        }
-      }
-    }
-    
-    // Sort by risk score and return top N
-    return pairs.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, limit);
+    // Call the dedicated backend endpoint that queries asset_vulnerabilities directly
+    return apiCall<any[]>(`/dashboard/top-risk-pairs?limit=${limit}`);
   },
 };
 

@@ -170,7 +170,12 @@ async def get_vulnerability(
             and_(
                 AssetVulnerability.vulnerability_id == vulnerability_id,
                 AssetVulnerability.asset.has(tenant_id=tenant.id),
-                AssetVulnerability.status == "ACTIVE",
+                or_(
+                    AssetVulnerability.status == "ACTIVE",
+                    AssetVulnerability.status.is_(None),
+                    AssetVulnerability.status == "open",
+                    AssetVulnerability.status == "in_progress"
+                ),
             )
         )
     )

@@ -50,8 +50,8 @@ interface Goal {
   id: string;
   name: string;
   target_completion_date: string | null;
-  patches_completed: number;
-  patches_remaining: number;
+  vulnerabilities_addressed: number;
+  vulnerabilities_total: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -130,10 +130,11 @@ export default function SchedulePage() {
                 (1000 * 60 * 60 * 24)
             )
           : null;
+        const patches_remaining = goal.vulnerabilities_total - goal.vulnerabilities_addressed;
         const patchesPerWeek =
-          goal.patches_completed > 0 ? (goal.patches_completed / 30) * 7 : 0;
+          goal.vulnerabilities_addressed > 0 ? (goal.vulnerabilities_addressed / 30) * 7 : 0;
         const weeksNeeded =
-          patchesPerWeek > 0 ? goal.patches_remaining / patchesPerWeek : Infinity;
+          patchesPerWeek > 0 ? patches_remaining / patchesPerWeek : Infinity;
         const weeksAvailable = daysRemaining ? daysRemaining / 7 : null;
 
         return {
@@ -251,9 +252,9 @@ export default function SchedulePage() {
             <h3 className="text-sm font-medium text-neutral-400 mb-3">Goal Progress Timeline</h3>
             <div className="space-y-3">
               {goals.map((goal) => {
-                const totalPatches = goal.patches_completed + goal.patches_remaining;
+                const totalPatches = goal.vulnerabilities_total;
                 const progressPct =
-                  totalPatches > 0 ? (goal.patches_completed / totalPatches) * 100 : 0;
+                  totalPatches > 0 ? (goal.vulnerabilities_addressed / totalPatches) * 100 : 0;
                 const daysRemaining = goal.target_completion_date
                   ? Math.ceil(
                       (new Date(goal.target_completion_date).getTime() - new Date().getTime()) /

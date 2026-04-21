@@ -9,8 +9,8 @@ interface Goal {
   name: string;
   goal_type: string;
   target_completion_date: string | null;
-  patches_completed: number;
-  patches_remaining: number;
+  vulnerabilities_addressed: number;
+  vulnerabilities_total: number;
   current_risk_score: number;
   target_risk_score: number | null;
 }
@@ -342,8 +342,9 @@ export default function DashboardPage() {
 }
 
 function GoalHealthCard({ goal }: { goal: Goal }) {
-  const totalPatches = goal.patches_completed + goal.patches_remaining;
-  const progressPct = totalPatches > 0 ? (goal.patches_completed / totalPatches) * 100 : 0;
+  const totalPatches = goal.vulnerabilities_total;
+  const patches_remaining = goal.vulnerabilities_total - goal.vulnerabilities_addressed;
+  const progressPct = totalPatches > 0 ? (goal.vulnerabilities_addressed / totalPatches) * 100 : 0;
   
   // Calculate velocity and projection
   const daysRemaining = goal.target_completion_date
@@ -351,8 +352,8 @@ function GoalHealthCard({ goal }: { goal: Goal }) {
     : null;
   
   // Assume patches were completed over the last 30 days (rough estimate)
-  const patchesPerWeek = goal.patches_completed > 0 ? (goal.patches_completed / 30) * 7 : 0;
-  const weeksNeeded = patchesPerWeek > 0 ? goal.patches_remaining / patchesPerWeek : Infinity;
+  const patchesPerWeek = goal.vulnerabilities_addressed > 0 ? (goal.vulnerabilities_addressed / 30) * 7 : 0;
+  const weeksNeeded = patchesPerWeek > 0 ? patches_remaining / patchesPerWeek : Infinity;
   const weeksAvailable = daysRemaining ? daysRemaining / 7 : null;
   
   // Determine status
@@ -414,7 +415,7 @@ function GoalHealthCard({ goal }: { goal: Goal }) {
       <div className="space-y-1 text-sm">
         <div className="flex justify-between">
           <span className="text-neutral-400">Patches remaining:</span>
-          <span className="font-medium">{goal.patches_remaining}</span>
+          <span className="font-medium">{patches_remaining}</span>
         </div>
         {daysRemaining !== null && (
           <div className="flex justify-between">

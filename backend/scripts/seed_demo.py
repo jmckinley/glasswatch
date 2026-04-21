@@ -230,7 +230,7 @@ def seed_asset_vulnerabilities(cur, vuln_ids, asset_ids):
             if exists(cur, "asset_vulnerabilities", asset_id=aid, vulnerability_id=vid):
                 continue
             risk = min(100, max(10, 50 + (hash(str(aid) + str(vid)) % 50)))
-            statuses = ["open", "open", "open", "in_progress", "mitigated"]
+            statuses = ["ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "MITIGATED"]
             status = statuses[hash(str(aid) + str(vid)) % len(statuses)]
             cur.execute("""
                 INSERT INTO asset_vulnerabilities (id, asset_id, vulnerability_id,
