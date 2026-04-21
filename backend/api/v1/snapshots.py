@@ -80,7 +80,7 @@ async def capture_snapshot(
         "checksum": snapshot.checksum,
         "created_at": snapshot.created_at.isoformat(),
         "expires_at": snapshot.expires_at.isoformat(),
-        "metadata": snapshot.metadata
+        "metadata": snapshot.snapshot_metadata
     }
 
 
@@ -186,7 +186,7 @@ async def get_snapshot(
         "tenant_id": str(snapshot.tenant_id),
         "snapshot_type": snapshot.snapshot_type.value,
         "system_state": snapshot.system_state,
-        "metadata": snapshot.metadata,
+        "metadata": snapshot.snapshot_metadata,
         "checksum": snapshot.checksum,
         "size_bytes": snapshot.size_bytes,
         "created_at": snapshot.created_at.isoformat(),

@@ -75,7 +75,7 @@ class PatchSnapshot(Base):
     # }
     
     # Capture metadata
-    metadata = Column(JSON, nullable=False)
+    snapshot_metadata = Column("metadata", JSON, nullable=False)
     # Structure:
     # {
     #   "capture_method": "apt-history",
