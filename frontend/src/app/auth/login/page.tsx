@@ -22,7 +22,7 @@ export default function LoginPage() {
 
   // Handle OAuth callback
   useEffect(() => {
-    const token = searchParams.get("token");
+    const token = searchParams?.get("token");
     if (token) {
       handleLoginCallback(token);
     }
