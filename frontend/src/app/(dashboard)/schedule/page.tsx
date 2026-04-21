@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 
 interface MaintenanceWindow {
   id: string;
@@ -25,7 +24,6 @@ interface Bundle {
   estimated_duration_minutes: number;
 }
 
-// Mock data for now - will connect to API
 const mockWindows: MaintenanceWindow[] = [
   {
     id: "1",
@@ -110,81 +108,48 @@ export default function SchedulePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-primary">
-                PatchGuide
-              </Link>
-              <span className="ml-3 text-sm text-neutral-400">
-                Intelligent Patch Optimization
-              </span>
-            </div>
-            <nav className="flex space-x-6">
-              <Link href="/" className="text-neutral-400 hover:text-foreground">
-                Dashboard
-              </Link>
-              <Link href="/vulnerabilities" className="text-neutral-400 hover:text-foreground">
-                Vulnerabilities
-              </Link>
-              <Link href="/goals" className="text-neutral-400 hover:text-foreground">
-                Goals
-              </Link>
-              <Link href="/schedule" className="text-foreground hover:text-primary">
-                Schedule
-              </Link>
-            </nav>
-          </div>
+    <>
+      {/* Page Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Patch Schedule</h1>
+          <p className="text-neutral-400 mt-1">
+            Maintenance windows and scheduled patch bundles
+          </p>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Patch Schedule</h1>
-            <p className="text-neutral-400 mt-1">
-              Maintenance windows and scheduled patch bundles
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-1 rounded ${
-                viewMode === "list"
-                  ? "bg-primary text-background"
-                  : "bg-neutral-800 text-neutral-400"
-              }`}
-            >
-              List View
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-3 py-1 rounded ${
-                viewMode === "calendar"
-                  ? "bg-primary text-background"
-                  : "bg-neutral-800 text-neutral-400"
-              }`}
-            >
-              Calendar
-            </button>
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-1 rounded ${
+              viewMode === "list"
+                ? "bg-primary text-background"
+                : "bg-neutral-800 text-neutral-400"
+            }`}
+          >
+            List View
+          </button>
+          <button
+            onClick={() => setViewMode("calendar")}
+            className={`px-3 py-1 rounded ${
+              viewMode === "calendar"
+                ? "bg-primary text-background"
+                : "bg-neutral-800 text-neutral-400"
+            }`}
+          >
+            Calendar
+          </button>
         </div>
+      </div>
 
-        {/* Content */}
-        {loading ? (
-          <ScheduleSkeleton />
-        ) : viewMode === "list" ? (
-          <ListView windows={windows} />
-        ) : (
-          <CalendarView windows={windows} />
-        )}
-      </main>
-    </div>
+      {/* Content */}
+      {loading ? (
+        <ScheduleSkeleton />
+      ) : viewMode === "list" ? (
+        <ListView windows={windows} />
+      ) : (
+        <CalendarView windows={windows} />
+      )}
+    </>
   );
 }
 
@@ -198,7 +163,6 @@ function ListView({ windows }: { windows: MaintenanceWindow[] }) {
 
   return (
     <div className="space-y-8">
-      {/* Upcoming Windows */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Upcoming Maintenance</h2>
         <div className="space-y-4">
@@ -214,7 +178,6 @@ function ListView({ windows }: { windows: MaintenanceWindow[] }) {
         </div>
       </div>
 
-      {/* Past Windows */}
       {pastWindows.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Past Maintenance</h2>
@@ -272,7 +235,6 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
         </div>
       </div>
 
-      {/* Window Utilization */}
       <div className="mb-4">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-neutral-400">Window Utilization</span>
@@ -288,7 +250,6 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
         </div>
       </div>
 
-      {/* Bundles */}
       {window.bundles.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-neutral-400">Scheduled Bundles</h4>
@@ -326,7 +287,6 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
 }
 
 function CalendarView({ windows }: { windows: MaintenanceWindow[] }) {
-  // Simple calendar view - in real app would use a proper calendar component
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (

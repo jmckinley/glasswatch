@@ -115,7 +115,7 @@ export function AIAssistant({ onSendMessage }: AIAssistantProps) {
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">PatchGuide Assistant</h3>
+              <h3 className="font-semibold">Glasswatch Assistant</h3>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -223,9 +223,9 @@ function getMockResponse(input: string): string {
 2. **CVE-2024-5678** (KEV Listed) - Active exploitation detected
 3. **CVE-2024-9012** (High) - Database servers at risk
 
-Total risk reduction if patched: 2,340 points (28% improvement)
+Total risk reduction if patched: 2,340 points (28% improvement).
 
-Would you like me to create a patch bundle for these?`;
+You can create a patch bundle for these from the Schedule page.`;
   }
 
   if (lowerInput.includes("critical")) {
@@ -237,7 +237,7 @@ Would you like me to create a patch bundle for these?`;
 
 The highest risk is CVE-2024-1234 with a CVSS score of 9.8 and active exploitation in the wild.
 
-Would you like to see the full list or create a goal to eliminate these?`;
+View the full list on the Vulnerabilities page, or create a goal to eliminate these from the Goals page.`;
   }
 
   if (lowerInput.includes("soc") || lowerInput.includes("compliance")) {
@@ -247,7 +247,7 @@ Would you like to see the full list or create a goal to eliminate these?`;
 • **Maintenance windows required**: 8-10
 • **Risk tolerance**: Conservative recommended
 
-Shall I create a goal targeting July 1st for your SOC 2 audit?`;
+You can create a compliance goal targeting July 1st from the Goals page.`;
   }
 
   if (lowerInput.includes("risk score")) {

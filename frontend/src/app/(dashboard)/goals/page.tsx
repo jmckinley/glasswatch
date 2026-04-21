@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { goalsApi } from "@/lib/api";
 
 interface Goal {
@@ -59,7 +58,7 @@ export default function GoalsPage() {
   const handleOptimize = async (goalId: string) => {
     try {
       await goalsApi.optimize(goalId);
-      await fetchGoals(); // Refresh to show new bundles
+      await fetchGoals();
       alert("Optimization complete! Check the schedule for new bundles.");
     } catch (error) {
       console.error("Failed to optimize goal:", error);
@@ -72,82 +71,49 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-primary">
-                PatchGuide
-              </Link>
-              <span className="ml-3 text-sm text-neutral-400">
-                Intelligent Patch Optimization
-              </span>
-            </div>
-            <nav className="flex space-x-6">
-              <Link href="/" className="text-neutral-400 hover:text-foreground">
-                Dashboard
-              </Link>
-              <Link href="/vulnerabilities" className="text-neutral-400 hover:text-foreground">
-                Vulnerabilities
-              </Link>
-              <Link href="/goals" className="text-foreground hover:text-primary">
-                Goals
-              </Link>
-              <Link href="/schedule" className="text-neutral-400 hover:text-foreground">
-                Schedule
-              </Link>
-            </nav>
-          </div>
+    <>
+      {/* Page Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Optimization Goals</h1>
+          <p className="text-neutral-400 mt-1">
+            Transform business objectives into optimized patch schedules
+          </p>
         </div>
-      </header>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 bg-primary text-background rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Create New Goal
+        </button>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Optimization Goals</h1>
-            <p className="text-neutral-400 mt-1">
-              Transform business objectives into optimized patch schedules
-            </p>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-primary text-background rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Create New Goal
-          </button>
-        </div>
-
-        {/* Goals List */}
-        <div className="space-y-6">
-          {goals.length === 0 ? (
-            <EmptyState onCreateClick={() => setShowCreateModal(true)} />
-          ) : (
-            goals.map((goal) => (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                onOptimize={() => handleOptimize(goal.id)}
-              />
-            ))
-          )}
-        </div>
-
-        {/* Create Modal */}
-        {showCreateModal && (
-          <CreateGoalModal
-            onClose={() => setShowCreateModal(false)}
-            onSuccess={() => {
-              setShowCreateModal(false);
-              fetchGoals();
-            }}
-          />
+      {/* Goals List */}
+      <div className="space-y-6">
+        {goals.length === 0 ? (
+          <EmptyState onCreateClick={() => setShowCreateModal(true)} />
+        ) : (
+          goals.map((goal) => (
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              onOptimize={() => handleOptimize(goal.id)}
+            />
+          ))
         )}
-      </main>
-    </div>
+      </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <CreateGoalModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchGoals();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -418,18 +384,13 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
 
 function GoalsSkeleton() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="h-16" />
-      </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="skeleton h-10 w-64 mb-8 rounded" />
-        <div className="space-y-6">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="skeleton h-48 rounded-lg" />
-          ))}
-        </div>
-      </main>
-    </div>
+    <>
+      <div className="skeleton h-10 w-64 mb-8 rounded" />
+      <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="skeleton h-48 rounded-lg" />
+        ))}
+      </div>
+    </>
   );
 }
