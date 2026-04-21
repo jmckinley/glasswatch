@@ -489,3 +489,20 @@ Timeline: 1 week to July 2026 Glasswing deadline
 
 Read HANDOVER_SPRINT_10.md for complete Sprint 10 context.
 ```
+
+---
+
+## Sprint 12: Frontend Cleanup (Next)
+
+### TypeScript / Code Quality
+- [ ] Fix MUI v9 Grid API usage (remove `item` prop, update Grid2 syntax)
+- [ ] Fix strict null checks (searchParams, optional chaining)
+- [ ] Re-enable `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds` in next.config.ts
+- [ ] Audit all subagent-generated component code for correctness
+- [ ] Add proper error boundaries
+
+### Infrastructure
+- [ ] Run database migrations on Railway PostgreSQL
+- [ ] Set up CI/CD pipeline (lint + type check + test before deploy)
+- [ ] Configure proper OWASP dependency scanning
+- [ ] Beta testing setup
