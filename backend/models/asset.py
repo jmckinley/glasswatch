@@ -12,7 +12,7 @@ from sqlalchemy import (
     Column, String, Integer, DateTime, ForeignKey, 
     Index, JSON, Float, Boolean, Text
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
 from backend.db.base_class import Base
@@ -65,7 +65,8 @@ class Asset(Base):
     cloud_account_id = Column(String(255))  # AWS account, Azure subscription
     cloud_region = Column(String(50))  # us-east-1, westeurope
     cloud_instance_type = Column(String(50))  # t3.medium, Standard_D4s_v3
-    cloud_tags = Column(JSON)  # {"Environment": "Prod", "CostCenter": "Engineering"}
+    cloud_tags = Column(JSONB)  # {"Environment": "Prod", "CostCenter": "Engineering"}
+    tags = Column(JSONB, default=list)  # User-defined tags: ["web-tier", "pci-scope", "deploy-group-a"]
     
     # Software inventory (simplified - full SBOM in separate table)
     installed_packages = Column(JSON)  # [{"name": "openssl", "version": "1.1.1k"}]

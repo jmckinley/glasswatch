@@ -166,40 +166,53 @@ def seed_vulnerabilities(cur):
 def seed_assets(cur):
     """Create 12 sample assets across environments."""
     assets = [
+        # (identifier, name, type, platform, env, exposure, crit, team, os_fam, os_ver, tags, patch_group)
         # Production servers
         ("PROD-WEB-01", "prod-web-01.acme.internal", "server", "linux", "production",
-         "internet-facing", 9, "Web Services", "Red Hat Enterprise Linux", "9.3"),
+         "internet-facing", 9, "Web Services", "Red Hat Enterprise Linux", "9.3",
+         ["web-tier", "pci-scope", "internet-facing", "deploy-group-a"], "web-prod"),
         ("PROD-WEB-02", "prod-web-02.acme.internal", "server", "linux", "production",
-         "internet-facing", 9, "Web Services", "Red Hat Enterprise Linux", "9.3"),
+         "internet-facing", 9, "Web Services", "Red Hat Enterprise Linux", "9.3",
+         ["web-tier", "pci-scope", "internet-facing", "deploy-group-a"], "web-prod"),
         ("PROD-API-01", "prod-api-01.acme.internal", "server", "linux", "production",
-         "internal", 8, "API Platform", "Ubuntu", "22.04 LTS"),
+         "internal", 8, "API Platform", "Ubuntu", "22.04 LTS",
+         ["api-tier", "pci-scope", "deploy-group-a"], "api-prod"),
         ("PROD-DB-01", "prod-db-primary.acme.internal", "database", "linux", "production",
-         "internal", 10, "Data Services", "Red Hat Enterprise Linux", "9.2"),
+         "internal", 10, "Data Services", "Red Hat Enterprise Linux", "9.2",
+         ["database-tier", "pci-scope", "critical-data", "deploy-group-b"], "db-prod"),
         ("PROD-DB-02", "prod-db-replica.acme.internal", "database", "linux", "production",
-         "internal", 8, "Data Services", "Red Hat Enterprise Linux", "9.2"),
+         "internal", 8, "Data Services", "Red Hat Enterprise Linux", "9.2",
+         ["database-tier", "pci-scope", "deploy-group-b"], "db-prod"),
         # Staging
         ("STG-WEB-01", "stg-web-01.acme.internal", "server", "linux", "staging",
-         "internal", 5, "Web Services", "Ubuntu", "22.04 LTS"),
+         "internal", 5, "Web Services", "Ubuntu", "22.04 LTS",
+         ["staging", "web-tier"], "staging"),
         ("STG-API-01", "stg-api-01.acme.internal", "server", "linux", "staging",
-         "internal", 5, "API Platform", "Ubuntu", "22.04 LTS"),
+         "internal", 5, "API Platform", "Ubuntu", "22.04 LTS",
+         ["staging", "api-tier"], "staging"),
         # Containers
         ("K8S-NODE-01", "k8s-node-01.acme.internal", "container", "linux", "production",
-         "internal", 7, "Platform Engineering", "Flatcar Container Linux", "3815"),
+         "internal", 7, "Platform Engineering", "Flatcar Container Linux", "3815",
+         ["k8s-workload", "container-host", "deploy-group-a"], "k8s-prod"),
         ("K8S-NODE-02", "k8s-node-02.acme.internal", "container", "linux", "production",
-         "internal", 7, "Platform Engineering", "Flatcar Container Linux", "3815"),
+         "internal", 7, "Platform Engineering", "Flatcar Container Linux", "3815",
+         ["k8s-workload", "container-host", "deploy-group-a"], "k8s-prod"),
         # Network
         ("FW-EDGE-01", "fw-edge-01.acme.internal", "server", "other", "production",
-         "internet-facing", 10, "Network Security", "PAN-OS", "11.1.2"),
+         "internet-facing", 10, "Network Security", "PAN-OS", "11.1.2",
+         ["network-infra", "internet-facing", "pci-scope", "deploy-group-c"], "network-prod"),
         # Development
         ("DEV-SERVER-01", "dev-server-01.acme.internal", "server", "linux", "development",
-         "internal", 3, "Engineering", "Ubuntu", "24.04 LTS"),
+         "internal", 3, "Engineering", "Ubuntu", "24.04 LTS",
+         ["development", "legacy"], "dev"),
         # Windows
         ("WIN-JUMP-01", "win-jump-01.acme.internal", "server", "windows", "production",
-         "internal", 8, "IT Operations", "Windows Server", "2022"),
+         "internal", 8, "IT Operations", "Windows Server", "2022",
+         ["jump-host", "windows", "deploy-group-c"], "windows-prod"),
     ]
     
     asset_ids = []
-    for ident, name, atype, platform, env, exposure, crit, team, os_fam, os_ver in assets:
+    for ident, name, atype, platform, env, exposure, crit, team, os_fam, os_ver, tags, patch_group in assets:
         if exists(cur, "assets", identifier=ident, tenant_id=TENANT_ID):
             cur.execute("SELECT id FROM assets WHERE identifier = %s AND tenant_id = %s", (ident, TENANT_ID))
             asset_ids.append(cur.fetchone()[0])
@@ -208,11 +221,11 @@ def seed_assets(cur):
         asset_ids.append(aid)
         cur.execute("""
             INSERT INTO assets (id, tenant_id, identifier, name, type, platform, environment,
-                exposure, criticality, owner_team, os_family, os_version, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                exposure, criticality, owner_team, os_family, os_version, tags, patch_group, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             aid, TENANT_ID, ident, name, atype, platform, env,
-            exposure, crit, team, os_fam, os_ver, NOW
+            exposure, crit, team, os_fam, os_ver, Json(tags), patch_group, NOW
         ))
     
     print(f"  ✓ Seeded {len(assets)} assets")

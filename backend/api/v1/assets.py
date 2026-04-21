@@ -12,6 +12,7 @@ from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, and_, or_, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +36,8 @@ async def list_assets(
     environment: Optional[str] = Query(None, description="Filter by environment"),
     criticality: Optional[int] = Query(None, ge=1, le=5, description="Filter by criticality"),
     exposure: Optional[str] = Query(None, description="Filter by exposure level"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    patch_group: Optional[str] = Query(None, description="Filter by patch group"),
     search: Optional[str] = Query(None, description="Search in name, identifier, fqdn"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=500),
@@ -65,6 +68,12 @@ async def list_assets(
     if exposure:
         filters.append(Asset.exposure.ilike(f"%{exposure}%"))
     
+    if tag:
+        filters.append(Asset.tags.op('@>')(func.cast([tag], JSONB)))
+    
+    if patch_group:
+        filters.append(Asset.patch_group == patch_group)
+    
     if search:
         filters.append(
             or_(
@@ -88,6 +97,24 @@ async def list_assets(
     result = await db.execute(query)
     assets = result.scalars().all()
     
+    # Get vulnerability counts for all assets
+    asset_ids = [asset.id for asset in assets]
+    vuln_count_query = (
+        select(
+            AssetVulnerability.asset_id,
+            func.count(AssetVulnerability.id).label('count')
+        )
+        .where(
+            and_(
+                AssetVulnerability.asset_id.in_(asset_ids),
+                or_(AssetVulnerability.status == "ACTIVE", AssetVulnerability.status.is_(None))
+            )
+        )
+        .group_by(AssetVulnerability.asset_id)
+    )
+    vuln_count_result = await db.execute(vuln_count_query)
+    vuln_counts = {row[0]: row[1] for row in vuln_count_result.all()}
+    
     return {
         "assets": [
             {
@@ -101,8 +128,14 @@ async def list_assets(
                 "exposure": asset.exposure,
                 "location": asset.location,
                 "owner_team": asset.owner_team,
+                "business_unit": asset.business_unit,
+                "os_family": asset.os_family,
+                "fqdn": asset.fqdn,
+                "patch_group": asset.patch_group,
+                "tags": asset.tags or [],
                 "risk_score": asset.risk_score,
                 "is_internet_facing": asset.is_internet_facing,
+                "vulnerability_count": vuln_counts.get(asset.id, 0),
                 "last_scanned_at": asset.last_scanned_at.isoformat() if asset.last_scanned_at else None,
                 "created_at": asset.created_at.isoformat(),
             }
@@ -143,7 +176,7 @@ async def get_asset(
         .where(
             and_(
                 AssetVulnerability.asset_id == asset_id,
-                AssetVulnerability.status == "ACTIVE",
+                or_(AssetVulnerability.status == "ACTIVE", AssetVulnerability.status.is_(None)),
             )
         )
         .order_by(AssetVulnerability.risk_score.desc())
@@ -196,7 +229,7 @@ async def get_asset(
                 "recommended_action": av.recommended_action,
                 "patch_available": av.patch_available,
                 "mitigation_applied": av.mitigation_applied,
-                "discovered_at": av.discovered_at.isoformat(),
+                "discovered_at": av.discovered_at.isoformat() if av.discovered_at else None,
             }
             for av in vulnerabilities
         ],
@@ -508,3 +541,324 @@ async def get_asset_vulnerabilities(
             "low": sum(1 for av in vulnerabilities if av.risk_score < 40),
         }
     }
+
+
+@router.patch("/{asset_id}/tags")
+async def patch_asset_tags(
+    asset_id: UUID,
+    tag_data: Dict[str, List[str]],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Add or remove tags from a single asset.
+    
+    Body: {"add": ["tag1", "tag2"], "remove": ["tag3"]}
+    """
+    # Get asset
+    query = select(Asset).where(
+        and_(
+            Asset.id == asset_id,
+            Asset.tenant_id == tenant.id
+        )
+    )
+    result = await db.execute(query)
+    asset = result.scalar_one_or_none()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Get current tags
+    current_tags = set(asset.tags or [])
+    
+    # Add tags
+    if "add" in tag_data:
+        current_tags.update(tag_data["add"])
+    
+    # Remove tags
+    if "remove" in tag_data:
+        current_tags.difference_update(tag_data["remove"])
+    
+    # Update asset
+    asset.tags = list(current_tags)
+    asset.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(asset)
+    
+    return {
+        "asset": {
+            "id": str(asset.id),
+            "identifier": asset.identifier,
+            "name": asset.name,
+            "tags": asset.tags,
+            "updated_at": asset.updated_at.isoformat(),
+        }
+    }
+
+
+@router.post("/bulk-tag")
+async def bulk_tag_assets(
+    bulk_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Bulk add/remove tags across multiple assets.
+    
+    Body: {"asset_ids": ["uuid1", "uuid2"], "add": ["tag1"], "remove": ["tag2"]}
+    """
+    asset_ids = [UUID(aid) for aid in bulk_data.get("asset_ids", [])]
+    add_tags = bulk_data.get("add", [])
+    remove_tags = bulk_data.get("remove", [])
+    
+    if not asset_ids:
+        raise HTTPException(status_code=400, detail="asset_ids required")
+    
+    # Get all assets
+    query = select(Asset).where(
+        and_(
+            Asset.id.in_(asset_ids),
+            Asset.tenant_id == tenant.id
+        )
+    )
+    result = await db.execute(query)
+    assets = result.scalars().all()
+    
+    modified_count = 0
+    for asset in assets:
+        current_tags = set(asset.tags or [])
+        original_tags = current_tags.copy()
+        
+        if add_tags:
+            current_tags.update(add_tags)
+        
+        if remove_tags:
+            current_tags.difference_update(remove_tags)
+        
+        if current_tags != original_tags:
+            asset.tags = list(current_tags)
+            asset.updated_at = datetime.utcnow()
+            modified_count += 1
+    
+    await db.commit()
+    
+    return {
+        "status": "completed",
+        "modified": modified_count,
+        "requested": len(asset_ids),
+    }
+
+
+@router.get("/tags")
+async def list_tags(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Get all unique tags used across the tenant's assets.
+    
+    Returns: {"tags": [{"name": "web-tier", "count": 4}, ...]}
+    """
+    # Query for all tags
+    query = select(Asset.tags).where(Asset.tenant_id == tenant.id)
+    result = await db.execute(query)
+    
+    # Aggregate tags
+    tag_counts = {}
+    for (tags,) in result.all():
+        if tags:
+            for tag in tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    
+    # Sort by count descending
+    sorted_tags = sorted(
+        [{"name": tag, "count": count} for tag, count in tag_counts.items()],
+        key=lambda x: (-x["count"], x["name"])
+    )
+    
+    return {"tags": sorted_tags}
+
+
+@router.post("/enrich")
+async def enrich_assets(
+    enrich_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Enrich assets by matching on identifier/fqdn and merging data.
+    
+    Body: {
+        "match_by": "identifier",  # or "fqdn"
+        "assets": [
+            {
+                "identifier": "prod-web-01.acme.internal",
+                "os_version": "RHEL 8.9",
+                "installed_packages": [...],
+                "tags": ["scanner-found"]
+            }
+        ]
+    }
+    """
+    match_by = enrich_data.get("match_by", "identifier")
+    assets_data = enrich_data.get("assets", [])
+    
+    if match_by not in ["identifier", "fqdn"]:
+        raise HTTPException(status_code=400, detail="match_by must be 'identifier' or 'fqdn'")
+    
+    matched_count = 0
+    not_found_count = 0
+    updated_count = 0
+    
+    for asset_data in assets_data:
+        match_value = asset_data.get(match_by)
+        if not match_value:
+            not_found_count += 1
+            continue
+        
+        # Find asset
+        if match_by == "identifier":
+            query = select(Asset).where(
+                and_(
+                    Asset.tenant_id == tenant.id,
+                    Asset.identifier == match_value
+                )
+            )
+        else:  # fqdn
+            query = select(Asset).where(
+                and_(
+                    Asset.tenant_id == tenant.id,
+                    Asset.fqdn == match_value
+                )
+            )
+        
+        result = await db.execute(query)
+        asset = result.scalar_one_or_none()
+        
+        if not asset:
+            not_found_count += 1
+            continue
+        
+        matched_count += 1
+        
+        # Merge data
+        updated = False
+        for field, value in asset_data.items():
+            if field == match_by:
+                continue
+            
+            if hasattr(asset, field) and field not in ["id", "tenant_id", "created_at"]:
+                # Special handling for tags - merge instead of replace
+                if field == "tags":
+                    current_tags = set(asset.tags or [])
+                    current_tags.update(value or [])
+                    asset.tags = list(current_tags)
+                    updated = True
+                else:
+                    setattr(asset, field, value)
+                    updated = True
+        
+        if updated:
+            asset.updated_at = datetime.utcnow()
+            updated_count += 1
+    
+    await db.commit()
+    
+    return {
+        "matched": matched_count,
+        "not_found": not_found_count,
+        "updated": updated_count,
+    }
+
+
+@router.get("/export")
+async def export_assets(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    type: Optional[str] = Query(None, description="Filter by asset type"),
+    platform: Optional[str] = Query(None, description="Filter by platform"),
+    environment: Optional[str] = Query(None, description="Filter by environment"),
+    criticality: Optional[int] = Query(None, ge=1, le=5, description="Filter by criticality"),
+    exposure: Optional[str] = Query(None, description="Filter by exposure level"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    patch_group: Optional[str] = Query(None, description="Filter by patch group"),
+) -> List[Dict[str, Any]]:
+    """
+    Export all matching assets with full detail.
+    
+    Returns JSON array of assets.
+    """
+    # Build query (same filters as list_assets)
+    query = select(Asset).where(Asset.tenant_id == tenant.id)
+    
+    filters = []
+    
+    if type:
+        filters.append(Asset.type == type)
+    
+    if platform:
+        filters.append(Asset.platform == platform)
+    
+    if environment:
+        filters.append(Asset.environment == environment)
+    
+    if criticality is not None:
+        filters.append(Asset.criticality == criticality)
+    
+    if exposure:
+        filters.append(Asset.exposure.ilike(f"%{exposure}%"))
+    
+    if tag:
+        filters.append(Asset.tags.op('@>')(func.cast([tag], JSONB)))
+    
+    if patch_group:
+        filters.append(Asset.patch_group == patch_group)
+    
+    if filters:
+        query = query.where(and_(*filters))
+    
+    # Order by criticality
+    query = query.order_by(Asset.criticality.desc(), Asset.name)
+    
+    # Execute query (no limit for export)
+    result = await db.execute(query)
+    assets = result.scalars().all()
+    
+    return [
+        {
+            "id": str(asset.id),
+            "identifier": asset.identifier,
+            "name": asset.name,
+            "type": asset.type,
+            "platform": asset.platform,
+            "environment": asset.environment,
+            "location": asset.location,
+            "owner_team": asset.owner_team,
+            "owner_email": asset.owner_email,
+            "business_unit": asset.business_unit,
+            "criticality": asset.criticality,
+            "exposure": asset.exposure,
+            "os_family": asset.os_family,
+            "os_version": asset.os_version,
+            "ip_addresses": asset.ip_addresses,
+            "fqdn": asset.fqdn,
+            "cloud_account_id": asset.cloud_account_id,
+            "cloud_region": asset.cloud_region,
+            "cloud_instance_type": asset.cloud_instance_type,
+            "cloud_tags": asset.cloud_tags,
+            "tags": asset.tags or [],
+            "installed_packages": asset.installed_packages,
+            "running_services": asset.running_services,
+            "open_ports": asset.open_ports,
+            "compliance_frameworks": asset.compliance_frameworks,
+            "compensating_controls": asset.compensating_controls,
+            "patch_group": asset.patch_group,
+            "maintenance_window": asset.maintenance_window,
+            "last_scanned_at": asset.last_scanned_at.isoformat() if asset.last_scanned_at else None,
+            "last_patched_at": asset.last_patched_at.isoformat() if asset.last_patched_at else None,
+            "created_at": asset.created_at.isoformat(),
+            "updated_at": asset.updated_at.isoformat(),
+        }
+        for asset in assets
+    ]

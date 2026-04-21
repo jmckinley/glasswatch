@@ -117,6 +117,22 @@ export const assetsApi = {
       method: "POST",
       body: data,
     }),
+
+  tags: () => apiCall<{tags: {name: string, count: number}[]}>('/assets/tags'),
+
+  updateTags: (id: string, add: string[], remove: string[]) =>
+    apiCall<any>(`/assets/${id}/tags`, { method: 'PATCH', body: { add, remove } }),
+
+  bulkTag: (assetIds: string[], add: string[], remove: string[]) =>
+    apiCall<any>('/assets/bulk-tag', { method: 'POST', body: { asset_ids: assetIds, add, remove } }),
+
+  enrich: (matchBy: string, assets: any[]) =>
+    apiCall<any>('/assets/enrich', { method: 'POST', body: { match_by: matchBy, assets } }),
+
+  exportAssets: (params?: any) => {
+    const query = new URLSearchParams(params || {}).toString();
+    return apiCall<any[]>(`/assets/export${query ? '?' + query : ''}`);
+  },
 };
 
 // Goals API
