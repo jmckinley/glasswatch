@@ -19,3 +19,5 @@ from backend.models.maintenance_window import MaintenanceWindow  # noqa: F401
 from backend.models.comment import Comment, Reaction  # noqa: F401
 from backend.models.activity import Activity  # noqa: F401
 from backend.models.approval import ApprovalRequest, ApprovalAction, ApprovalPolicy  # noqa: F401
+from backend.models.snapshot import PatchSnapshot, RollbackRecord  # noqa: F401
+from backend.models.simulation import PatchSimulation  # noqa: F401

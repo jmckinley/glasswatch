@@ -75,7 +75,7 @@ class User(Base):
     
     # Unique constraint on email per tenant
     __table_args__ = (
-        {"schema": "public"},
+        {},
     )
     
     def __repr__(self):

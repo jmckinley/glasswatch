@@ -101,6 +101,11 @@ class Settings(BaseSettings):
 # Create settings instance
 settings = Settings()
 
+
+def get_settings() -> Settings:
+    """Get cached settings instance."""
+    return settings
+
 # Log configuration on startup (hide sensitive values)
 if settings.DEBUG:
     print(f"🔧 Configuration loaded for environment: {settings.ENV}")
