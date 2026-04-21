@@ -26,7 +26,7 @@ from backend.services.scoring import scoring_service
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 async def list_assets(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),

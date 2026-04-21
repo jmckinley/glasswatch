@@ -151,7 +151,7 @@ class OptimizationResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
-@router.post("/", response_model=GoalResponse)
+@router.post("", response_model=GoalResponse)
 async def create_goal(
     goal_data: GoalCreate,
     db: AsyncSession = Depends(get_db),

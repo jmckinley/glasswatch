@@ -188,10 +188,10 @@ export const dashboardApi = {
       },
       assets: {
         total: assetList.total || 0,
-        internet_exposed: assetList.items?.filter(
-          (a: any) => a.exposure === "internet"
+        internet_exposed: (assetList.assets || assetList.items || []).filter(
+          (a: any) => a.exposure === "internet" || a.is_internet_facing
         ).length || 0,
-        critical_assets: assetList.items?.filter(
+        critical_assets: (assetList.assets || assetList.items || []).filter(
           (a: any) => a.criticality >= 4
         ).length || 0,
       },

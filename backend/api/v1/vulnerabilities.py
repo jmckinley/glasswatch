@@ -8,7 +8,7 @@ from typing import Optional, List, Any, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,7 +22,7 @@ from backend.models.tenant import Tenant
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 async def list_vulnerabilities(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -97,6 +97,48 @@ async def list_vulnerabilities(
         "total": total,
         "skip": skip,
         "limit": limit,
+    }
+
+
+
+
+@router.get("/stats")
+async def get_vulnerability_stats(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """Get vulnerability statistics for the tenant."""
+    severity_stats = await db.execute(
+        select(
+            Vulnerability.severity,
+            func.count(Vulnerability.id).label("count")
+        ).group_by(Vulnerability.severity)
+    )
+    by_severity = {row.severity.upper() if row.severity else "UNKNOWN": row.count for row in severity_stats}
+
+    total_count = await db.scalar(select(func.count(Vulnerability.id)))
+    kev_count = await db.scalar(
+        select(func.count(Vulnerability.id)).where(Vulnerability.kev_listed == True)
+    )
+    exploit_count = await db.scalar(
+        select(func.count(Vulnerability.id)).where(Vulnerability.exploit_available == True)
+    )
+    patch_count = await db.scalar(
+        select(func.count(Vulnerability.id)).where(Vulnerability.patch_available == True)
+    )
+    recent_count = await db.scalar(
+        select(func.count(Vulnerability.id))
+        .where(Vulnerability.published_at >= func.now() - text("interval '7 days'"))
+    )
+
+    return {
+        "total": total_count,
+        "by_severity": by_severity,
+        "kev_listed": kev_count,
+        "exploits_available": exploit_count,
+        "patches_available": patch_count,
+        "recent_7d": recent_count,
+        "total_risk_score": total_count * 100,  # Simplified for MVP
     }
 
 
@@ -275,66 +317,4 @@ async def search_vulnerabilities(
             "has_patch": has_patch,
         }
     }
-
-
-@router.get("/stats")
-async def get_vulnerability_stats(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-) -> Dict[str, Any]:
-    """
-    Get vulnerability statistics for the tenant.
-    
-    Used for dashboard widgets and reports.
-    """
-    # Get severity distribution
-    severity_stats = await db.execute(
-        select(
-            Vulnerability.severity,
-            func.count(Vulnerability.id).label("count")
-        ).group_by(Vulnerability.severity)
-    )
-    
-    severity_distribution = {
-        row.severity or "UNKNOWN": row.count 
-        for row in severity_stats
-    }
-    
-    # Get KEV stats
-    kev_count = await db.scalar(
-        select(func.count(Vulnerability.id))
-        .where(Vulnerability.kev_listed == True)
-    )
-    
-    # Get exploit availability stats
-    exploit_count = await db.scalar(
-        select(func.count(Vulnerability.id))
-        .where(Vulnerability.exploit_available == True)
-    )
-    
-    # Get patch availability stats
-    patch_available_count = await db.scalar(
-        select(func.count(Vulnerability.id))
-        .where(Vulnerability.patch_available == True)
-    )
-    
-    # Get recent vulnerabilities (last 7 days)
-    recent_count = await db.scalar(
-        select(func.count(Vulnerability.id))
-        .where(Vulnerability.published_at >= func.now() - func.interval("7 days"))
-    )
-    
-    # Get total count
-    total_count = await db.scalar(
-        select(func.count(Vulnerability.id))
-    )
-    
-    return {
-        "total_vulnerabilities": total_count,
-        "severity_distribution": severity_distribution,
-        "kev_listed_count": kev_count,
-        "exploits_available_count": exploit_count,
-        "patches_available_count": patch_available_count,
-        "recent_vulnerabilities_7d": recent_count,
-        "timestamp": datetime.utcnow().isoformat(),
     }

@@ -50,7 +50,7 @@ class WindowUpdate(BaseModel):
     change_freeze_reason: Optional[str] = None
 
 
-@router.get("/")
+@router.get("")
 async def list_maintenance_windows(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
