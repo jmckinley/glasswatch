@@ -55,11 +55,12 @@ class AuditLog(Base):
         return f"<AuditLog {self.action} by {self.user_id} at {self.timestamp}>"
     
     @classmethod
-    def log_action(cls, db_session, tenant_id: uuid.UUID, user_id: uuid.UUID, 
+    async def log_action(cls, db_session, tenant_id: uuid.UUID, user_id: uuid.UUID, 
                    action: str, resource_type: str = None, resource_id: str = None,
                    details: dict = None, ip_address: str = None, user_agent: str = None):
         """
-        Helper method to create audit log entries
+        Helper method to create audit log entries.
+        Async to support await from async route handlers.
         """
         log_entry = cls(
             tenant_id=tenant_id,

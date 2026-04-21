@@ -8,7 +8,7 @@ const navLinks = [
   { href: "/vulnerabilities", label: "Vulnerabilities" },
   { href: "/goals", label: "Goals" },
   { href: "/schedule", label: "Schedule" },
-  { href: "/dashboard/approvals", label: "Approvals" },
+  { href: "/approvals", label: "Approvals" },
 ];
 
 export default function Navigation() {
