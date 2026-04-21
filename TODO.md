@@ -506,3 +506,45 @@ Read HANDOVER_SPRINT_10.md for complete Sprint 10 context.
 - [ ] Set up CI/CD pipeline (lint + type check + test before deploy)
 - [ ] Configure proper OWASP dependency scanning
 - [ ] Beta testing setup
+
+---
+
+## Sprint 13: Onboarding, Integrations & OAuth
+
+### Onboarding Flow
+- [ ] Fix onboarding wizard routing (currently at /onboarding, needs to trigger after first login)
+- [ ] Wire onboarding steps to real backend APIs (asset discovery, goal creation, schedule setup)
+- [ ] Add "Connect your tools" step (Slack, cloud providers, vulnerability scanners)
+- [ ] Store onboarding completion state per tenant
+- [ ] Redirect new tenants to onboarding, returning users to dashboard
+
+### OAuth / SSO
+- [ ] Complete WorkOS SSO integration (currently stubbed with fallback)
+- [ ] Add WORKOS_API_KEY and WORKOS_CLIENT_ID to Railway env vars
+- [ ] Test SSO flow end-to-end with a real IdP
+- [ ] Add Google OAuth as a login option (social login for smaller teams)
+- [ ] Add GitHub OAuth option (dev-focused teams)
+- [ ] Session management: token refresh, proper expiry, logout cleanup
+
+### Slack Integration
+- [ ] Slack app manifest and OAuth install flow
+- [ ] Store Slack workspace tokens per tenant
+- [ ] Wire notification service Slack handler (currently TODO stub in alerts.py)
+- [ ] Slash commands: /glasswatch status, /glasswatch patch-now, /glasswatch approve
+- [ ] Interactive messages: approval buttons in Slack for patch bundles
+- [ ] Channel configuration per notification type (critical → #security-alerts, digest → #ops)
+
+### External Connections
+- [ ] Cloud provider OAuth flows (AWS, Azure, GCP) for asset discovery
+- [ ] Vulnerability scanner API connections (Qualys, Tenable, Rapid7)
+- [ ] CMDB/ITSM integration endpoints (ServiceNow, Jira)
+- [ ] Webhook configuration UI (inbound + outbound)
+- [ ] Connection health monitoring and status page
+- [ ] Encrypted credential storage for external connections
+
+### API & Backend
+- [ ] Tenant settings API for integration configs
+- [ ] Integration connection test endpoints
+- [ ] OAuth callback handlers for each provider
+- [ ] Slack event subscription endpoint
+- [ ] Rate limiting for external API calls
