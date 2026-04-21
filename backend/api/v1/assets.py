@@ -26,7 +26,7 @@ from backend.services.scoring import scoring_service
 router = APIRouter()
 
 
-@router.get("/assets")
+@router.get("/")
 async def list_assets(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -114,7 +114,7 @@ async def list_assets(
     }
 
 
-@router.get("/assets/{asset_id}")
+@router.get("/{asset_id}")
 async def get_asset(
     asset_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -207,7 +207,7 @@ async def get_asset(
     }
 
 
-@router.post("/assets")
+@router.post("/")
 async def create_asset(
     asset_data: Dict[str, Any],
     db: AsyncSession = Depends(get_db),
@@ -261,7 +261,7 @@ async def create_asset(
     }
 
 
-@router.put("/assets/{asset_id}")
+@router.put("/{asset_id}")
 async def update_asset(
     asset_id: UUID,
     asset_data: Dict[str, Any],
@@ -305,7 +305,7 @@ async def update_asset(
     }
 
 
-@router.delete("/assets/{asset_id}")
+@router.delete("/{asset_id}")
 async def delete_asset(
     asset_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -334,7 +334,7 @@ async def delete_asset(
     return {"status": "deleted", "asset_id": str(asset_id)}
 
 
-@router.post("/assets/bulk-import")
+@router.post("/bulk-import")
 async def bulk_import_assets(
     file: UploadFile = File(...),
     format: str = Query("json", pattern="^(json|csv)$"),
@@ -429,7 +429,7 @@ async def bulk_import_assets(
     }
 
 
-@router.get("/assets/{asset_id}/vulnerabilities")
+@router.get("/{asset_id}/vulnerabilities")
 async def get_asset_vulnerabilities(
     asset_id: UUID,
     db: AsyncSession = Depends(get_db),

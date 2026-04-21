@@ -50,7 +50,7 @@ class WindowUpdate(BaseModel):
     change_freeze_reason: Optional[str] = None
 
 
-@router.get("/maintenance-windows")
+@router.get("/")
 async def list_maintenance_windows(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -120,7 +120,7 @@ async def list_maintenance_windows(
     }
 
 
-@router.post("/maintenance-windows")
+@router.post("/")
 async def create_maintenance_window(
     window_data: WindowCreate,
     db: AsyncSession = Depends(get_db),
@@ -192,7 +192,7 @@ async def create_maintenance_window(
     return window.to_dict()
 
 
-@router.get("/maintenance-windows/{window_id}")
+@router.get("/{window_id}")
 async def get_maintenance_window(
     window_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -232,7 +232,7 @@ async def get_maintenance_window(
     return window_dict
 
 
-@router.patch("/maintenance-windows/{window_id}")
+@router.patch("/{window_id}")
 async def update_maintenance_window(
     window_id: UUID,
     updates: WindowUpdate,
@@ -278,7 +278,7 @@ async def update_maintenance_window(
     return window.to_dict()
 
 
-@router.delete("/maintenance-windows/{window_id}")
+@router.delete("/{window_id}")
 async def delete_maintenance_window(
     window_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -321,7 +321,7 @@ async def delete_maintenance_window(
     return {"message": f"Maintenance window '{window.name}' deleted successfully"}
 
 
-@router.post("/maintenance-windows/create-recurring")
+@router.post("/create-recurring")
 async def create_recurring_windows(
     recurrence_data: Dict[str, Any],
     db: AsyncSession = Depends(get_db),

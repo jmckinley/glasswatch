@@ -22,7 +22,7 @@ from backend.models.tenant import Tenant
 router = APIRouter()
 
 
-@router.get("/vulnerabilities")
+@router.get("/")
 async def list_vulnerabilities(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -100,7 +100,7 @@ async def list_vulnerabilities(
     }
 
 
-@router.get("/vulnerabilities/{vulnerability_id}")
+@router.get("/{vulnerability_id}")
 async def get_vulnerability(
     vulnerability_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -180,7 +180,7 @@ async def get_vulnerability(
     }
 
 
-@router.post("/vulnerabilities/search")
+@router.post("/search")
 async def search_vulnerabilities(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -277,7 +277,7 @@ async def search_vulnerabilities(
     }
 
 
-@router.get("/vulnerabilities/stats")
+@router.get("/stats")
 async def get_vulnerability_stats(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),

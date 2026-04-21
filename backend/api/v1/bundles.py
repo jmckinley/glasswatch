@@ -24,7 +24,7 @@ from backend.core.auth_compat import get_current_tenant_compat as get_current_te
 router = APIRouter()
 
 
-@router.get("/bundles")
+@router.get("/")
 async def list_bundles(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -81,7 +81,7 @@ async def list_bundles(
     }
 
 
-@router.get("/bundles/{bundle_id}")
+@router.get("/{bundle_id}")
 async def get_bundle(
     bundle_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -134,7 +134,7 @@ async def get_bundle(
     return bundle_dict
 
 
-@router.patch("/bundles/{bundle_id}/status")
+@router.patch("/{bundle_id}/status")
 async def update_bundle_status(
     bundle_id: UUID,
     status_update: Dict[str, str],
@@ -184,7 +184,7 @@ async def update_bundle_status(
     return bundle.to_dict()
 
 
-@router.post("/bundles/{bundle_id}/execute")
+@router.post("/{bundle_id}/execute")
 async def execute_bundle(
     bundle_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -229,7 +229,7 @@ async def execute_bundle(
     }
 
 
-@router.get("/bundles/stats")
+@router.get("/stats")
 async def get_bundle_stats(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),

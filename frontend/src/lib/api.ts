@@ -3,7 +3,7 @@
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const DEMO_TENANT = "demo-tenant"; // For MVP - will use real auth later
+const DEMO_TENANT = "550e8400-e29b-41d4-a716-446655440000"; // Demo tenant UUID - will use real auth later
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";

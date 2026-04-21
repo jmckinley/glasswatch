@@ -151,7 +151,7 @@ class OptimizationResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
-@router.post("/goals", response_model=GoalResponse)
+@router.post("/", response_model=GoalResponse)
 async def create_goal(
     goal_data: GoalCreate,
     db: AsyncSession = Depends(get_db),
@@ -249,7 +249,7 @@ async def create_goal(
     )
 
 
-@router.get("/goals", response_model=List[GoalResponse])
+@router.get("/", response_model=List[GoalResponse])
 async def list_goals(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -327,7 +327,7 @@ async def list_goals(
     return responses
 
 
-@router.get("/goals/{goal_id}", response_model=GoalResponse)
+@router.get("/{goal_id}", response_model=GoalResponse)
 async def get_goal(
     goal_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -395,7 +395,7 @@ async def get_goal(
     )
 
 
-@router.patch("/goals/{goal_id}", response_model=GoalResponse)
+@router.patch("/{goal_id}", response_model=GoalResponse)
 async def update_goal(
     goal_id: UUID,
     updates: GoalUpdate,
@@ -472,7 +472,7 @@ async def update_goal(
     )
 
 
-@router.post("/goals/{goal_id}/optimize", response_model=OptimizationResponse)
+@router.post("/{goal_id}/optimize", response_model=OptimizationResponse)
 async def optimize_goal(
     goal_id: UUID,
     request: OptimizationRequest,
@@ -563,7 +563,7 @@ async def optimize_goal(
         )
 
 
-@router.delete("/goals/{goal_id}")
+@router.delete("/{goal_id}")
 async def delete_goal(
     goal_id: UUID,
     db: AsyncSession = Depends(get_db),
