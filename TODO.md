@@ -542,6 +542,14 @@ Read HANDOVER_SPRINT_10.md for complete Sprint 10 context.
 - [ ] Connection health monitoring and status page
 - [ ] Encrypted credential storage for external connections
 
+### Maintenance Windows Overhaul
+- [ ] Scope maintenance windows per app/service and environment (not just tenant-level)
+- [ ] Support multiple overlapping windows with priority/specificity rules
+- [ ] Add environment (prod/staging/dev) and asset_group fields to maintenance window model
+- [ ] Bundles inherit the most specific matching window
+- [ ] UI to manage windows per environment and criticality tier
+- [ ] Default/fallback window when no specific match exists
+
 ### API & Backend
 - [ ] Tenant settings API for integration configs
 - [ ] Integration connection test endpoints
