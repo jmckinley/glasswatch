@@ -96,33 +96,33 @@ class GoalResponse(BaseModel):
     active: bool
     
     # Progress
-    progress_percentage: float
-    vulnerabilities_total: int
-    vulnerabilities_addressed: int
-    risk_score_initial: float
-    risk_score_current: float
+    progress_percentage: float = 0.0
+    vulnerabilities_total: int = 0
+    vulnerabilities_addressed: int = 0
+    risk_score_initial: float = 0.0
+    risk_score_current: float = 0.0
     
     # Target
-    target_date: Optional[datetime]
-    target_metric: Optional[str]
-    target_value: Optional[float]
+    target_date: Optional[datetime] = None
+    target_metric: Optional[str] = None
+    target_value: Optional[float] = None
     
     # Constraints
-    risk_tolerance: RiskTolerance
-    max_vulns_per_window: int
-    max_downtime_hours: float
-    require_vendor_approval: bool
-    min_patch_weather_score: int
+    risk_tolerance: RiskTolerance = RiskTolerance.BALANCED
+    max_vulns_per_window: Optional[int] = None
+    max_downtime_hours: Optional[float] = None
+    require_vendor_approval: bool = False
+    min_patch_weather_score: Optional[int] = None
     
     # Metadata
-    created_at: datetime
-    updated_at: datetime
-    completed_at: Optional[datetime]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     
     # Optimization results
-    next_bundle_id: Optional[UUID]
-    next_bundle_date: Optional[datetime]
-    estimated_completion_date: Optional[datetime]
+    next_bundle_id: Optional[UUID] = None
+    next_bundle_date: Optional[datetime] = None
+    estimated_completion_date: Optional[datetime] = None
 
 
 class OptimizationRequest(BaseModel):
@@ -219,7 +219,7 @@ async def create_goal(
         id=goal.id,
         tenant_id=goal.tenant_id,
         name=goal.name,
-        type=GoalType(goal.type),
+        type=GoalType(goal.type) if goal.type else GoalType.CUSTOM,
         description=goal.description,
         active=goal.active,
         
@@ -233,7 +233,7 @@ async def create_goal(
         target_metric=goal.target_metric,
         target_value=goal.target_value,
         
-        risk_tolerance=RiskTolerance(goal.risk_tolerance),
+        risk_tolerance=RiskTolerance(goal.risk_tolerance) if goal.risk_tolerance else RiskTolerance.BALANCED,
         max_vulns_per_window=goal.max_vulns_per_window,
         max_downtime_hours=goal.max_downtime_hours,
         require_vendor_approval=goal.require_vendor_approval,
@@ -295,7 +295,7 @@ async def list_goals(
             id=goal.id,
             tenant_id=goal.tenant_id,
             name=goal.name,
-            type=GoalType(goal.type),
+            type=GoalType(goal.type) if goal.type else GoalType.CUSTOM,
             description=goal.description,
             active=goal.active,
             
@@ -309,7 +309,7 @@ async def list_goals(
             target_metric=goal.target_metric,
             target_value=goal.target_value,
             
-            risk_tolerance=RiskTolerance(goal.risk_tolerance),
+            risk_tolerance=RiskTolerance(goal.risk_tolerance) if goal.risk_tolerance else RiskTolerance.BALANCED,
             max_vulns_per_window=goal.max_vulns_per_window,
             max_downtime_hours=goal.max_downtime_hours,
             require_vendor_approval=goal.require_vendor_approval,
@@ -365,7 +365,7 @@ async def get_goal(
         id=goal.id,
         tenant_id=goal.tenant_id,
         name=goal.name,
-        type=GoalType(goal.type),
+        type=GoalType(goal.type) if goal.type else GoalType.CUSTOM,
         description=goal.description,
         active=goal.active,
         
@@ -379,7 +379,7 @@ async def get_goal(
         target_metric=goal.target_metric,
         target_value=goal.target_value,
         
-        risk_tolerance=RiskTolerance(goal.risk_tolerance),
+        risk_tolerance=RiskTolerance(goal.risk_tolerance) if goal.risk_tolerance else RiskTolerance.BALANCED,
         max_vulns_per_window=goal.max_vulns_per_window,
         max_downtime_hours=goal.max_downtime_hours,
         require_vendor_approval=goal.require_vendor_approval,
@@ -442,7 +442,7 @@ async def update_goal(
         id=goal.id,
         tenant_id=goal.tenant_id,
         name=goal.name,
-        type=GoalType(goal.type),
+        type=GoalType(goal.type) if goal.type else GoalType.CUSTOM,
         description=goal.description,
         active=goal.active,
         
@@ -456,7 +456,7 @@ async def update_goal(
         target_metric=goal.target_metric,
         target_value=goal.target_value,
         
-        risk_tolerance=RiskTolerance(goal.risk_tolerance),
+        risk_tolerance=RiskTolerance(goal.risk_tolerance) if goal.risk_tolerance else RiskTolerance.BALANCED,
         max_vulns_per_window=goal.max_vulns_per_window,
         max_downtime_hours=goal.max_downtime_hours,
         require_vendor_approval=goal.require_vendor_approval,

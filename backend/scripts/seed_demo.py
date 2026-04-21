@@ -272,13 +272,13 @@ def seed_goals(cur):
         cur.execute("""
             INSERT INTO goals (id, tenant_id, name, description, goal_type,
                 target_completion_date, target_risk_score, target_vulnerability_count,
-                status, current_risk_score, current_vulnerability_count,
+                risk_tolerance, status, current_risk_score, current_vulnerability_count,
                 patches_completed, patches_remaining, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             gid, TENANT_ID, name, desc, gtype,
             target_date, target_risk, target_vuln_count,
-            "active", 72, 25, 8, 17, NOW
+            "balanced", "active", 72, 25, 8, 17, NOW
         ))
     
     print(f"  ✓ Seeded {len(goals)} goals")
