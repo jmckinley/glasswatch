@@ -27,7 +27,7 @@ class WindowCreate(BaseModel):
     """Request model for creating a maintenance window."""
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    type: str = Field("scheduled", regex="^(scheduled|emergency|blackout)$")
+    type: str = Field("scheduled", pattern="^(scheduled|emergency|blackout)$")
     start_time: datetime
     end_time: datetime
     timezone: Optional[str] = Field(None, max_length=50)

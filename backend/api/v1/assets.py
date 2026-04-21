@@ -337,7 +337,7 @@ async def delete_asset(
 @router.post("/assets/bulk-import")
 async def bulk_import_assets(
     file: UploadFile = File(...),
-    format: str = Query("json", regex="^(json|csv)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> Dict[str, Any]:
