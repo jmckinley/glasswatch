@@ -166,15 +166,50 @@ export const goalsApi = {
     }),
 };
 
+// Bundles API
+export const bundlesApi = {
+  list: (params?: {
+    status?: string;
+    goal_id?: string;
+    maintenance_window_id?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+    }
+    return apiCall<any>(`/bundles?${query}`);
+  },
+
+  get: (id: string) => apiCall<any>(`/bundles/${id}`),
+};
+
 // Dashboard Stats
 export const dashboardApi = {
   getStats: async () => {
     // Aggregate data from multiple endpoints
-    const [vulnStats, assetList, goalsList] = await Promise.all([
+    const [vulnStats, assetList, goalsList, windowsList, bundlesList] = await Promise.all([
       vulnerabilitiesApi.stats(),
-      assetsApi.list({ limit: 100 }), // Need enough to calculate internet_exposed/critical counts
+      assetsApi.list({ limit: 200 }), // Need enough to calculate internet_exposed/critical counts
       goalsApi.list({ active_only: true }),
+      maintenanceWindowsApi.list({ active: true, limit: 5 }),
+      bundlesApi.list({ limit: 100 }),
     ]);
+
+    const assets = assetList.assets || assetList.items || [];
+    const windows = windowsList.items || windowsList || [];
+    const bundles = bundlesList.items || bundlesList || [];
+
+    // Find next maintenance window
+    const upcomingWindows = windows
+      .filter((w: any) => new Date(w.start_time) > new Date())
+      .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    const nextWindow = upcomingWindows[0];
 
     // Transform into dashboard format
     return {
@@ -188,33 +223,62 @@ export const dashboardApi = {
       },
       assets: {
         total: assetList.total || 0,
-        internet_exposed: (assetList.assets || assetList.items || []).filter(
-          (a: any) => a.exposure === "internet" || a.is_internet_facing
+        internet_exposed: assets.filter(
+          (a: any) => a.exposure === "internet-facing" || a.exposure === "internet" || a.is_internet_facing
         ).length || 0,
-        critical_assets: (assetList.assets || assetList.items || []).filter(
-          (a: any) => a.criticality >= 4
+        critical_assets: assets.filter(
+          (a: any) => a.criticality >= 8
         ).length || 0,
       },
-      goals: {
-        active: goalsList.length,
-        on_track: goalsList.filter(
-          (g: any) => g.progress_percentage >= 50
-        ).length,
-        at_risk: goalsList.filter(
-          (g: any) => g.progress_percentage < 50 && g.target_date
-        ).length,
-      },
+      goals: goalsList,
       risk_score: {
         total: vulnStats.total_risk_score || 0,
         trend: "down" as const, // TODO: Calculate from history
         reduction_7d: 12.4, // TODO: Calculate from history
       },
       bundles: {
-        scheduled: 0, // TODO: Add bundles API
-        next_window: null, // TODO: Get from maintenance windows
-        pending_approval: 0, // TODO: Add bundles API
+        scheduled: bundles.filter((b: any) => b.status === "scheduled" || b.status === "approved").length,
+        next_window: nextWindow ? nextWindow.start_time : null,
+        pending_approval: bundles.filter((b: any) => b.status === "draft" && b.approval_required).length,
       },
+      windows: upcomingWindows.slice(0, 2),
     };
+  },
+
+  getTopRiskPairs: async (limit: number = 5) => {
+    // Get vulnerabilities with their affected assets, sorted by risk
+    const vulns = await vulnerabilitiesApi.list({ limit: 50 });
+    const vulnItems = vulns.items || vulns.vulnerabilities || [];
+    
+    // Build asset-vulnerability pairs with risk scores
+    const pairs: any[] = [];
+    for (const vuln of vulnItems) {
+      if (vuln.affected_assets && vuln.affected_assets.length > 0) {
+        for (const asset of vuln.affected_assets) {
+          pairs.push({
+            vulnerability_id: vuln.id,
+            vulnerability_identifier: vuln.identifier,
+            vulnerability_title: vuln.title,
+            vulnerability_severity: vuln.severity,
+            asset_id: asset.id || asset.asset_id,
+            asset_name: asset.name || asset.asset_name,
+            asset_environment: asset.environment,
+            risk_score: asset.risk_score || vuln.cvss_score * 10,
+            risk_factors: {
+              severity: vuln.severity,
+              kev_listed: vuln.kev_listed,
+              epss_score: vuln.epss_score,
+              exploit_available: vuln.exploit_available,
+              asset_exposure: asset.exposure,
+              asset_criticality: asset.criticality,
+            },
+          });
+        }
+      }
+    }
+    
+    // Sort by risk score and return top N
+    return pairs.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, limit);
   },
 };
 
@@ -242,6 +306,9 @@ export const maintenanceWindowsApi = {
   optimize: () => apiCall<any>("/maintenance-windows/optimize", {
     method: "POST",
   }),
+
+  getBundlesForWindow: (windowId: string) => 
+    apiCall<any>(`/maintenance-windows/${windowId}/bundles`),
 };
 
 export { apiCall };

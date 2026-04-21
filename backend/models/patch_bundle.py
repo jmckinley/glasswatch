@@ -4,7 +4,7 @@ PatchBundle model - represents a collection of patches scheduled together.
 Bundles are the output of the goal optimizer - they group patches that can
 be safely deployed together during a maintenance window.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import uuid4
 
@@ -141,7 +141,7 @@ class PatchBundle(Base):
         """Check if bundle is ready for execution."""
         return (
             self.status == "APPROVED" and
-            self.scheduled_for <= datetime.utcnow() and
+            self.scheduled_for <= datetime.now(timezone.utc) and
             not self.depends_on_bundles  # No unmet dependencies
         )
     

@@ -246,24 +246,24 @@ def seed_asset_vulnerabilities(cur, vuln_ids, asset_ids):
 
 
 def seed_goals(cur):
-    """Create 3 sample goals."""
+    """Create 3 sample goals with varied progress."""
     goals = [
         (uid(), "Glasswing Compliance Deadline", "compliance_deadline",
          "Achieve full Glasswing vulnerability disclosure compliance by the July 2026 deadline. "
          "All critical and high severity vulnerabilities must be patched or mitigated.",
-         NOW + timedelta(days=70), 20, None),
+         NOW + timedelta(days=70), 20, None, 72, 25, 8, 17),  # 32% complete, on track
         (uid(), "Zero Critical Vulnerabilities", "zero_critical",
          "Reduce critical vulnerability count to zero across all production assets. "
          "Focus on KEV-listed and actively exploited CVEs first.",
-         NOW + timedelta(days=30), None, 0),
+         NOW + timedelta(days=30), None, 0, 0, 5, 4, 1),  # 80% complete, ahead
         (uid(), "Risk Score Reduction Q3", "risk_reduction",
          "Reduce overall risk score by 60% before end of Q3 2026. "
          "Prioritize internet-facing assets and high-business-impact systems.",
-         NOW + timedelta(days=90), 30, None),
+         NOW + timedelta(days=90), 30, None, 55, 40, 6, 34),  # 15% complete, at risk
     ]
     
     goal_ids = []
-    for gid, name, gtype, desc, target_date, target_risk, target_vuln_count in goals:
+    for gid, name, gtype, desc, target_date, target_risk, target_vuln_count, curr_risk, curr_vuln, patches_done, patches_left in goals:
         if exists(cur, "goals", name=name, tenant_id=TENANT_ID):
             cur.execute("SELECT id FROM goals WHERE name = %s AND tenant_id = %s", (name, TENANT_ID))
             goal_ids.append(cur.fetchone()[0])
@@ -278,7 +278,7 @@ def seed_goals(cur):
         """, (
             gid, TENANT_ID, name, desc, gtype,
             target_date, target_risk, target_vuln_count,
-            "balanced", "active", 72, 25, 8, 17, NOW
+            "balanced", "active", curr_risk, curr_vuln, patches_done, patches_left, NOW
         ))
     
     print(f"  ✓ Seeded {len(goals)} goals")
@@ -286,25 +286,55 @@ def seed_goals(cur):
 
 
 def seed_maintenance_windows(cur, goal_ids):
-    """Create 2 maintenance windows with bundles."""
+    """Create 6 maintenance windows with bundles across different environments."""
     mw1_id = uid()
     mw2_id = uid()
+    mw3_id = uid()
+    mw4_id = uid()
+    mw5_id = uid()
+    mw6_id = uid()
     
     windows = [
-        (mw1_id, "Critical Patch Window — Week 18",
+        (mw1_id, "Production - Web Tier Emergency Patch",
          "Emergency patching window for critical KEV-listed vulnerabilities. "
-         "Focus on internet-facing production systems.",
+         "Focus on internet-facing production web systems. Zero-downtime deployment required.",
          "emergency",
          NOW + timedelta(days=3, hours=2),
-         NOW + timedelta(days=3, hours=6),
-         "production", 4.0, 20, 85.0),
-        (mw2_id, "Scheduled Maintenance — Week 19",
-         "Regular bi-weekly maintenance window for high and medium priority patches. "
-         "Staging first, then production rollout.",
+         NOW + timedelta(days=3, hours=4),
+         "production", 2.0, 8, 90.0),
+        (mw2_id, "Production - Database Tier Scheduled",
+         "Scheduled maintenance for database systems. Includes primary and replica patching. "
+         "Requires database downtime and application quiesce.",
          "scheduled",
          NOW + timedelta(days=10, hours=2),
          NOW + timedelta(days=10, hours=8),
-         "production", 6.0, 50, 70.0),
+         "production", 6.0, 12, 75.0),
+        (mw3_id, "Staging - Full Environment",
+         "Full staging environment patch cycle. Used to validate patches before production rollout.",
+         "scheduled",
+         NOW + timedelta(days=5, hours=14),
+         NOW + timedelta(days=5, hours=18),
+         "staging", 4.0, 30, 60.0),
+        (mw4_id, "DR/Backup Systems Weekly",
+         "Weekly maintenance window for disaster recovery and backup infrastructure. "
+         "Lower priority patches and configuration updates.",
+         "scheduled",
+         NOW + timedelta(days=7, hours=3),
+         NOW + timedelta(days=7, hours=6),
+         "dr", 3.0, 20, 50.0),
+        (mw5_id, "Production - Network Infrastructure",
+         "Biweekly maintenance for firewalls, load balancers, and edge devices. "
+         "Requires careful coordination with network team.",
+         "scheduled",
+         NOW + timedelta(days=14, hours=1),
+         NOW + timedelta(days=14, hours=5),
+         "production", 4.0, 6, 95.0),
+        (mw6_id, "Development - Platform Updates",
+         "Monthly maintenance window for development and CI/CD infrastructure.",
+         "scheduled",
+         NOW + timedelta(days=21, hours=10),
+         NOW + timedelta(days=21, hours=14),
+         "development", 4.0, 40, 40.0),
     ]
     
     mw_ids = []
@@ -328,33 +358,82 @@ def seed_maintenance_windows(cur, goal_ids):
     
     print(f"  ✓ Seeded {len(windows)} maintenance windows")
     
-    # Create bundles for each maintenance window
+    # Create bundles for maintenance windows with realistic assignments
     bundles = [
-        (uid(), goal_ids[0] if goal_ids else None, mw_ids[0],
+        (uid(), goal_ids[0] if len(goal_ids) > 0 else None, mw_ids[0],
          "Emergency KEV Patch Bundle",
-         "Critical patches for KEV-listed vulnerabilities affecting production web and API servers.",
-         "approved", 92.5, "CRITICAL", 4, True),
-        (uid(), goal_ids[0] if goal_ids else None, mw_ids[1] if len(mw_ids) > 1 else mw_ids[0],
-         "High Priority Patch Bundle — Sprint 12",
-         "High and medium priority patches targeting OpenSSH, PHP, and Ivanti vulnerabilities.",
-         "scheduled", 68.0, "HIGH", 8, True),
+         "Critical patches for CVE-2024-21762 (FortiOS) and CVE-2024-3400 (PAN-OS) on internet-facing systems.",
+         "approved", 92.5, "CRITICAL", 4, True, 90),
+        (uid(), goal_ids[1] if len(goal_ids) > 1 else None, mw_ids[1],
+         "Database Tier Security Updates",
+         "Patches for database servers including PostgreSQL and OS-level vulnerabilities.",
+         "scheduled", 68.0, "HIGH", 8, True, 180),
+        (uid(), goal_ids[2] if len(goal_ids) > 2 else None, mw_ids[2],
+         "Staging Pre-Production Validation",
+         "Complete patch cycle for staging environment validation before prod rollout.",
+         "scheduled", 55.0, "MEDIUM", 12, False, 120),
+        (uid(), goal_ids[0] if len(goal_ids) > 0 else None, mw_ids[3],
+         "DR Infrastructure Updates",
+         "Quarterly updates for backup and disaster recovery systems.",
+         "draft", 32.0, "LOW", 6, False, 60),
     ]
     
-    for bid, gid, mwid, name, desc, status, risk, risk_level, asset_count, approval_required in bundles:
+    bundle_ids = []
+    for bid, gid, mwid, name, desc, status, risk, risk_level, asset_count, approval_required, est_minutes in bundles:
         if exists(cur, "bundles", name=name, tenant_id=TENANT_ID):
             continue
+        bundle_ids.append(bid)
         cur.execute("""
             INSERT INTO bundles (id, tenant_id, goal_id, maintenance_window_id, name, description,
                 status, risk_score, risk_level, assets_affected_count, approval_required,
-                created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                estimated_duration_minutes, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             bid, TENANT_ID, gid, mwid, name, desc,
-            status, risk, risk_level, asset_count, approval_required,
+            status, risk, risk_level, asset_count, approval_required, est_minutes,
             NOW, NOW
         ))
     
     print(f"  ✓ Seeded {len(bundles)} bundles")
+    
+    # Now populate bundle_items to link bundles to actual asset-vuln pairs
+    cur.execute("""
+        SELECT av.id, av.asset_id, av.vulnerability_id, av.risk_score 
+        FROM asset_vulnerabilities av
+        JOIN vulnerabilities v ON v.id = av.vulnerability_id
+        WHERE av.status = 'open'
+        ORDER BY av.risk_score DESC
+        LIMIT 30
+    """)
+    asset_vulns = cur.fetchall()
+    
+    # Distribute asset-vulns across bundles
+    items_count = 0
+    for i, (av_id, asset_id, vuln_id, risk_score) in enumerate(asset_vulns):
+        # First 4 items go to emergency bundle, next 8 to DB bundle, etc.
+        if i < 4:
+            bundle_id = bundle_ids[0] if len(bundle_ids) > 0 else None
+        elif i < 12:
+            bundle_id = bundle_ids[1] if len(bundle_ids) > 1 else None
+        elif i < 24:
+            bundle_id = bundle_ids[2] if len(bundle_ids) > 2 else None
+        else:
+            bundle_id = bundle_ids[3] if len(bundle_ids) > 3 else None
+        
+        if bundle_id:
+            cur.execute("""
+                INSERT INTO bundle_items (id, bundle_id, asset_vulnerability_id, execution_order,
+                    estimated_duration_minutes, rollback_plan, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                uid(), bundle_id, av_id, i % 10,
+                15 + (hash(str(av_id)) % 30),  # 15-45 minutes per patch
+                "Standard rollback: restore from snapshot, restart service",
+                NOW
+            ))
+            items_count += 1
+    
+    print(f"  ✓ Seeded {items_count} bundle items")
     return mw_ids
 
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { maintenanceWindowsApi } from "@/lib/api";
+import { maintenanceWindowsApi, goalsApi, bundlesApi } from "@/lib/api";
 
 interface MaintenanceWindow {
   id: string;
@@ -28,9 +28,31 @@ interface Bundle {
   vulnerabilities_count?: number;
   assets_affected_count?: number;
   estimated_duration_minutes?: number;
+  goal_id?: string;
+  items?: BundleItem[];
 }
 
+interface BundleItem {
+  id: string;
+  asset_vulnerability_id: string;
+  vulnerability?: {
+    identifier: string;
+    title: string;
+    severity: string;
+  };
+  asset?: {
+    name: string;
+    identifier: string;
+  };
+}
 
+interface Goal {
+  id: string;
+  name: string;
+  target_completion_date: string | null;
+  patches_completed: number;
+  patches_remaining: number;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   scheduled: "text-success",
@@ -38,6 +60,7 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: "text-secondary",
   completed: "text-success",
   failed: "text-destructive",
+  approved: "text-primary",
 };
 
 const STATUS_BG: Record<string, string> = {
@@ -46,63 +69,106 @@ const STATUS_BG: Record<string, string> = {
   in_progress: "bg-secondary/10",
   completed: "bg-success/10",
   failed: "bg-destructive/10",
+  approved: "bg-primary/10",
 };
 
 export default function SchedulePage() {
   const [windows, setWindows] = useState<MaintenanceWindow[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
-  const [optimizing, setOptimizing] = useState(false);
-  const [optimizeResult, setOptimizeResult] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchWindows();
+    fetchData();
   }, []);
 
-  const fetchWindows = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await maintenanceWindowsApi.list();
-      setWindows(data.items || []);
+      const [windowsData, goalsData] = await Promise.all([
+        maintenanceWindowsApi.list(),
+        goalsApi.list({ active_only: true }),
+      ]);
+      setWindows(windowsData.items || []);
+      setGoals(goalsData || []);
     } catch (error) {
-      console.error("Failed to fetch maintenance windows:", error);
+      console.error("Failed to fetch schedule data:", error);
       setWindows([]);
+      setGoals([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOptimize = async () => {
-    setOptimizing(true);
-    setOptimizeResult(null);
-    
-    try {
-      // Try to call the backend optimize endpoint
-      await maintenanceWindowsApi.optimize();
-      await fetchWindows();
-      setOptimizeResult("Schedule optimized successfully across all maintenance windows and goals.");
-    } catch (error) {
-      // If endpoint doesn't exist or fails, provide analysis based on current data
-      const totalWindows = windows.length;
-      const totalBundles = windows.reduce(
-        (sum, w) => sum + (w.scheduled_bundles?.length || 0),
-        0
-      );
-      const avgUtilization = windows.reduce((sum, w) => {
-        const totalDuration = w.scheduled_bundles.reduce(
-          (s, b) => s + (b.estimated_duration_minutes || 0),
-          0
-        );
-        return sum + (totalDuration / (w.duration_hours * 60)) * 100;
-      }, 0) / (totalWindows || 1);
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    setAnalysisResult(null);
 
-      setOptimizeResult(
-        `Analysis complete:\n\u2022 ${totalWindows} maintenance windows analyzed\n\u2022 ${totalBundles} patch bundles scheduled\n\u2022 ${avgUtilization.toFixed(1)}% average window utilization\n\nCurrent schedule appears optimal. All goals are being addressed within available maintenance windows.`
+    try {
+      // Call the optimize endpoint with preview_only if available
+      // For now, provide analysis based on current data
+      const totalWindows = windows.length;
+      const totalBundles = windows.reduce((sum, w) => sum + (w.scheduled_bundles?.length || 0), 0);
+
+      // Calculate average utilization
+      const avgUtilization =
+        windows.reduce((sum, w) => {
+          const totalDuration = w.scheduled_bundles.reduce(
+            (s, b) => s + (b.estimated_duration_minutes || 0),
+            0
+          );
+          return sum + (totalDuration / (w.duration_hours * 60)) * 100;
+        }, 0) / (totalWindows || 1);
+
+      // Calculate velocity per goal
+      const velocityAnalysis = goals.map((goal) => {
+        const daysRemaining = goal.target_completion_date
+          ? Math.ceil(
+              (new Date(goal.target_completion_date).getTime() - new Date().getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : null;
+        const patchesPerWeek =
+          goal.patches_completed > 0 ? (goal.patches_completed / 30) * 7 : 0;
+        const weeksNeeded =
+          patchesPerWeek > 0 ? goal.patches_remaining / patchesPerWeek : Infinity;
+        const weeksAvailable = daysRemaining ? daysRemaining / 7 : null;
+
+        return {
+          name: goal.name,
+          daysRemaining,
+          weeksNeeded,
+          weeksAvailable,
+          onTrack: weeksAvailable ? weeksNeeded <= weeksAvailable : null,
+        };
+      });
+
+      const atRiskGoals = velocityAnalysis.filter((g) => g.onTrack === false);
+
+      let analysis = `**Schedule Analysis Complete**\n\n`;
+      analysis += `• ${totalWindows} maintenance windows scheduled\n`;
+      analysis += `• ${totalBundles} patch bundles across all windows\n`;
+      analysis += `• ${avgUtilization.toFixed(1)}% average window utilization\n\n`;
+
+      if (atRiskGoals.length > 0) {
+        analysis += `**Velocity Concerns:**\n`;
+        atRiskGoals.forEach((g) => {
+          const shortfall = g.weeksNeeded - (g.weeksAvailable || 0);
+          analysis += `• "${g.name}" will miss deadline by ~${shortfall.toFixed(1)} weeks at current velocity\n`;
+        });
+      } else {
+        analysis += `✓ All goals are on track at current patch velocity.\n`;
+      }
+
+      setAnalysisResult(analysis);
+    } catch (error) {
+      setAnalysisResult(
+        `Analysis unavailable. Backend optimization endpoint may not be implemented yet.\n\nCurrent schedule shows ${windows.length} windows with ${windows.reduce((s, w) => s + w.scheduled_bundles.length, 0)} bundles.`
       );
     } finally {
-      setTimeout(() => {
-        setOptimizing(false);
-      }, 1500);
+      setTimeout(() => setAnalyzing(false), 1000);
     }
   };
 
@@ -118,17 +184,17 @@ export default function SchedulePage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleOptimize}
-            disabled={optimizing || loading}
+            onClick={handleAnalyze}
+            disabled={analyzing || loading}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {optimizing ? (
+            {analyzing ? (
               <>
                 <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                Optimizing...
+                Analyzing...
               </>
             ) : (
-              "Optimize Schedule"
+              "Analyze Schedule"
             )}
           </button>
           <button
@@ -154,17 +220,19 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Optimize Result */}
-      {optimizeResult && (
+      {/* Analysis Result */}
+      {analysisResult && (
         <div className="card p-6 mb-6 bg-primary/10 border-primary/30">
           <div className="flex items-start gap-3">
-            <div className="text-primary text-xl">✓</div>
+            <div className="text-primary text-xl">📊</div>
             <div className="flex-1">
-              <h3 className="font-semibold mb-2 text-primary">Optimization Complete</h3>
-              <p className="text-sm text-neutral-300 whitespace-pre-line">{optimizeResult}</p>
+              <h3 className="font-semibold mb-2 text-primary">Schedule Analysis</h3>
+              <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-sans">
+                {analysisResult}
+              </pre>
             </div>
             <button
-              onClick={() => setOptimizeResult(null)}
+              onClick={() => setAnalysisResult(null)}
               className="text-neutral-400 hover:text-white transition-colors"
             >
               ✕
@@ -173,11 +241,91 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {/* Optimization Summary */}
+      {!loading && goals.length > 0 && (
+        <div className="card p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Optimization Summary</h2>
+
+          {/* Goal Timelines */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-neutral-400 mb-3">Goal Progress Timeline</h3>
+            <div className="space-y-3">
+              {goals.map((goal) => {
+                const totalPatches = goal.patches_completed + goal.patches_remaining;
+                const progressPct =
+                  totalPatches > 0 ? (goal.patches_completed / totalPatches) * 100 : 0;
+                const daysRemaining = goal.target_completion_date
+                  ? Math.ceil(
+                      (new Date(goal.target_completion_date).getTime() - new Date().getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  : null;
+
+                return (
+                  <div key={goal.id} className="bg-neutral-800 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium">{goal.name}</span>
+                      <span className="text-sm text-neutral-400">
+                        {daysRemaining !== null ? `${daysRemaining} days remaining` : "No deadline"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-3 bg-neutral-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            progressPct >= 75
+                              ? "bg-success"
+                              : progressPct >= 40
+                              ? "bg-warning"
+                              : "bg-destructive"
+                          }`}
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium w-16 text-right">
+                        {progressPct.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cross-Goal Insights */}
+          <div>
+            <h3 className="text-sm font-medium text-neutral-400 mb-3">Cross-Goal Insights</h3>
+            <div className="bg-neutral-800 rounded-lg p-4 text-sm text-neutral-300">
+              {windows.length === 0 ? (
+                <p>No maintenance windows scheduled yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  <li>
+                    • {windows.filter((w) => w.type === "emergency").length} emergency windows
+                    prioritize critical KEV-listed vulnerabilities
+                  </li>
+                  <li>
+                    • {windows.filter((w) => w.type === "scheduled").length} scheduled windows
+                    balance capacity across environments
+                  </li>
+                  {goals.length > 1 && (
+                    <li>
+                      • Multiple goals may share maintenance windows — bundles are assigned based
+                      on risk, deadline, and capacity constraints
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <ScheduleSkeleton />
       ) : viewMode === "list" ? (
-        <ListView windows={windows} />
+        <ListView windows={windows} goals={goals} />
       ) : (
         <CalendarView windows={windows} />
       )}
@@ -185,13 +333,9 @@ export default function SchedulePage() {
   );
 }
 
-function ListView({ windows }: { windows: MaintenanceWindow[] }) {
-  const upcomingWindows = windows.filter(
-    (w) => new Date(w.start_time) > new Date()
-  );
-  const pastWindows = windows.filter(
-    (w) => new Date(w.start_time) <= new Date()
-  );
+function ListView({ windows, goals }: { windows: MaintenanceWindow[]; goals: Goal[] }) {
+  const upcomingWindows = windows.filter((w) => new Date(w.start_time) > new Date());
+  const pastWindows = windows.filter((w) => new Date(w.start_time) <= new Date());
 
   return (
     <div className="space-y-8">
@@ -204,7 +348,7 @@ function ListView({ windows }: { windows: MaintenanceWindow[] }) {
             </div>
           ) : (
             upcomingWindows.map((window) => (
-              <WindowCard key={window.id} window={window} />
+              <WindowCard key={window.id} window={window} goals={goals} />
             ))
           )}
         </div>
@@ -215,7 +359,7 @@ function ListView({ windows }: { windows: MaintenanceWindow[] }) {
           <h2 className="text-xl font-semibold mb-4">Past Maintenance</h2>
           <div className="space-y-4">
             {pastWindows.map((window) => (
-              <WindowCard key={window.id} window={window} isPast />
+              <WindowCard key={window.id} window={window} goals={goals} isPast />
             ))}
           </div>
         </div>
@@ -224,7 +368,15 @@ function ListView({ windows }: { windows: MaintenanceWindow[] }) {
   );
 }
 
-function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isPast?: boolean }) {
+function WindowCard({
+  window,
+  goals,
+  isPast = false,
+}: {
+  window: MaintenanceWindow;
+  goals: Goal[];
+  isPast?: boolean;
+}) {
   const startDate = new Date(window.start_time);
   const endDate = new Date(window.end_time);
   const duration = window.duration_hours;
@@ -233,6 +385,24 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
     0
   );
   const utilizationPercent = (totalBundleDuration / (duration * 60)) * 100;
+
+  // Calculate which goals this window serves
+  const goalIds = new Set(
+    window.scheduled_bundles.map((b) => b.goal_id).filter((id) => id !== undefined)
+  );
+  const servedGoals = goals.filter((g) => goalIds.has(g.id));
+
+  // Calculate total risk reduction
+  const totalRiskReduction = window.scheduled_bundles.reduce(
+    (sum, b) => sum + (b.risk_score || 0),
+    0
+  );
+
+  // Count assets
+  const totalAssets = window.scheduled_bundles.reduce(
+    (sum, b) => sum + (b.assets_affected_count || 0),
+    0
+  );
 
   return (
     <div className={`card p-6 ${isPast ? "opacity-60" : ""}`}>
@@ -248,6 +418,9 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
             <span>•</span>
             <span>{window.environment}</span>
           </div>
+          {window.description && (
+            <p className="text-sm text-neutral-400 mt-2">{window.description}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -260,14 +433,54 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
             {window.type.toUpperCase()}
           </span>
           {window.approved ? (
-            <span className="text-xs px-2 py-1 bg-success/10 text-success rounded">
-              APPROVED
-            </span>
+            <span className="text-xs px-2 py-1 bg-success/10 text-success rounded">APPROVED</span>
           ) : (
             <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded">
               PENDING APPROVAL
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Goals Served */}
+      {servedGoals.length > 0 && (
+        <div className="mb-4 pb-4 border-b border-neutral-700">
+          <div className="text-sm text-neutral-400 mb-2">Goals Served by This Window:</div>
+          <div className="flex flex-wrap gap-2">
+            {servedGoals.map((goal) => (
+              <span
+                key={goal.id}
+                className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full border border-primary/30"
+              >
+                {goal.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Capacity & Risk */}
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div>
+          <div className="text-sm text-neutral-400">Capacity</div>
+          <div className="text-lg font-semibold">
+            {totalAssets}/{window.max_assets || "∞"}
+          </div>
+          <div className="text-xs text-neutral-500">
+            {window.max_assets ? `${((totalAssets / window.max_assets) * 100).toFixed(0)}% used` : ""}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-neutral-400">Utilization</div>
+          <div className="text-lg font-semibold">{utilizationPercent.toFixed(0)}%</div>
+          <div className="text-xs text-neutral-500">
+            {totalBundleDuration}m / {duration * 60}m
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-neutral-400">Risk Reduction</div>
+          <div className="text-lg font-semibold">{totalRiskReduction.toFixed(1)}</div>
+          <div className="text-xs text-neutral-500">total risk score</div>
         </div>
       </div>
 
@@ -281,26 +494,21 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
             className={`h-full transition-all duration-500 ${
               utilizationPercent > 80 ? "bg-warning" : "bg-primary"
             }`}
-            style={{ width: `${utilizationPercent}%` }}
+            style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
           />
         </div>
       </div>
 
+      {/* Bundles */}
       {window.scheduled_bundles && window.scheduled_bundles.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-neutral-400">Scheduled Bundles</h4>
           {window.scheduled_bundles.map((bundle) => (
             <div key={bundle.id} className="bg-neutral-800 rounded-lg p-4">
               <div className="flex justify-between items-start">
-                <div>
+                <div className="flex-1">
                   <h5 className="font-medium">{bundle.name}</h5>
                   <div className="flex items-center gap-4 mt-1 text-sm text-neutral-400">
-                    {bundle.vulnerabilities_count && (
-                      <>
-                        <span>{bundle.vulnerabilities_count} vulnerabilities</span>
-                        <span>•</span>
-                      </>
-                    )}
                     {bundle.assets_affected_count && (
                       <>
                         <span>{bundle.assets_affected_count} assets</span>
@@ -308,9 +516,18 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
                       </>
                     )}
                     {bundle.estimated_duration_minutes && (
-                      <span>{bundle.estimated_duration_minutes} min</span>
+                      <>
+                        <span>{bundle.estimated_duration_minutes} min</span>
+                        <span>•</span>
+                      </>
                     )}
+                    {bundle.risk_score && <span>Risk: {bundle.risk_score.toFixed(1)}</span>}
                   </div>
+                  {bundle.items && bundle.items.length > 0 && (
+                    <div className="mt-2 text-xs text-neutral-500">
+                      Patches: {bundle.items.map((item) => item.vulnerability?.identifier).join(", ")}
+                    </div>
+                  )}
                 </div>
                 <span
                   className={`text-xs px-2 py-1 rounded ${STATUS_BG[bundle.status]} ${
@@ -320,12 +537,6 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
                   {bundle.status.toUpperCase()}
                 </span>
               </div>
-              {bundle.risk_score && (
-                <div className="mt-2 text-sm">
-                  <span className="text-neutral-400">Risk Score:</span>{" "}
-                  <span className="font-medium">{bundle.risk_score.toFixed(1)}</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -335,24 +546,45 @@ function WindowCard({ window, isPast = false }: { window: MaintenanceWindow; isP
 }
 
 function CalendarView({ windows }: { windows: MaintenanceWindow[] }) {
-  const currentMonth = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const currentMonth = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <div className="card p-6">
       <h2 className="text-xl font-semibold mb-4">{currentMonth}</h2>
-      <div className="text-center text-neutral-400">
-        Calendar view coming soon...
-      </div>
-      <div className="mt-8 space-y-2">
+      <div className="text-center text-neutral-400 mb-8">Calendar view coming soon...</div>
+      <div className="space-y-2">
         {windows.map((window) => {
           const date = new Date(window.start_time);
           return (
-            <div key={window.id} className="flex items-center gap-4 p-2">
-              <div className="text-sm font-medium w-20">{date.toLocaleDateString()}</div>
-              <div className="flex-1 bg-primary/20 rounded p-2">
-                <div className="text-sm font-medium">{window.name}</div>
-                <div className="text-xs text-neutral-400">
-                  {window.scheduled_bundles?.length || 0} bundles scheduled
+            <div key={window.id} className="flex items-center gap-4 p-3 hover:bg-neutral-800 rounded transition-colors">
+              <div className="text-sm font-medium w-32">
+                {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              </div>
+              <div className="flex-1 bg-primary/20 rounded p-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-sm font-medium">{window.name}</div>
+                    <div className="text-xs text-neutral-400 mt-1">
+                      {window.scheduled_bundles?.length || 0} bundles •{" "}
+                      {window.scheduled_bundles?.reduce(
+                        (sum, b) => sum + (b.assets_affected_count || 0),
+                        0
+                      )}{" "}
+                      assets • {window.environment}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      window.type === "emergency"
+                        ? "bg-destructive/20 text-destructive"
+                        : "bg-primary/30 text-primary"
+                    }`}
+                  >
+                    {window.type}
+                  </span>
                 </div>
               </div>
             </div>
