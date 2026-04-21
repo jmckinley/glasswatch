@@ -186,7 +186,7 @@ async def get_current_tenant(
     return tenant
 
 
-async def require_role(required_role: UserRole):
+def require_role(required_role: UserRole):
     """Dependency to require a specific role or higher."""
     async def role_checker(user: User = Depends(get_current_user)) -> User:
         # Define role hierarchy
@@ -211,7 +211,7 @@ async def require_role(required_role: UserRole):
     return role_checker
 
 
-async def require_permission(permission: str):
+def require_permission(permission: str):
     """Dependency to require a specific permission."""
     async def permission_checker(user: User = Depends(get_current_user)) -> User:
         if not user.has_permission(permission):
