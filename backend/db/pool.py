@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
-from sqlalchemy.pool import NullPool, QueuePool
+from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from sqlalchemy import event, text
 
 from backend.core.config import settings
@@ -51,11 +51,10 @@ def create_optimized_engine(
     
     # Determine pool class based on environment
     if settings.ENV == "test":
-        # Use NullPool for testing to avoid connection issues
         poolclass = NullPool
         logger.info("Using NullPool for testing environment")
     else:
-        poolclass = QueuePool
+        poolclass = AsyncAdaptedQueuePool
         logger.info(
             f"Configuring connection pool: "
             f"size={pool_size}, max_overflow={max_overflow}, "
@@ -67,12 +66,12 @@ def create_optimized_engine(
         echo=echo,
         future=True,
         poolclass=poolclass,
-        pool_size=pool_size if poolclass == QueuePool else None,
-        max_overflow=max_overflow if poolclass == QueuePool else None,
-        pool_timeout=pool_timeout if poolclass == QueuePool else None,
-        pool_recycle=pool_recycle if poolclass == QueuePool else None,
-        pool_pre_ping=True,  # Verify connections before using
-        pool_use_lifo=True,  # Use LIFO to reduce connection churn
+        pool_size=pool_size if poolclass != NullPool else None,
+        max_overflow=max_overflow if poolclass != NullPool else None,
+        pool_timeout=pool_timeout if poolclass != NullPool else None,
+        pool_recycle=pool_recycle if poolclass != NullPool else None,
+        pool_pre_ping=True,
+        pool_use_lifo=True,
     )
     
     # Add connection pool event listeners
