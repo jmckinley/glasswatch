@@ -42,12 +42,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # CORS
+    # CORS — stored as comma-separated string in env, parsed by validator
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost",
         "http://localhost:3000",
         "http://localhost:8000",
-        "http://frontend:3000",  # Docker service name
+        "http://frontend:3000",
     ]
     
     # External APIs (optional)
@@ -87,7 +87,14 @@ class Settings(BaseSettings):
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
         if isinstance(v, str):
-            return [i.strip() for i in v.split(",")]
+            # Handle both JSON arrays and comma-separated strings
+            if v.startswith("["):
+                import json as _json
+                try:
+                    return _json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
 
