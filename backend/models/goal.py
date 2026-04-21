@@ -89,10 +89,66 @@ class Goal(Base):
     tenant = relationship("Tenant", back_populates="goals")
     bundles = relationship("Bundle", back_populates="goal")
     
+    # ── API compatibility properties ────────────────────────────────
+    # The API layer references attribute names that differ from the DB columns.
+
     @property
     def type(self):
-        """Alias for goal_type for API compatibility."""
         return self.goal_type
+
+    @property
+    def target_date(self):
+        return self.target_completion_date
+
+    @property
+    def estimated_completion_date(self):
+        return self.target_completion_date
+
+    @property
+    def target_metric(self):
+        return self.goal_type
+
+    @property
+    def target_value(self):
+        if self.target_risk_score is not None:
+            return self.target_risk_score
+        if self.target_vulnerability_count is not None:
+            return self.target_vulnerability_count
+        return 0
+
+    @property
+    def risk_score_current(self):
+        return self.current_risk_score or 0
+
+    @property
+    def risk_score_initial(self):
+        return (self.current_risk_score or 0) + (self.patches_completed or 0) * 3
+
+    @property
+    def vulnerabilities_total(self):
+        return self.current_vulnerability_count or 0
+
+    @property
+    def vulnerabilities_addressed(self):
+        return self.patches_completed or 0
+
+    @property
+    def max_downtime_hours(self):
+        if self.max_downtime_minutes:
+            return self.max_downtime_minutes / 60
+        return None
+
+    @property
+    def max_vulns_per_window(self):
+        return self.max_patches_per_window
+
+    @property
+    def min_patch_weather_score(self):
+        return 0.0
+
+    @property
+    def require_vendor_approval(self):
+        return False
 
     @hybrid_property
     def active(self):
