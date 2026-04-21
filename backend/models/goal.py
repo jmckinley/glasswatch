@@ -14,6 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from backend.db.base_class import Base
 
@@ -88,6 +89,15 @@ class Goal(Base):
     tenant = relationship("Tenant", back_populates="goals")
     bundles = relationship("Bundle", back_populates="goal")
     
+    @hybrid_property
+    def active(self):
+        """Whether the goal is currently active."""
+        return self.status in ("active", "ACTIVE")
+
+    @active.expression
+    def active(cls):
+        return cls.status.in_(["active", "ACTIVE"])
+
     def __repr__(self):
         return f"<Goal {self.name}: {self.goal_type}>"
     
