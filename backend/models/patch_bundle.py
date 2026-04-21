@@ -118,7 +118,7 @@ class PatchBundle(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    goal = relationship("Goal", back_populates="bundles")
+    goal = relationship("Goal")  # no back_populates — Goal.bundles points to Bundle
     bundle_patches = relationship("BundlePatch", back_populates="bundle")
     
     def __repr__(self):

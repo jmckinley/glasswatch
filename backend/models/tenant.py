@@ -53,6 +53,8 @@ class Tenant(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
+    assets = relationship("Asset", back_populates="tenant")
+    goals = relationship("Goal", back_populates="tenant")
     bundles = relationship("Bundle", back_populates="tenant")
     maintenance_windows = relationship("MaintenanceWindow", back_populates="tenant")
     

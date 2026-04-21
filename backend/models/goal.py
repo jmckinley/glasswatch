@@ -86,7 +86,7 @@ class Goal(Base):
     
     # Relationships
     tenant = relationship("Tenant", back_populates="goals")
-    bundles = relationship("PatchBundle", back_populates="goal")
+    bundles = relationship("Bundle", back_populates="goal")
     
     def __repr__(self):
         return f"<Goal {self.name}: {self.goal_type}>"
