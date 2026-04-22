@@ -22,3 +22,5 @@ from backend.models.approval import ApprovalRequest, ApprovalAction, ApprovalPol
 from backend.models.snapshot import PatchSnapshot, RollbackRecord  # noqa: F401
 from backend.models.simulation import PatchSimulation  # noqa: F401
 from backend.models.connection import Connection  # noqa: F401
+from backend.models.tag import Tag  # noqa: F401
+from backend.models.rule import DeploymentRule  # noqa: F401

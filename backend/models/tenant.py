@@ -63,6 +63,8 @@ class Tenant(Base):
     bundles = relationship("Bundle", back_populates="tenant")
     maintenance_windows = relationship("MaintenanceWindow", back_populates="tenant")
     connections = relationship("Connection", back_populates="tenant")
+    tags = relationship("Tag", back_populates="tenant")
+    deployment_rules = relationship("DeploymentRule", back_populates="tenant")
     
     def __repr__(self):
         return f"<Tenant {self.name} ({self.id})>"

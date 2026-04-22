@@ -5,7 +5,7 @@ Aggregates all v1 API endpoints.
 """
 from fastapi import APIRouter
 
-from backend.api.v1 import vulnerabilities, assets, goals, bundles, maintenance_windows, discovery, auth, audit, users, approvals, comments, activities, snapshots, simulator, dashboard, slack, connections, onboarding, settings
+from backend.api.v1 import vulnerabilities, assets, goals, bundles, maintenance_windows, discovery, auth, audit, users, approvals, comments, activities, snapshots, simulator, dashboard, slack, connections, onboarding, settings, tags, rules
 
 # Create main v1 router
 api_router = APIRouter()
@@ -123,4 +123,16 @@ api_router.include_router(
     settings.router,
     prefix="/settings",
     tags=["settings"],
+)
+
+api_router.include_router(
+    tags.router,
+    prefix="/tags",
+    tags=["tags"],
+)
+
+api_router.include_router(
+    rules.router,
+    prefix="/rules",
+    tags=["rules"],
 )

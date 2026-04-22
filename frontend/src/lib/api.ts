@@ -331,4 +331,80 @@ export const maintenanceWindowsApi = {
   listAssetGroups: () => apiCall<{asset_groups: string[]}>("/maintenance-windows/asset-groups"),
 };
 
+// Tags API
+export const tagsApi = {
+  list: (params?: { namespace?: string; search?: string; skip?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+    }
+    return apiCall<any>(`/tags?${query}`);
+  },
+
+  suggest: (params: { q: string; namespace?: string; limit?: number }) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        query.append(key, String(value));
+      }
+    });
+    return apiCall<any[]>(`/tags/suggest?${query}`);
+  },
+
+  namespaces: () => apiCall<Record<string, number>>("/tags/namespaces"),
+
+  create: (tag: { name: string; namespace: string; description?: string; color?: string; aliases?: string[] }) =>
+    apiCall<any>("/tags", { method: "POST", body: tag }),
+
+  update: (id: string, updates: any) =>
+    apiCall<any>(`/tags/${id}`, { method: "PATCH", body: updates }),
+
+  delete: (id: string) =>
+    apiCall<any>(`/tags/${id}`, { method: "DELETE" }),
+
+  merge: (sourceId: string, targetId: string) =>
+    apiCall<any>("/tags/merge", { method: "POST", body: { source_id: sourceId, target_id: targetId } }),
+};
+
+// Rules API
+export const rulesApi = {
+  list: (params?: { scope_type?: string; enabled?: boolean; skip?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+    }
+    return apiCall<any>(`/rules?${query}`);
+  },
+
+  defaults: () => apiCall<any[]>("/rules/defaults"),
+
+  get: (id: string) => apiCall<any>(`/rules/${id}`),
+
+  create: (rule: any) =>
+    apiCall<any>("/rules", { method: "POST", body: rule }),
+
+  update: (id: string, updates: any) =>
+    apiCall<any>(`/rules/${id}`, { method: "PATCH", body: updates }),
+
+  delete: (id: string) =>
+    apiCall<any>(`/rules/${id}`, { method: "DELETE" }),
+
+  evaluate: (request: {
+    asset_ids?: string[];
+    asset_tags?: string[];
+    environment?: string;
+    window_id?: string;
+    bundle_id?: string;
+  }) =>
+    apiCall<any>("/rules/evaluate", { method: "POST", body: request }),
+};
+
 export { apiCall };
