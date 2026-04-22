@@ -26,6 +26,7 @@ from backend.models.asset_vulnerability import AssetVulnerability
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.optimization import OptimizationService
 from backend.services.scoring import scoring_service
+from backend.services.notifications import notification_service
 
 
 router = APIRouter()
@@ -536,6 +537,26 @@ async def optimize_goal(
             preview_only=request.preview_only,
             max_future_windows=request.max_future_windows,
         )
+        
+        # Send notification after successful optimization
+        if result["success"] and result["bundles_created"] > 0:
+            try:
+                # Create a summary for the notification
+                summary = {
+                    "goal_name": goal.name,
+                    "vulnerabilities_scheduled": result["vulnerabilities_scheduled"],
+                    "bundles_created": result["bundles_created"],
+                    "risk_reduction": result["total_risk_reduction"],
+                    "completion_date": result["estimated_completion_date"],
+                }
+                # Note: notification_service would need a send_optimization_complete method
+                # For now, we'll log this - implement the method if needed
+                import logging
+                logging.info(f"Optimization complete for goal {goal.id}: {summary}")
+            except Exception as e:
+                # Don't fail the request if notification fails
+                import logging
+                logging.warning(f"Failed to send optimization notification: {e}")
         
         return OptimizationResponse(
             goal_id=goal.id,
