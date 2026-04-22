@@ -126,6 +126,27 @@ class OptimizationService:
         """
         logger.info(f"Starting optimization for goal {goal.id}: {goal.name}")
         
+        # Load enhanced_settings relationship if it exists
+        await db.refresh(goal, ["enhanced_settings"])
+        
+        # Determine constraints from EnhancedGoal risk profile if available
+        risk_profile_name = None
+        if goal.enhanced_settings:
+            risk_profile_rules = goal.enhanced_settings.get_risk_profile_rules()
+            risk_profile_name = goal.enhanced_settings.risk_profile
+            # Override goal constraints with risk profile values
+            max_vulns_per_window = risk_profile_rules.get("max_vulns_per_window", goal.max_vulns_per_window)
+            min_patch_weather = risk_profile_rules.get("min_patch_weather", goal.min_patch_weather_score)
+            logger.info(f"Using risk profile {risk_profile_name}: max_vulns={max_vulns_per_window}, min_weather={min_patch_weather}")
+        else:
+            # Use goal's direct constraints
+            max_vulns_per_window = goal.max_vulns_per_window
+            min_patch_weather = goal.min_patch_weather_score
+        
+        # Store these for use in optimization methods
+        self._current_max_vulns_per_window = max_vulns_per_window
+        self._current_min_patch_weather = min_patch_weather
+        
         # Get current metrics and vulnerabilities
         metrics = await self.calculate_goal_metrics(db, goal)
         asset_vulns = metrics["asset_vulns"]
@@ -190,7 +211,7 @@ class OptimizationService:
                 "assets_affected": len(bundle_data["affected_assets"]),
             })
         
-        return {
+        result = {
             "success": True,
             "message": f"Optimization complete. Scheduled {vulnerabilities_scheduled} vulnerabilities across {len(schedule)} windows.",
             "vulnerabilities_scheduled": vulnerabilities_scheduled,
@@ -200,6 +221,13 @@ class OptimizationService:
             "schedule": schedule_preview,
             "warnings": [],
         }
+        
+        # Include risk profile info if used
+        if risk_profile_name:
+            result["risk_profile"] = risk_profile_name
+            result["message"] += f" (Using {risk_profile_name} risk profile)"
+        
+        return result
     
     async def _optimize_with_constraint_solver(
         self,
@@ -229,10 +257,11 @@ class OptimizationService:
             model.Add(sum(assignments[(i, j)] for j in range(len(windows))) <= 1)
         
         # Constraint 2: Window capacity (max vulns per window)
+        max_vulns = getattr(self, '_current_max_vulns_per_window', goal.max_vulns_per_window)
         for j in range(len(windows)):
             model.Add(
                 sum(assignments[(i, j)] for i in range(len(asset_vulns))) 
-                <= goal.max_vulns_per_window
+                <= max_vulns
             )
         
         # Constraint 3: Window duration capacity
@@ -358,20 +387,24 @@ class OptimizationService:
         current_risk_reduction = 0.0
         affected_assets = set()
         
+        # Use risk profile constraints if available
+        max_vulns = getattr(self, '_current_max_vulns_per_window', goal.max_vulns_per_window)
+        max_downtime = goal.max_downtime_hours
+        
         for score, av in scored_vulns:
             if window_idx >= len(windows):
                 break  # No more windows available
             
             window = windows[window_idx]
             window_duration_limit = min(
-                goal.max_downtime_hours,
+                max_downtime,
                 (window.end_time - window.start_time).total_seconds() / 3600
             )
             
             # Check if vuln fits in current window
             vuln_duration = 0.5  # 30 minutes estimate
             
-            if (len(current_window_vulns) < goal.max_vulns_per_window and
+            if (len(current_window_vulns) < max_vulns and
                 current_window_duration + vuln_duration <= window_duration_limit):
                 # Add to current window
                 current_window_vulns.append(av)
