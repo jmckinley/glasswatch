@@ -5,6 +5,7 @@ import Link from "next/link";
 
 interface SlackStatus {
   connected: boolean;
+  configured?: boolean;
   team_name?: string;
   team_id?: string;
   installed_at?: string;
@@ -49,6 +50,9 @@ export default function IntegrationsPage() {
         const data = await response.json();
         // Redirect to Slack OAuth
         window.location.href = data.authorization_url;
+      } else if (response.status === 503) {
+        // Not configured - should be handled by UI state
+        console.error("Slack not configured");
       }
     } catch (error) {
       console.error("Failed to initiate Slack connection:", error);
@@ -123,7 +127,20 @@ export default function IntegrationsPage() {
           <div className="flex items-center gap-4">
             <div className="text-5xl">💬</div>
             <div>
-              <h2 className="text-2xl font-semibold text-white mb-1">Slack</h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-2xl font-semibold text-white">Slack</h2>
+                {!loading && (
+                  <span className="text-sm">
+                    {slackStatus?.configured === false ? (
+                      <span title="Not configured (admin action needed)">🔴</span>
+                    ) : slackStatus?.connected ? (
+                      <span title="Connected and working">🟢</span>
+                    ) : (
+                      <span title="Configured but not connected">🟡</span>
+                    )}
+                  </span>
+                )}
+              </div>
               <p className="text-gray-400">
                 Send patch alerts and approval requests to Slack channels
               </p>
@@ -139,6 +156,8 @@ export default function IntegrationsPage() {
             >
               Disconnect
             </button>
+          ) : slackStatus?.configured === false ? (
+            <div className="text-gray-400 text-sm italic">Admin configuration required</div>
           ) : (
             <button
               onClick={handleConnectSlack}
@@ -148,6 +167,36 @@ export default function IntegrationsPage() {
             </button>
           )}
         </div>
+
+        {/* Not configured info box */}
+        {!loading && slackStatus?.configured === false && (
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mb-4">
+            <h3 className="text-sm font-medium text-orange-300 mb-2">
+              🔧 Slack Integration Requires Configuration
+            </h3>
+            <p className="text-sm text-gray-300 mb-3">
+              An administrator needs to configure the following environment variables for Slack integration to work:
+            </p>
+            <ul className="text-sm text-gray-300 space-y-1 list-disc list-inside">
+              <li><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">SLACK_CLIENT_ID</code></li>
+              <li><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">SLACK_CLIENT_SECRET</code></li>
+              <li><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">SLACK_SIGNING_SECRET</code></li>
+            </ul>
+          </div>
+        )}
+
+        {/* Configured but not connected info */}
+        {!loading && slackStatus?.configured !== false && !slackStatus?.connected && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+            <h3 className="text-sm font-medium text-blue-300 mb-2">
+              Connect Your Workspace
+            </h3>
+            <p className="text-sm text-gray-300">
+              Click &quot;Connect to Slack&quot; above to authorize Glasswatch to send messages to your Slack workspace.
+              You&apos;ll be redirected to Slack to approve the connection.
+            </p>
+          </div>
+        )}
 
         {slackStatus?.connected && (
           <div className="space-y-4">

@@ -166,6 +166,68 @@ export default function AssetsPage() {
     }
   };
 
+  const handleExportCSV = () => {
+    // Get assets to export (selected or all visible)
+    const assetsToExport = selectedAssets.size > 0 
+      ? assets.filter(a => selectedAssets.has(a.id))
+      : assets;
+
+    if (assetsToExport.length === 0) {
+      alert("No assets to export");
+      return;
+    }
+
+    // CSV headers
+    const headers = [
+      "Name",
+      "Identifier",
+      "FQDN",
+      "Environment",
+      "Criticality",
+      "Exposure",
+      "Tags",
+      "Last Scanned"
+    ];
+
+    // Build CSV rows
+    const rows = assetsToExport.map(asset => [
+      asset.name || "",
+      asset.identifier || "",
+      asset.fqdn || "",
+      asset.environment || "",
+      asset.criticality?.toString() || "",
+      asset.exposure || "",
+      (asset.tags || []).join("; ") || "",
+      asset.last_scanned_at ? new Date(asset.last_scanned_at).toLocaleDateString() : "Never"
+    ]);
+
+    // Escape CSV values (handle commas, quotes, newlines)
+    const escapeCSV = (value: string) => {
+      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    };
+
+    // Build CSV content
+    const csvContent = [
+      headers.map(escapeCSV).join(","),
+      ...rows.map(row => row.map(escapeCSV).join(","))
+    ].join("\n");
+
+    // Create download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const today = new Date().toISOString().split("T")[0];
+    link.download = `glasswatch-assets-${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const stats = {
     total: pagination.total,
     internetFacing: assets.filter(a => a.is_internet_facing || a.exposure === 'internet-facing' || a.exposure === 'internet').length,
@@ -354,10 +416,10 @@ export default function AssetsPage() {
                 Tag Selected
               </button>
               <button
-                onClick={() => {/* TODO: Implement export */}}
+                onClick={handleExportCSV}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
-                Export
+                Export Selected
               </button>
               <button
                 onClick={() => setSelectedAssets(new Set())}

@@ -27,6 +27,7 @@ router = APIRouter()
 # Pydantic models
 class SlackStatusResponse(BaseModel):
     connected: bool
+    configured: bool = True
     team_name: Optional[str] = None
     team_id: Optional[str] = None
     installed_at: Optional[str] = None
@@ -113,16 +114,21 @@ async def get_slack_status(
     """
     Get Slack connection status for current tenant.
     """
+    # Check if Slack is configured at all
+    if not slack_service.is_configured():
+        return SlackStatusResponse(connected=False, configured=False)
+    
     slack_config = await slack_service.get_slack_config(
         tenant_id=str(current_user.tenant_id),
         db=db,
     )
     
     if not slack_config:
-        return SlackStatusResponse(connected=False)
+        return SlackStatusResponse(connected=False, configured=True)
     
     return SlackStatusResponse(
         connected=True,
+        configured=True,
         team_name=slack_config.get("team_name"),
         team_id=slack_config.get("team_id"),
         installed_at=slack_config.get("installed_at"),
