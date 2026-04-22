@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { goalsApi } from "@/lib/api";
+import TagAutocomplete from "@/components/TagAutocomplete";
 
 interface Goal {
   id: string;
@@ -230,6 +231,7 @@ function CreateGoalModal({
     risk_tolerance: "balanced",
     max_vulns_per_window: 10,
     max_downtime_hours: 4,
+    tags: [] as string[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -341,6 +343,15 @@ function CreateGoalModal({
                 }
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Tags</label>
+            <TagAutocomplete
+              value={formData.tags}
+              onChange={(tags) => setFormData({ ...formData, tags })}
+              placeholder="Categorize this goal with tags..."
+            />
           </div>
 
           <div className="flex justify-end gap-3 mt-6">

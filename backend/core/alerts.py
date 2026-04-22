@@ -365,9 +365,8 @@ class AlertManager:
         try:
             from backend.services.slack_service import slack_service
             from backend.db.session import AsyncSessionLocal
-            
-            # Get channel from environment or use default
-            channel = getattr(settings, "SLACK_ALERT_CHANNEL", "#alerts")
+            from backend.models.tenant import Tenant
+            from sqlalchemy import select
             
             # Build severity emoji
             severity_emoji = {
@@ -382,13 +381,32 @@ class AlertManager:
             text += f"Metric: {alert['metric_name']}\n"
             text += f"Current: {alert['current_value']:.2f} {alert['operator']} {alert['threshold']:.2f}"
             
-            # Get tenant_id from environment or default to first tenant
-            # In production, alerts should be tenant-specific
+            if alert.get("escalated"):
+                text += "\n⚠️ *ESCALATED* - This alert has triggered multiple times"
+            
+            # Send to all tenants with Slack configured
             async with AsyncSessionLocal() as db:
-                # TODO: Make this tenant-aware
-                # For now, we'll skip if Slack isn't configured
-                # In production, iterate over tenants or use a system tenant
-                pass
+                result = await db.execute(select(Tenant))
+                tenants = result.scalars().all()
+                
+                for tenant in tenants:
+                    # Get Slack config
+                    slack_config = tenant.settings.get("slack") if tenant.settings else None
+                    if not slack_config:
+                        continue
+                    
+                    # Get alert channel from tenant settings
+                    alert_channel = tenant.settings.get("integrations", {}).get("slack", {}).get("alert_channel", "#alerts")
+                    
+                    try:
+                        await slack_service.send_message(
+                            tenant_id=str(tenant.id),
+                            channel=alert_channel,
+                            text=text,
+                            db=db,
+                        )
+                    except Exception as e:
+                        print(f"Failed to send Slack alert to tenant {tenant.id}: {e}")
         
         except Exception as e:
             print(f"Failed to send Slack alert: {e}")
@@ -397,25 +415,135 @@ class AlertManager:
         """
         Email handler.
         
-        TODO: Implement email integration
+        Sends alert via email using NotificationService.
         
         Args:
             alert: Alert data
         """
-        # TODO: Send email
-        pass
+        try:
+            from backend.services.notifications import notification_service
+            from backend.db.session import AsyncSessionLocal
+            from backend.models.tenant import Tenant
+            from sqlalchemy import select
+            
+            # Build subject with severity prefix
+            severity_prefix = {
+                "info": "[INFO]",
+                "warning": "[WARNING]",
+                "critical": "[CRITICAL]",
+            }
+            prefix = severity_prefix.get(alert["severity"], "[ALERT]")
+            subject = f"{prefix} {alert['description']}"
+            
+            # Build email body
+            message = f"""
+An alert has been triggered in Glasswatch:
+
+**Alert:** {alert['description']}
+**Severity:** {alert['severity'].upper()}
+**Metric:** {alert['metric_name']}
+**Current Value:** {alert['current_value']:.2f}
+**Threshold:** {alert['operator']} {alert['threshold']:.2f}
+**Time:** {alert['timestamp']}
+"""
+            
+            if alert.get("escalated"):
+                message += "\n**Status:** ESCALATED - This alert has triggered multiple times\n"
+            
+            # Send to all tenants with email configured
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Tenant))
+                tenants = result.scalars().all()
+                
+                for tenant in tenants:
+                    email_config = tenant.settings.get("integrations", {}).get("email", {}) if tenant.settings else {}
+                    if not email_config.get("resend_api_key"):
+                        continue
+                    
+                    try:
+                        await notification_service._send_email(
+                            tenant=tenant,
+                            title=subject,
+                            message=message,
+                            priority=alert["severity"],
+                        )
+                    except Exception as e:
+                        print(f"Failed to send email alert to tenant {tenant.id}: {e}")
+        
+        except Exception as e:
+            print(f"Failed to send email alert: {e}")
     
     async def _pagerduty_handler(self, alert: Dict[str, Any]):
         """
         PagerDuty handler.
         
-        TODO: Implement PagerDuty integration
+        Sends alert to PagerDuty Events API v2.
         
         Args:
             alert: Alert data
         """
-        # TODO: Send to PagerDuty
-        pass
+        try:
+            import httpx
+            from backend.db.session import AsyncSessionLocal
+            from backend.models.tenant import Tenant
+            from sqlalchemy import select
+            
+            # Map alert severity to PagerDuty severity
+            pd_severity_map = {
+                "info": "info",
+                "warning": "warning",
+                "critical": "critical",
+            }
+            pd_severity = pd_severity_map.get(alert["severity"], "error")
+            
+            # Send to all tenants with PagerDuty configured
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Tenant))
+                tenants = result.scalars().all()
+                
+                for tenant in tenants:
+                    pd_config = tenant.settings.get("integrations", {}).get("pagerduty", {}) if tenant.settings else {}
+                    routing_key = pd_config.get("routing_key")
+                    
+                    if not routing_key:
+                        continue
+                    
+                    # Build PagerDuty event payload
+                    payload = {
+                        "routing_key": routing_key,
+                        "event_action": "trigger",
+                        "dedup_key": f"{alert['rule_name']}_{alert['metric_name']}",
+                        "payload": {
+                            "summary": alert["description"],
+                            "severity": pd_severity,
+                            "source": "glasswatch-alerts",
+                            "timestamp": alert["timestamp"],
+                            "custom_details": {
+                                "rule_name": alert["rule_name"],
+                                "metric_name": alert["metric_name"],
+                                "current_value": alert["current_value"],
+                                "threshold": alert["threshold"],
+                                "operator": alert["operator"],
+                                "escalated": alert.get("escalated", False),
+                            },
+                        },
+                    }
+                    
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                "https://events.pagerduty.com/v2/enqueue",
+                                json=payload,
+                                timeout=30.0,
+                            )
+                            
+                            if response.status_code != 202:
+                                print(f"PagerDuty API returned {response.status_code}: {response.text}")
+                    except Exception as e:
+                        print(f"Failed to send PagerDuty alert to tenant {tenant.id}: {e}")
+        
+        except Exception as e:
+            print(f"Failed to send PagerDuty alert: {e}")
 
 
 # Global alert manager instance

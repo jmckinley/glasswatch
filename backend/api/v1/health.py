@@ -107,8 +107,8 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)) -> Dict[str,
     checks["database"] = db_health
     
     # Redis health (if configured)
-    # redis_health = await _check_redis_health()
-    # checks["redis"] = redis_health
+    redis_health = await _check_redis_health()
+    checks["redis"] = redis_health
     
     # System resources
     system_health = _check_system_resources()
@@ -201,18 +201,63 @@ async def _check_redis_health() -> Dict[str, Any]:
     Returns:
         Redis health metrics
     """
+    import os
+    import time
+    
     health = {}
     
-    # TODO: Implement when Redis is integrated
-    # try:
-    #     redis_client = get_redis_client()
-    #     await redis_client.ping()
-    #     health["status"] = "ok"
-    # except Exception as e:
-    #     health["status"] = "error"
-    #     health["error"] = str(e)
+    redis_url = os.environ.get("REDIS_URL")
     
-    health["status"] = "not_configured"
+    if not redis_url:
+        health["status"] = "not_configured"
+        health["message"] = "REDIS_URL environment variable not set"
+        return health
+    
+    try:
+        import redis.asyncio as redis
+        
+        # Create Redis client
+        client = redis.from_url(redis_url, decode_responses=True)
+        
+        try:
+            # PING with latency measurement
+            start = time.perf_counter()
+            pong = await client.ping()
+            latency = time.perf_counter() - start
+            
+            if not pong:
+                health["status"] = "error"
+                health["error"] = "PING failed"
+                return health
+            
+            health["status"] = "ok"
+            health["latency_ms"] = round(latency * 1000, 2)
+            
+            # Get memory info
+            try:
+                info = await client.info("memory")
+                health["memory_used"] = info.get("used_memory_human", "unknown")
+                health["memory_peak"] = info.get("used_memory_peak_human", "unknown")
+            except Exception:
+                pass  # INFO command might not be available in all Redis configurations
+            
+            # Get connected clients count
+            try:
+                client_info = await client.info("clients")
+                health["connected_clients"] = client_info.get("connected_clients", 0)
+            except Exception:
+                pass
+            
+        finally:
+            await client.aclose()
+    
+    except ImportError:
+        health["status"] = "error"
+        health["error"] = "redis library not installed (pip install redis[hiredis])"
+    
+    except Exception as e:
+        health["status"] = "error"
+        health["error"] = str(e)
     
     return health
 

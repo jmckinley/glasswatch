@@ -74,6 +74,7 @@ class User(Base):
     tenant = relationship("Tenant", backref="users")
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
     approval_actions = relationship("ApprovalAction", back_populates="user")
+    notifications = relationship("Notification", back_populates="user")
     
     # Unique constraint on email per tenant
     __table_args__ = (

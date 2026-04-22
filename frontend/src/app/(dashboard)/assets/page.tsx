@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { assetsApi } from "@/lib/api";
+import TagAutocomplete from "@/components/TagAutocomplete";
 
 interface Asset {
   id: string;
@@ -611,11 +612,8 @@ function BulkTagModal({
     }
   };
 
-  const addTag = () => {
-    if (newTag && !tagsToAdd.includes(newTag)) {
-      setTagsToAdd([...tagsToAdd, newTag]);
-      setNewTag("");
-    }
+  const handleTagsChange = (tags: string[]) => {
+    setTagsToAdd(tags);
   };
 
   return (
@@ -627,44 +625,11 @@ function BulkTagModal({
 
         <div className="mb-4">
           <label className="block text-sm text-gray-400 mb-2">Add Tags</label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addTag()}
-              placeholder="Type tag name..."
-              className="flex-1 px-3 py-2 bg-gray-900 text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              list="available-tags"
-            />
-            <datalist id="available-tags">
-              {availableTags.map(tag => (
-                <option key={tag} value={tag} />
-              ))}
-            </datalist>
-            <button
-              onClick={addTag}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-            >
-              Add
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {tagsToAdd.map(tag => (
-              <span
-                key={tag}
-                className={`px-2 py-1 text-sm rounded border ${getTagColor(tag)} flex items-center gap-1`}
-              >
-                {tag}
-                <button
-                  onClick={() => setTagsToAdd(tagsToAdd.filter(t => t !== tag))}
-                  className="hover:text-white"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+          <TagAutocomplete
+            value={tagsToAdd}
+            onChange={handleTagsChange}
+            placeholder="Search and add tags..."
+          />
         </div>
 
         <div className="mb-6">

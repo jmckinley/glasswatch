@@ -219,10 +219,23 @@ class NotificationService:
         data: Optional[Dict[str, Any]] = None,
         priority: str = "normal",
     ) -> Dict[str, Any]:
-        """Send email notification."""
+        """Send email notification via Resend API."""
+        import os
+        
         # Get email config and recipients
         email_config = tenant.settings.get("integrations", {}).get("email", {})
-        recipients = email_config.get("recipients", [tenant.email])
+        recipients = email_config.get("recipients", [tenant.email]) if hasattr(tenant, 'email') and tenant.email else email_config.get("recipients", [])
+        
+        if not recipients:
+            raise ValueError("No email recipients configured")
+        
+        # Get API key
+        api_key = email_config.get("resend_api_key") or os.environ.get("RESEND_API_KEY")
+        if not api_key:
+            raise ValueError("Resend API key not configured")
+        
+        # Get from address
+        from_address = email_config.get("from_address", "noreply@updates.mckinleylabsllc.com")
         
         # Format HTML email
         priority_badge = {
@@ -252,7 +265,7 @@ class NotificationService:
                     <p>{message}</p>
                     {"<a href='" + data['action_url'] + "' class='button'>" + data.get('action_text', 'View Details') + "</a>" if data and data.get('action_url') else ""}
                     <p style="color: #666; font-size: 12px; margin-top: 20px;">
-                        Sent by PatchGuide at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+                        Sent by Glasswatch at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
                     </p>
                 </div>
             </div>
@@ -260,13 +273,42 @@ class NotificationService:
         </html>
         """
         
-        # TODO: Integrate with email service (SendGrid, SES, etc.)
-        # For now, just log that we would send an email
-        return {
-            "message_sent": True,
-            "channel": "email",
-            "recipients": recipients,
-        }
+        # Send via Resend API
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": from_address,
+                        "to": recipients,
+                        "subject": title,
+                        "html": html_content,
+                    },
+                    timeout=30.0,
+                )
+                
+                if response.status_code != 200:
+                    error_detail = response.text
+                    raise Exception(f"Resend API returned {response.status_code}: {error_detail}")
+                
+                result = response.json()
+                
+                return {
+                    "message_sent": True,
+                    "channel": "email",
+                    "recipients": recipients,
+                    "email_id": result.get("id"),
+                }
+        except Exception as e:
+            return {
+                "message_sent": False,
+                "channel": "email",
+                "error": str(e),
+            }
     
     async def _send_webhook(
         self,
@@ -315,15 +357,36 @@ class NotificationService:
         message: str,
         data: Optional[Dict[str, Any]] = None,
         priority: str = "normal",
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Store in-app notification for display in UI."""
-        # TODO: Store in database for UI to fetch
-        # For now, just return success
-        return {
-            "message_sent": True,
-            "channel": "in_app",
-            "notification_id": "demo-" + str(datetime.now(timezone.utc).timestamp()),
-        }
+        from backend.models.notification import Notification
+        from backend.db.session import AsyncSessionLocal
+        
+        # Determine channel from data if available
+        channel = data.get("channel") if data else None
+        
+        # Create notification record
+        async with AsyncSessionLocal() as db:
+            notification = Notification(
+                tenant_id=tenant.id,
+                user_id=user_id,  # None means broadcast to all tenant users
+                title=title,
+                message=message,
+                data=data,
+                priority=priority,
+                channel=channel,
+            )
+            
+            db.add(notification)
+            await db.commit()
+            await db.refresh(notification)
+            
+            return {
+                "message_sent": True,
+                "channel": "in_app",
+                "notification_id": str(notification.id),
+            }
     
     async def send_critical_vulnerability_alert(
         self,

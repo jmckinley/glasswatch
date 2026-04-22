@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { maintenanceWindowsApi, goalsApi, bundlesApi } from "@/lib/api";
+import { maintenanceWindowsApi, goalsApi, bundlesApi, rulesApi } from "@/lib/api";
 
 interface MaintenanceWindow {
   id: string;
@@ -89,10 +89,18 @@ export default function SchedulePage() {
   const [filterAssetGroup, setFilterAssetGroup] = useState<string>("");
   const [environments, setEnvironments] = useState<string[]>([]);
   const [assetGroups, setAssetGroups] = useState<string[]>([]);
+  // Rule violations
+  const [ruleViolations, setRuleViolations] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     fetchData();
   }, [filterEnvironment, filterAssetGroup]);
+
+  useEffect(() => {
+    if (windows.length > 0) {
+      evaluateRules();
+    }
+  }, [windows]);
 
   const fetchData = async () => {
     try {
@@ -117,6 +125,32 @@ export default function SchedulePage() {
       setGoals([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const evaluateRules = async () => {
+    try {
+      const violations: Record<string, any[]> = {};
+      
+      // Evaluate rules for each window/bundle combination
+      for (const window of windows) {
+        for (const bundle of window.scheduled_bundles || []) {
+          const result = await rulesApi.evaluate({
+            window_id: window.id,
+            bundle_id: bundle.id,
+            environment: window.environment,
+          });
+          
+          if (result.violations && result.violations.length > 0) {
+            const key = `${window.id}-${bundle.id}`;
+            violations[key] = result.violations;
+          }
+        }
+      }
+      
+      setRuleViolations(violations);
+    } catch (error) {
+      console.error("Failed to evaluate rules:", error);
     }
   };
 
@@ -365,7 +399,7 @@ export default function SchedulePage() {
       {loading ? (
         <ScheduleSkeleton />
       ) : viewMode === "list" ? (
-        <ListView windows={windows} goals={goals} />
+        <ListView windows={windows} goals={goals} ruleViolations={ruleViolations} />
       ) : (
         <CalendarView windows={windows} />
       )}
@@ -373,7 +407,7 @@ export default function SchedulePage() {
   );
 }
 
-function ListView({ windows, goals }: { windows: MaintenanceWindow[]; goals: Goal[] }) {
+function ListView({ windows, goals, ruleViolations }: { windows: MaintenanceWindow[]; goals: Goal[]; ruleViolations: Record<string, any[]> }) {
   const upcomingWindows = windows.filter((w) => new Date(w.start_time) > new Date());
   const pastWindows = windows.filter((w) => new Date(w.start_time) <= new Date());
 
@@ -388,7 +422,7 @@ function ListView({ windows, goals }: { windows: MaintenanceWindow[]; goals: Goa
             </div>
           ) : (
             upcomingWindows.map((window) => (
-              <WindowCard key={window.id} window={window} goals={goals} />
+              <WindowCard key={window.id} window={window} goals={goals} ruleViolations={ruleViolations} />
             ))
           )}
         </div>
@@ -399,7 +433,7 @@ function ListView({ windows, goals }: { windows: MaintenanceWindow[]; goals: Goa
           <h2 className="text-xl font-semibold mb-4">Past Maintenance</h2>
           <div className="space-y-4">
             {pastWindows.map((window) => (
-              <WindowCard key={window.id} window={window} goals={goals} isPast />
+              <WindowCard key={window.id} window={window} goals={goals} ruleViolations={ruleViolations} isPast />
             ))}
           </div>
         </div>
@@ -411,10 +445,12 @@ function ListView({ windows, goals }: { windows: MaintenanceWindow[]; goals: Goa
 function WindowCard({
   window,
   goals,
+  ruleViolations,
   isPast = false,
 }: {
   window: MaintenanceWindow;
   goals: Goal[];
+  ruleViolations: Record<string, any[]>;
   isPast?: boolean;
 }) {
   const startDate = new Date(window.start_time);
@@ -565,42 +601,87 @@ function WindowCard({
       {window.scheduled_bundles && window.scheduled_bundles.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-neutral-400">Scheduled Bundles</h4>
-          {window.scheduled_bundles.map((bundle) => (
-            <div key={bundle.id} className="bg-neutral-800 rounded-lg p-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h5 className="font-medium">{bundle.name}</h5>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-neutral-400">
-                    {bundle.assets_affected_count && (
-                      <>
-                        <span>{bundle.assets_affected_count} assets</span>
-                        <span>•</span>
-                      </>
-                    )}
-                    {bundle.estimated_duration_minutes && (
-                      <>
-                        <span>{bundle.estimated_duration_minutes} min</span>
-                        <span>•</span>
-                      </>
-                    )}
-                    {bundle.risk_score && <span>Risk: {bundle.risk_score.toFixed(1)}</span>}
+          {window.scheduled_bundles.map((bundle) => {
+            const violationKey = `${window.id}-${bundle.id}`;
+            const violations = ruleViolations[violationKey] || [];
+            const hasBlocks = violations.some((v) => v.action_type === "block");
+            const hasWarns = violations.some((v) => v.action_type === "warn");
+            const hasApprovals = violations.some((v) => v.action_type === "require_approval");
+
+            return (
+              <div key={bundle.id} className="bg-neutral-800 rounded-lg p-4">
+                {/* Rule Violation Banners */}
+                {violations.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    {violations.map((violation, idx) => {
+                      const bannerColor =
+                        violation.action_type === "block"
+                          ? "bg-red-500/20 border-red-500 text-red-300"
+                          : violation.action_type === "warn"
+                          ? "bg-yellow-500/20 border-yellow-500 text-yellow-300"
+                          : violation.action_type === "require_approval"
+                          ? "bg-blue-500/20 border-blue-500 text-blue-300"
+                          : "bg-gray-500/20 border-gray-500 text-gray-300";
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-2 p-3 border rounded-md ${bannerColor}`}
+                        >
+                          <span className="text-lg">
+                            {violation.action_type === "block" && "⚠️"}
+                            {violation.action_type === "warn" && "⚠️"}
+                            {violation.action_type === "require_approval" && "🔒"}
+                          </span>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">
+                              {violation.rule_name || "Rule Triggered"}
+                            </div>
+                            <div className="text-xs mt-1">
+                              {violation.message || violation.action_config?.reason || violation.action_config?.message || "Action required"}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {bundle.items && bundle.items.length > 0 && (
-                    <div className="mt-2 text-xs text-neutral-500">
-                      Patches: {bundle.items.map((item) => item.vulnerability?.identifier).join(", ")}
+                )}
+
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h5 className="font-medium">{bundle.name}</h5>
+                    <div className="flex items-center gap-4 mt-1 text-sm text-neutral-400">
+                      {bundle.assets_affected_count && (
+                        <>
+                          <span>{bundle.assets_affected_count} assets</span>
+                          <span>•</span>
+                        </>
+                      )}
+                      {bundle.estimated_duration_minutes && (
+                        <>
+                          <span>{bundle.estimated_duration_minutes} min</span>
+                          <span>•</span>
+                        </>
+                      )}
+                      {bundle.risk_score && <span>Risk: {bundle.risk_score.toFixed(1)}</span>}
                     </div>
-                  )}
+                    {bundle.items && bundle.items.length > 0 && (
+                      <div className="mt-2 text-xs text-neutral-500">
+                        Patches: {bundle.items.map((item) => item.vulnerability?.identifier).join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${STATUS_BG[bundle.status]} ${
+                      STATUS_COLORS[bundle.status]
+                    }`}
+                  >
+                    {bundle.status.toUpperCase()}
+                  </span>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded ${STATUS_BG[bundle.status]} ${
-                    STATUS_COLORS[bundle.status]
-                  }`}
-                >
-                  {bundle.status.toUpperCase()}
-                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
