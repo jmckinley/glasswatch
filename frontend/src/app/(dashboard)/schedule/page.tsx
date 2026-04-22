@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { maintenanceWindowsApi, goalsApi, bundlesApi, rulesApi } from "@/lib/api";
 import MaintenanceWindowDialog from "@/components/MaintenanceWindowDialog";
+import ScheduleCalendar from "@/components/ScheduleCalendar";
 
 interface MaintenanceWindow {
   id: string;
@@ -10,7 +11,7 @@ interface MaintenanceWindow {
   description?: string;
   start_time: string;
   end_time: string;
-  type: "scheduled" | "emergency";
+  type: "scheduled" | "emergency" | "blackout";
   environment?: string;
   timezone?: string;
   duration_hours: number;
@@ -443,7 +444,12 @@ export default function SchedulePage() {
           onDelete={(id) => setDeleteConfirm(id)}
         />
       ) : (
-        <CalendarView windows={windows} />
+        <ScheduleCalendar 
+          windows={windows}
+          onWindowUpdate={loadData}
+          environments={environments}
+          assetGroups={assetGroups}
+        />
       )}
       
       {/* Maintenance Window Dialog */}
@@ -886,56 +892,6 @@ function WindowCard({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function CalendarView({ windows }: { windows: MaintenanceWindow[] }) {
-  const currentMonth = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-
-  return (
-    <div className="card p-6">
-      <h2 className="text-xl font-semibold mb-4">{currentMonth}</h2>
-      <div className="text-center text-neutral-400 mb-8">Calendar view coming soon...</div>
-      <div className="space-y-2">
-        {windows.map((window) => {
-          const date = new Date(window.start_time);
-          return (
-            <div key={window.id} className="flex items-center gap-4 p-3 hover:bg-neutral-800 rounded transition-colors">
-              <div className="text-sm font-medium w-32">
-                {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </div>
-              <div className="flex-1 bg-primary/20 rounded p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-sm font-medium">{window.name}</div>
-                    <div className="text-xs text-neutral-400 mt-1">
-                      {window.scheduled_bundles?.length || 0} bundles •{" "}
-                      {window.scheduled_bundles?.reduce(
-                        (sum, b) => sum + (b.assets_affected_count || 0),
-                        0
-                      )}{" "}
-                      assets • {window.environment}
-                    </div>
-                  </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      window.type === "emergency"
-                        ? "bg-destructive/20 text-destructive"
-                        : "bg-primary/30 text-primary"
-                    }`}
-                  >
-                    {window.type}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

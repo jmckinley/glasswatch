@@ -32,6 +32,7 @@ async def list_bundles(
     tenant: Tenant = Depends(get_current_tenant),
     status: Optional[str] = Query(None, description="Filter by status"),
     goal_id: Optional[UUID] = Query(None, description="Filter by goal"),
+    maintenance_window_id: Optional[str] = Query(None, description="Filter by window ID or 'unassigned'"),
     scheduled_after: Optional[datetime] = Query(None, description="Scheduled after date"),
     scheduled_before: Optional[datetime] = Query(None, description="Scheduled before date"),
     skip: int = Query(0, ge=0),
@@ -49,6 +50,11 @@ async def list_bundles(
         query = query.where(Bundle.status == status)
     if goal_id:
         query = query.where(Bundle.goal_id == goal_id)
+    if maintenance_window_id:
+        if maintenance_window_id == "unassigned":
+            query = query.where(Bundle.maintenance_window_id.is_(None))
+        else:
+            query = query.where(Bundle.maintenance_window_id == UUID(maintenance_window_id))
     if scheduled_after:
         query = query.where(Bundle.scheduled_for >= scheduled_after)
     if scheduled_before:
@@ -226,6 +232,112 @@ async def execute_bundle(
         )
     
     return result
+
+
+@router.patch("/{bundle_id}/assign-window")
+async def assign_bundle_to_window(
+    bundle_id: UUID,
+    assignment: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Assign or unassign a bundle to/from a maintenance window.
+    
+    Validates capacity, risk, and asset constraints before assignment.
+    """
+    from backend.models.maintenance_window import MaintenanceWindow
+    
+    # Get the bundle
+    result = await db.execute(
+        select(Bundle)
+        .where(
+            and_(
+                Bundle.id == bundle_id,
+                Bundle.tenant_id == tenant.id
+            )
+        )
+        .options(selectinload(Bundle.items))
+    )
+    bundle = result.scalar_one_or_none()
+    
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+    
+    window_id = assignment.get("maintenance_window_id")
+    
+    # Unassign case
+    if window_id is None:
+        bundle.maintenance_window_id = None
+        if bundle.status == "scheduled":
+            bundle.status = "draft"
+        bundle.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(bundle)
+        return bundle.to_dict()
+    
+    # Assign case - validate window exists
+    window_uuid = UUID(window_id) if isinstance(window_id, str) else window_id
+    window_result = await db.execute(
+        select(MaintenanceWindow)
+        .where(
+            and_(
+                MaintenanceWindow.id == window_uuid,
+                MaintenanceWindow.tenant_id == tenant.id
+            )
+        )
+        .options(selectinload(MaintenanceWindow.bundles).selectinload(Bundle.items))
+    )
+    window = window_result.scalar_one_or_none()
+    
+    if not window:
+        raise HTTPException(404, "Maintenance window not found")
+    
+    # Calculate current window utilization (excluding this bundle if already assigned)
+    current_bundles = [b for b in window.bundles if b.id != bundle_id]
+    total_duration = sum(b.estimated_duration_minutes or 0 for b in current_bundles)
+    total_assets = sum(b.assets_affected_count or 0 for b in current_bundles)
+    max_risk = max((b.risk_score or 0 for b in current_bundles), default=0)
+    
+    # Check capacity constraints
+    window_duration_minutes = window.duration_hours * 60
+    new_total_duration = total_duration + (bundle.estimated_duration_minutes or 0)
+    
+    if new_total_duration > window_duration_minutes:
+        raise HTTPException(
+            400,
+            f"Bundle duration ({bundle.estimated_duration_minutes} min) exceeds window capacity. "
+            f"Available: {window_duration_minutes - total_duration} min of {window_duration_minutes} min total."
+        )
+    
+    # Check risk constraints
+    if window.max_risk_score and bundle.risk_score:
+        if bundle.risk_score > window.max_risk_score:
+            raise HTTPException(
+                400,
+                f"Bundle risk score ({bundle.risk_score:.1f}) exceeds window maximum ({window.max_risk_score:.1f})"
+            )
+    
+    # Check asset constraints
+    if window.max_assets:
+        new_total_assets = total_assets + (bundle.assets_affected_count or 0)
+        if new_total_assets > window.max_assets:
+            raise HTTPException(
+                400,
+                f"Bundle affects {bundle.assets_affected_count} assets, which would exceed window limit. "
+                f"Available: {window.max_assets - total_assets} of {window.max_assets} total."
+            )
+    
+    # All checks passed - assign bundle
+    bundle.maintenance_window_id = window_uuid
+    bundle.status = "scheduled"
+    bundle.scheduled_for = window.start_time
+    bundle.updated_at = datetime.now(timezone.utc)
+    
+    await db.commit()
+    await db.refresh(bundle)
+    
+    return bundle.to_dict()
 
 async def get_bundle_stats(
     db: AsyncSession = Depends(get_db),

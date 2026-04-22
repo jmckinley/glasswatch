@@ -219,7 +219,14 @@ export const bundlesApi = {
   },
 
   get: (id: string) => apiCall<any>(`/bundles/${id}`),
+
+  assignToWindow: (bundleId: string, windowId: string | null) =>
+    apiCall<any>(`/bundles/${bundleId}/assign-window`, {
+      method: "PATCH",
+      body: { maintenance_window_id: windowId },
+    }),
 };
+
 
 // Dashboard Stats
 export const dashboardApi = {
