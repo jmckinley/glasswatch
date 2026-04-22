@@ -156,6 +156,16 @@ export default function AssetsPage() {
     }
   };
 
+  const handleAddTag = async (assetId: string, tag: string) => {
+    try {
+      await assetsApi.updateTags(assetId, [tag], []);
+      fetchAssets();
+      fetchTags();
+    } catch (error) {
+      console.error("Failed to add tag:", error);
+    }
+  };
+
   const stats = {
     total: pagination.total,
     internetFacing: assets.filter(a => a.is_internet_facing || a.exposure === 'internet-facing' || a.exposure === 'internet').length,
@@ -406,6 +416,8 @@ export default function AssetsPage() {
                   selected={selectedAssets.has(asset.id)}
                   onToggleSelect={() => toggleAssetSelection(asset.id)}
                   onRemoveTag={(tag) => handleRemoveTag(asset.id, tag)}
+                  onAddTag={(tag) => handleAddTag(asset.id, tag)}
+                  availableTags={allTags.map(t => t.name)}
                 />
               ))
             )}
@@ -469,12 +481,18 @@ function AssetRow({
   selected,
   onToggleSelect,
   onRemoveTag,
+  onAddTag,
+  availableTags,
 }: {
   asset: Asset;
   selected: boolean;
   onToggleSelect: () => void;
   onRemoveTag: (tag: string) => void;
+  onAddTag: (tag: string) => void;
+  availableTags: string[];
 }) {
+  const [showTagPopover, setShowTagPopover] = useState(false);
+  const [tagSearchInput, setTagSearchInput] = useState("");
   const criticalityColor = CRITICALITY_COLORS[asset.criticality] || "text-gray-400";
   const lastScanned = asset.last_scanned_at
     ? new Date(asset.last_scanned_at).toLocaleDateString()
@@ -482,6 +500,25 @@ function AssetRow({
 
   const riskBarWidth = Math.min(100, (asset.risk_score / 1000) * 100);
   const riskColor = asset.risk_score > 700 ? 'bg-red-500' : asset.risk_score > 400 ? 'bg-orange-500' : 'bg-yellow-500';
+
+  const filteredTags = availableTags.filter(tag => 
+    !asset.tags.includes(tag) && 
+    tag.toLowerCase().includes(tagSearchInput.toLowerCase())
+  );
+
+  const handleAddTag = (tag: string) => {
+    onAddTag(tag);
+    setShowTagPopover(false);
+    setTagSearchInput("");
+  };
+
+  const handleCreateNewTag = () => {
+    if (tagSearchInput.trim()) {
+      onAddTag(tagSearchInput.trim());
+      setShowTagPopover(false);
+      setTagSearchInput("");
+    }
+  };
 
   return (
     <tr className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors">
@@ -532,7 +569,7 @@ function AssetRow({
         {asset.patch_group || '-'}
       </td>
       <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 items-center relative">
           {asset.tags && asset.tags.length > 0 ? (
             asset.tags.map(tag => (
               <span
@@ -553,6 +590,71 @@ function AssetRow({
             ))
           ) : (
             <span className="text-gray-500 text-xs">-</span>
+          )}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              setShowTagPopover(!showTagPopover);
+            }}
+            className="w-5 h-5 flex items-center justify-center rounded bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white text-xs transition-colors"
+            title="Add tag"
+          >
+            +
+          </button>
+          
+          {/* Inline tag add popover */}
+          {showTagPopover && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowTagPopover(false)}
+              />
+              <div className="absolute left-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-xl w-64">
+                <div className="p-2">
+                  <input
+                    type="text"
+                    value={tagSearchInput}
+                    onChange={(e) => setTagSearchInput(e.target.value)}
+                    placeholder="Search or create tag..."
+                    className="w-full px-3 py-1.5 bg-gray-900 text-gray-300 text-sm rounded border border-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredTags.length > 0 ? (
+                    filteredTags.slice(0, 8).map(tag => (
+                      <button
+                        key={tag}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddTag(tag);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        <span className={`px-2 py-0.5 rounded border text-xs ${getTagColor(tag)}`}>
+                          {tag}
+                        </span>
+                      </button>
+                    ))
+                  ) : tagSearchInput.trim() ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateNewTag();
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-gray-700 transition-colors"
+                    >
+                      + Create &quot;{tagSearchInput}&quot;
+                    </button>
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      No tags found
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </td>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { maintenanceWindowsApi, goalsApi, bundlesApi, rulesApi } from "@/lib/api";
+import MaintenanceWindowDialog from "@/components/MaintenanceWindowDialog";
 
 interface MaintenanceWindow {
   id: string;
@@ -91,6 +92,11 @@ export default function SchedulePage() {
   const [assetGroups, setAssetGroups] = useState<string[]>([]);
   // Rule violations
   const [ruleViolations, setRuleViolations] = useState<Record<string, any[]>>({});
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingWindow, setEditingWindow] = useState<any>(null);
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -154,6 +160,30 @@ export default function SchedulePage() {
     }
   };
 
+  const handleNewWindow = () => {
+    setEditingWindow(null);
+    setDialogOpen(true);
+  };
+  
+  const handleEditWindow = (window: MaintenanceWindow) => {
+    setEditingWindow(window);
+    setDialogOpen(true);
+  };
+  
+  const handleDeleteWindow = async (windowId: string) => {
+    try {
+      await maintenanceWindowsApi.delete(windowId);
+      await fetchData();
+      setDeleteConfirm(null);
+    } catch (error: any) {
+      alert(error.message || "Failed to delete window");
+    }
+  };
+  
+  const handleDialogSave = async () => {
+    await fetchData();
+  };
+  
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setAnalysisResult(null);
@@ -257,6 +287,12 @@ export default function SchedulePage() {
               <option key={group} value={group}>{group}</option>
             ))}
           </select>
+          <button
+            onClick={handleNewWindow}
+            className="px-4 py-2 bg-success text-white rounded-lg hover:bg-success/90 transition-colors flex items-center gap-2"
+          >
+            + New Window
+          </button>
           <button
             onClick={handleAnalyze}
             disabled={analyzing || loading}
@@ -399,41 +435,183 @@ export default function SchedulePage() {
       {loading ? (
         <ScheduleSkeleton />
       ) : viewMode === "list" ? (
-        <ListView windows={windows} goals={goals} ruleViolations={ruleViolations} />
+        <ListView 
+          windows={windows} 
+          goals={goals} 
+          ruleViolations={ruleViolations}
+          onEdit={handleEditWindow}
+          onDelete={(id) => setDeleteConfirm(id)}
+        />
       ) : (
         <CalendarView windows={windows} />
+      )}
+      
+      {/* Maintenance Window Dialog */}
+      <MaintenanceWindowDialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSave={handleDialogSave}
+        windowData={editingWindow}
+      />
+      
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md border border-gray-600">
+            <h3 className="text-xl font-bold mb-4">Delete Maintenance Window?</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to delete this maintenance window? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteWindow(deleteConfirm)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
 }
 
-function ListView({ windows, goals, ruleViolations }: { windows: MaintenanceWindow[]; goals: Goal[]; ruleViolations: Record<string, any[]> }) {
-  const upcomingWindows = windows.filter((w) => new Date(w.start_time) > new Date());
-  const pastWindows = windows.filter((w) => new Date(w.start_time) <= new Date());
+function ListView({ 
+  windows, 
+  goals, 
+  ruleViolations,
+  onEdit,
+  onDelete,
+}: { 
+  windows: MaintenanceWindow[]; 
+  goals: Goal[]; 
+  ruleViolations: Record<string, any[]>;
+  onEdit: (window: MaintenanceWindow) => void;
+  onDelete: (id: string) => void;
+}) {
+  const now = new Date();
+  const upcomingWindows = windows.filter((w) => new Date(w.start_time) > now);
+  const pastWindows = windows.filter((w) => new Date(w.start_time) <= now);
+  
+  // Group upcoming windows by environment
+  const groupedWindows = upcomingWindows.reduce((acc, window) => {
+    const env = window.environment || "default";
+    if (!acc[env]) acc[env] = [];
+    acc[env].push(window);
+    return acc;
+  }, {} as Record<string, MaintenanceWindow[]>);
+  
+  // Separate default and blackout windows
+  const defaultWindows = upcomingWindows.filter(w => w.is_default);
+  const blackoutWindows = upcomingWindows.filter(w => w.type === "blackout");
+  const regularWindows = upcomingWindows.filter(w => !w.is_default && w.type !== "blackout");
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Upcoming Maintenance</h2>
-        <div className="space-y-4">
-          {upcomingWindows.length === 0 ? (
-            <div className="card p-8 text-center text-neutral-400">
-              No upcoming maintenance windows scheduled
-            </div>
-          ) : (
-            upcomingWindows.map((window) => (
-              <WindowCard key={window.id} window={window} goals={goals} ruleViolations={ruleViolations} />
-            ))
-          )}
+      {/* Default Windows */}
+      {defaultWindows.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
+            Default Fallback Windows
+            <span className="text-sm text-gray-400 font-normal">(apply when no specific match exists)</span>
+          </h2>
+          <div className="space-y-4">
+            {defaultWindows.map((window) => (
+              <WindowCard 
+                key={window.id} 
+                window={window} 
+                goals={goals} 
+                ruleViolations={ruleViolations}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+      
+      {/* Blackout Windows */}
+      {blackoutWindows.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
+            <span className="text-red-400">⚠️ Blackout Windows</span>
+            <span className="text-sm text-gray-400 font-normal">(no changes allowed)</span>
+          </h2>
+          <div className="space-y-4">
+            {blackoutWindows.map((window) => (
+              <div key={window.id} className="border-2 border-red-500/50 rounded-lg">
+                <WindowCard 
+                  window={window} 
+                  goals={goals} 
+                  ruleViolations={ruleViolations}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Regular Windows Grouped by Environment */}
+      {regularWindows.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Upcoming Maintenance</h2>
+          
+          {Object.keys(groupedWindows).sort().map(env => {
+            const envWindows = groupedWindows[env].filter(w => !w.is_default && w.type !== "blackout");
+            if (envWindows.length === 0) return null;
+            
+            return (
+              <div key={env} className="mb-6">
+                <h3 className="text-lg font-medium mb-3 text-primary capitalize">
+                  {env === "default" ? "No Environment Specified" : env}
+                </h3>
+                <div className="space-y-4">
+                  {envWindows.map((window) => (
+                    <WindowCard 
+                      key={window.id} 
+                      window={window} 
+                      goals={goals} 
+                      ruleViolations={ruleViolations}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      
+      {upcomingWindows.length === 0 && (
+        <div className="card p-8 text-center text-neutral-400">
+          No upcoming maintenance windows scheduled
+        </div>
+      )}
 
       {pastWindows.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Past Maintenance</h2>
           <div className="space-y-4">
             {pastWindows.map((window) => (
-              <WindowCard key={window.id} window={window} goals={goals} ruleViolations={ruleViolations} isPast />
+              <WindowCard 
+                key={window.id} 
+                window={window} 
+                goals={goals} 
+                ruleViolations={ruleViolations}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                isPast 
+              />
             ))}
           </div>
         </div>
@@ -446,11 +624,15 @@ function WindowCard({
   window,
   goals,
   ruleViolations,
+  onEdit,
+  onDelete,
   isPast = false,
 }: {
   window: MaintenanceWindow;
   goals: Goal[];
   ruleViolations: Record<string, any[]>;
+  onEdit: (window: MaintenanceWindow) => void;
+  onDelete: (id: string) => void;
   isPast?: boolean;
 }) {
   const startDate = new Date(window.start_time);
@@ -536,6 +718,26 @@ function WindowCard({
             <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded">
               PENDING APPROVAL
             </span>
+          )}
+          
+          {/* Edit/Delete buttons for non-past windows */}
+          {!isPast && (
+            <div className="flex gap-2 ml-2">
+              <button
+                onClick={() => onEdit(window)}
+                className="text-xs px-3 py-1 bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30 transition-colors flex items-center gap-1"
+                title="Edit window"
+              >
+                ✏️ Edit
+              </button>
+              <button
+                onClick={() => onDelete(window.id)}
+                className="text-xs px-3 py-1 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30 transition-colors flex items-center gap-1"
+                title="Delete window"
+              >
+                🗑️ Delete
+              </button>
+            </div>
           )}
         </div>
       </div>

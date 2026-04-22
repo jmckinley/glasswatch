@@ -329,6 +329,12 @@ export const maintenanceWindowsApi = {
   listEnvironments: () => apiCall<{environments: string[]}>("/maintenance-windows/environments"),
   
   listAssetGroups: () => apiCall<{asset_groups: string[]}>("/maintenance-windows/asset-groups"),
+  
+  create: (window: any) => apiCall<any>("/maintenance-windows", { method: "POST", body: window }),
+  
+  update: (id: string, updates: any) => apiCall<any>(`/maintenance-windows/${id}`, { method: "PATCH", body: updates }),
+  
+  delete: (id: string) => apiCall<any>(`/maintenance-windows/${id}`, { method: "DELETE" }),
 };
 
 // Tags API

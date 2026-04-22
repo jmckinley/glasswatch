@@ -329,9 +329,13 @@ function RuleDialog({
     priority: rule?.priority || 100,
     enabled: rule?.enabled ?? true,
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
     try {
       if (rule) {
         await rulesApi.update(rule.id, formData);
@@ -341,16 +345,41 @@ function RuleDialog({
       onSuccess();
     } catch (error) {
       console.error("Failed to save rule:", error);
-      alert("Failed to save rule. Please try again.");
+      setError(error instanceof Error ? error.message : "Failed to save rule. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h3 className="text-lg font-semibold text-white mb-4">
           {rule ? "Edit Rule" : "Create Rule"}
         </h3>
+
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mb-4">
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Basic Info */}
@@ -719,15 +748,17 @@ function RuleDialog({
           <div className="flex gap-3 mt-6 border-t border-gray-700 pt-4">
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {rule ? "Update Rule" : "Create Rule"}
+              {loading ? "Saving..." : rule ? "Update Rule" : "Create Rule"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
-            >}
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50"
+            >
               Cancel
             </button>
           </div>
