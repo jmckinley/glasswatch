@@ -261,6 +261,66 @@ class ScoringService:
         else:
             return "ACCEPT_RISK"
     
+    def calculate_vulnerability_score(
+        self,
+        vulnerability: Vulnerability,
+        asset: Asset,
+        runtime_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Wrapper for optimization service compatibility.
+        
+        This is the interface used by the optimizer - it returns a dict
+        with score and metadata instead of just the score integer.
+        
+        Args:
+            vulnerability: The vulnerability entity
+            asset: The affected asset
+            runtime_data: Optional Snapper runtime analysis
+            
+        Returns:
+            Dict with score, risk_level, and factors
+        """
+        # Create a minimal asset_vulnerability object for internal calculation
+        # We need this because calculate_score expects it
+        from backend.models.asset_vulnerability import AssetVulnerability as AVModel
+        
+        # Create a temporary object - we won't persist this
+        temp_av = AVModel(
+            vulnerability_id=vulnerability.id,
+            asset_id=asset.id,
+            vulnerability=vulnerability,
+            asset=asset
+        )
+        
+        # If runtime data is provided, set it on the temp object
+        if runtime_data:
+            temp_av.code_executed = runtime_data.get("code_executed", False)
+            temp_av.library_loaded = runtime_data.get("library_loaded", False)
+            temp_av.execution_frequency = runtime_data.get("execution_frequency")
+        
+        # Calculate the score using the existing logic
+        score = self.calculate_score(
+            vulnerability=vulnerability,
+            asset=asset,
+            asset_vulnerability=temp_av,
+            runtime_data=runtime_data
+        )
+        
+        # Get risk level
+        risk_level = self.get_risk_level(score)
+        
+        # Get recommended action
+        action = self.get_recommended_action(score, vulnerability, asset, temp_av)
+        
+        # Return dict format expected by optimizer
+        return {
+            "score": score,
+            "risk_level": risk_level,
+            "recommended_action": action,
+            "factors": temp_av.score_factors if hasattr(temp_av, 'score_factors') else {}
+        }
+    
     async def bulk_score_vulnerabilities(
         self,
         asset_vulnerabilities: list[AssetVulnerability],
