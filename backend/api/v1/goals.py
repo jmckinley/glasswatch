@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 import json
+import logging
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,6 +31,7 @@ from backend.services.notifications import notification_service
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class GoalType(str, Enum):
@@ -150,6 +152,47 @@ class OptimizationResponse(BaseModel):
     
     # Warnings
     warnings: List[str] = Field(default_factory=list)
+
+
+class RecommendationPlanSummary(BaseModel):
+    """Summary metrics for a single recommendation strategy."""
+    vulnerabilities_scheduled: int
+    bundles_count: int
+    windows_needed: int
+    estimated_completion_days: int
+    total_risk_reduction: float
+    risk_reduction_percentage: float
+    max_vulns_per_window: int
+    avg_bundle_risk: float
+
+
+class RecommendationPlan(BaseModel):
+    """A single optimization plan with a specific strategy."""
+    strategy: str
+    label: str
+    description: str
+    summary: RecommendationPlanSummary
+    schedule: List[Dict[str, Any]]
+    trade_offs: List[str]
+    warnings: List[str]
+
+
+class CurrentStateMetrics(BaseModel):
+    """Current state of vulnerabilities for a goal."""
+    total_vulnerabilities: int
+    total_risk_score: float
+    critical_count: int
+    kev_count: int
+
+
+class RecommendationResponse(BaseModel):
+    """Response with multiple optimization plans for comparison."""
+    goal_id: UUID
+    goal_name: str
+    current_state: CurrentStateMetrics
+    plans: List[RecommendationPlan]
+    recommendation: str
+    recommendation_reason: str
 
 
 @router.post("", response_model=GoalResponse)
@@ -582,6 +625,222 @@ async def optimize_goal(
             schedule=[],
             warnings=[f"Error: {str(e)}"],
         )
+
+
+@router.post("/{goal_id}/recommend", response_model=RecommendationResponse)
+async def recommend_plans(
+    goal_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    optimization_service: OptimizationService = Depends(),
+) -> RecommendationResponse:
+    """
+    Generate multiple optimization plans for comparison.
+    
+    Runs the optimizer with three different constraint profiles:
+    - Conservative: Smaller batches, longer timeline, lower risk per window
+    - Balanced: Standard approach meeting deadlines with acceptable risk
+    - Aggressive: Larger batches, faster timeline, higher risk tolerance
+    
+    Returns all three plans so users can compare and choose.
+    """
+    # Get goal
+    result = await db.execute(
+        select(Goal).where(
+            and_(
+                Goal.id == goal_id,
+                Goal.tenant_id == tenant.id
+            )
+        )
+    )
+    goal = result.scalar_one_or_none()
+    
+    if not goal:
+        raise HTTPException(404, "Goal not found")
+    
+    if not goal.active:
+        raise HTTPException(400, "Cannot generate recommendations for inactive goal")
+    
+    # Get current state metrics
+    from sqlalchemy.orm import selectinload
+    
+    metrics = await optimization_service.calculate_goal_metrics(db, goal)
+    asset_vulns = metrics["asset_vulns"]
+    
+    # Calculate current state
+    critical_count = 0
+    kev_count = 0
+    
+    for av in asset_vulns:
+        if av.vulnerability.severity == "CRITICAL":
+            critical_count += 1
+        if av.vulnerability.kev_listed:
+            kev_count += 1
+    
+    current_state = CurrentStateMetrics(
+        total_vulnerabilities=metrics["vulnerabilities_total"],
+        total_risk_score=metrics["risk_score_total"],
+        critical_count=critical_count,
+        kev_count=kev_count,
+    )
+    
+    # Define three strategies with different constraints
+    strategies = [
+        {
+            "strategy": "conservative",
+            "label": "Safe & Steady",
+            "description": "Minimize disruption. Smaller batches, more windows, lower risk per deployment.",
+            "max_vulns_per_window": 5,
+            "max_downtime_hours": 2.0,
+            "trade_offs": [
+                "Longer timeline",
+                "More maintenance windows needed",
+                "Lower blast radius per window",
+                "Reduced operational risk"
+            ],
+        },
+        {
+            "strategy": "balanced",
+            "label": "Balanced Approach",
+            "description": "Standard risk tolerance. Balances speed with safety, moderate batch sizes.",
+            "max_vulns_per_window": 15,
+            "max_downtime_hours": 4.0,
+            "trade_offs": [
+                "Moderate timeline",
+                "Balanced risk per window",
+                "Standard maintenance schedule",
+                "Good mix of speed and safety"
+            ],
+        },
+        {
+            "strategy": "aggressive",
+            "label": "Fast Track",
+            "description": "Fastest timeline. Larger batches, fewer windows, higher risk tolerance.",
+            "max_vulns_per_window": 50,
+            "max_downtime_hours": 8.0,
+            "trade_offs": [
+                "Shortest timeline",
+                "Fewer maintenance windows",
+                "Higher blast radius per window",
+                "Requires strong rollback capability"
+            ],
+        },
+    ]
+    
+    plans = []
+    
+    # Run optimization for each strategy
+    for strategy_config in strategies:
+        try:
+            # Temporarily override goal constraints
+            original_max_vulns = goal.max_vulns_per_window
+            original_max_downtime = goal.max_downtime_hours
+            
+            goal.max_vulns_per_window = strategy_config["max_vulns_per_window"]
+            goal.max_downtime_hours = strategy_config["max_downtime_hours"]
+            
+            # Run optimization with preview_only=True
+            optimization_result = await optimization_service.optimize_goal(
+                db=db,
+                goal=goal,
+                preview_only=True,
+                max_future_windows=12,
+            )
+            
+            # Restore original constraints
+            goal.max_vulns_per_window = original_max_vulns
+            goal.max_downtime_hours = original_max_downtime
+            
+            # Calculate summary metrics
+            bundles_count = len(optimization_result["schedule"])
+            completion_date = optimization_result["estimated_completion_date"]
+            
+            if completion_date:
+                completion_days = (completion_date - datetime.now(timezone.utc)).days
+            else:
+                completion_days = 0
+            
+            risk_reduction_percentage = 0.0
+            if current_state.total_risk_score > 0:
+                risk_reduction_percentage = (
+                    optimization_result["total_risk_reduction"] / current_state.total_risk_score
+                ) * 100
+            
+            # Calculate max vulns per window and avg bundle risk from schedule
+            max_vulns_in_window = 0
+            total_bundle_risk = 0.0
+            
+            for bundle in optimization_result["schedule"]:
+                max_vulns_in_window = max(max_vulns_in_window, bundle["vulnerabilities_count"])
+                total_bundle_risk += bundle["risk_reduction"]
+            
+            avg_bundle_risk = total_bundle_risk / bundles_count if bundles_count > 0 else 0.0
+            
+            plan = RecommendationPlan(
+                strategy=strategy_config["strategy"],
+                label=strategy_config["label"],
+                description=strategy_config["description"],
+                summary=RecommendationPlanSummary(
+                    vulnerabilities_scheduled=optimization_result["vulnerabilities_scheduled"],
+                    bundles_count=bundles_count,
+                    windows_needed=bundles_count,
+                    estimated_completion_days=completion_days,
+                    total_risk_reduction=optimization_result["total_risk_reduction"],
+                    risk_reduction_percentage=risk_reduction_percentage,
+                    max_vulns_per_window=max_vulns_in_window,
+                    avg_bundle_risk=avg_bundle_risk,
+                ),
+                schedule=optimization_result["schedule"],
+                trade_offs=strategy_config["trade_offs"],
+                warnings=optimization_result.get("warnings", []),
+            )
+            
+            plans.append(plan)
+            
+        except Exception as e:
+            logger.error(f"Failed to generate {strategy_config['strategy']} plan: {str(e)}")
+            # Continue with other strategies even if one fails
+            continue
+    
+    if not plans:
+        raise HTTPException(500, "Failed to generate any optimization plans")
+    
+    # Determine recommendation
+    # Prefer balanced if it meets the deadline, otherwise recommend based on target date
+    recommendation = "balanced"
+    recommendation_reason = "Balanced approach provides good mix of speed and safety"
+    
+    if goal.target_date:
+        days_until_deadline = (goal.target_date - datetime.now(timezone.utc)).days
+        
+        # Find which strategies meet the deadline
+        for plan in plans:
+            if plan.strategy == "balanced" and plan.summary.estimated_completion_days <= days_until_deadline:
+                recommendation = "balanced"
+                buffer_days = days_until_deadline - plan.summary.estimated_completion_days
+                recommendation_reason = f"Meets your deadline with {buffer_days} days buffer while maintaining acceptable risk levels"
+                break
+        else:
+            # Balanced doesn't meet deadline, check if aggressive does
+            for plan in plans:
+                if plan.strategy == "aggressive" and plan.summary.estimated_completion_days <= days_until_deadline:
+                    recommendation = "aggressive"
+                    buffer_days = days_until_deadline - plan.summary.estimated_completion_days
+                    recommendation_reason = f"Aggressive approach needed to meet your deadline with {buffer_days} days buffer"
+                    break
+            else:
+                # Neither meets deadline
+                recommendation = "balanced"
+                recommendation_reason = "Deadline may not be achievable. Balanced approach minimizes risk while maximizing speed."
+    
+    return RecommendationResponse(
+        goal_id=goal.id,
+        goal_name=goal.name,
+        current_state=current_state,
+        plans=plans,
+        recommendation=recommendation,
+        recommendation_reason=recommendation_reason,
+    )
 
 
 @router.delete("/{goal_id}")
