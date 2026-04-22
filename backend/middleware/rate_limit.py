@@ -11,6 +11,7 @@ from threading import Lock
 
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from backend.services.rate_limiter import get_rate_limiter
 
 
 class InMemoryRateLimiter:
@@ -104,20 +105,42 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             # Use IP address as key
             client_ip = request.client.host if request.client else "unknown"
             
-            # Check rate limit
-            allowed, retry_after = rate_limiter.is_allowed(
-                key=client_ip,
-                endpoint=path,
-                max_requests=max_requests,
-                window_seconds=window_seconds
-            )
+            # Try Redis-backed rate limiter first
+            redis_limiter = get_rate_limiter()
             
-            if not allowed:
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"Too many requests. Retry after {retry_after} seconds.",
-                    headers={"Retry-After": str(retry_after)}
+            try:
+                allowed, remaining = await redis_limiter.check_rate_limit(
+                    key=f"ip:{client_ip}:{path}",
+                    limit=max_requests,
+                    window_seconds=window_seconds
                 )
+                
+                if not allowed:
+                    raise HTTPException(
+                        status_code=429,
+                        detail=f"Too many requests. Try again later.",
+                        headers={
+                            "Retry-After": str(window_seconds),
+                            "X-RateLimit-Limit": str(max_requests),
+                            "X-RateLimit-Remaining": "0"
+                        }
+                    )
+            
+            except Exception:
+                # Fall back to in-memory rate limiter on error
+                allowed, retry_after = rate_limiter.is_allowed(
+                    key=client_ip,
+                    endpoint=path,
+                    max_requests=max_requests,
+                    window_seconds=window_seconds
+                )
+                
+                if not allowed:
+                    raise HTTPException(
+                        status_code=429,
+                        detail=f"Too many requests. Retry after {retry_after} seconds.",
+                        headers={"Retry-After": str(retry_after)}
+                    )
         
         # Continue processing
         response = await call_next(request)

@@ -127,10 +127,28 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         
         # Add rate limiting headers (if rate limiter is configured)
         if self.rate_limit_per_minute:
-            response.headers["X-RateLimit-Limit"] = str(self.rate_limit_per_minute)
-            # Note: Actual remaining count would come from Redis/rate limiter
-            # This is a placeholder - implement with actual rate limiter
-            response.headers["X-RateLimit-Remaining"] = str(self.rate_limit_per_minute)
+            from backend.services.rate_limiter import get_rate_limiter
+            
+            # Get real remaining count from Redis rate limiter
+            try:
+                limiter = get_rate_limiter()
+                client_ip = request.client.host if request.client else "unknown"
+                
+                # Check current rate limit status without incrementing
+                # We'll use a small window (60 seconds) for per-minute limit
+                allowed, remaining = await limiter.check_rate_limit(
+                    key=f"global:{client_ip}",
+                    limit=self.rate_limit_per_minute,
+                    window_seconds=60
+                )
+                
+                response.headers["X-RateLimit-Limit"] = str(self.rate_limit_per_minute)
+                response.headers["X-RateLimit-Remaining"] = str(max(0, remaining))
+            
+            except Exception:
+                # Fall back to placeholder values if Redis unavailable
+                response.headers["X-RateLimit-Limit"] = str(self.rate_limit_per_minute)
+                response.headers["X-RateLimit-Remaining"] = str(self.rate_limit_per_minute)
         
         return response
 

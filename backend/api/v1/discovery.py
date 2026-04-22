@@ -23,12 +23,14 @@ from backend.services.discovery.nmap_scanner import NmapScanner
 from backend.services.discovery.cloudquery_scanner import CloudQueryScanner
 from backend.services.discovery.jira_assets_scanner import JiraAssetsScanner
 from backend.services.discovery.device42_scanner import Device42Scanner
+from backend.models.discovery_scan import DiscoveryScan
 
 
 router = APIRouter()
 
 
-# In-memory discovery status tracking (TODO: move to Redis/DB)
+# In-memory discovery status tracking for ACTIVE scans only
+# Completed scans are stored in the database
 _discovery_status: Dict[UUID, Dict[str, Any]] = {}
 
 
@@ -125,10 +127,26 @@ async def trigger_discovery(
                 detail=f"Scanner {scanner_type} not available: {str(e)}"
             )
     
-    # Set initial status
+    # Create database record for this scan
+    from datetime import datetime, timezone
+    
+    scan_record = DiscoveryScan(
+        tenant_id=tenant.id,
+        scan_type="manual",  # or derive from config
+        status="running",
+        started_at=datetime.now(timezone.utc),
+        config=config,
+        # initiated_by would come from current user if available
+    )
+    db.add(scan_record)
+    await db.commit()
+    await db.refresh(scan_record)
+    
+    # Set initial in-memory status for active tracking
     _discovery_status[tenant.id] = {
+        "scan_id": str(scan_record.id),
         "status": "running",
-        "started_at": None,
+        "started_at": scan_record.started_at.isoformat(),
         "completed_at": None,
         "summary": None
     }
@@ -142,6 +160,7 @@ async def trigger_discovery(
         orchestrator,
         db,
         tenant.id,
+        scan_record.id,
         parallel,
         update_existing
     )
@@ -158,32 +177,63 @@ async def _run_discovery(
     orchestrator: DiscoveryOrchestrator,
     db: AsyncSession,
     tenant_id: UUID,
+    scan_id: UUID,
     parallel: bool,
     update_existing: bool
 ):
     """Background task to run discovery."""
     from datetime import datetime, timezone
+    from sqlalchemy import select
     
     try:
-        _discovery_status[tenant_id]["started_at"] = datetime.now(timezone.utc).isoformat()
-        
         summary = await orchestrator.discover_all(
             db,
             parallel=parallel,
             update_existing=update_existing
         )
         
+        completed_at = datetime.now(timezone.utc)
+        
+        # Update database record
+        result = await db.execute(
+            select(DiscoveryScan).where(DiscoveryScan.id == scan_id)
+        )
+        scan_record = result.scalar_one_or_none()
+        
+        if scan_record:
+            scan_record.status = "completed"
+            scan_record.completed_at = completed_at
+            scan_record.results_summary = summary
+            await db.commit()
+        
+        # Update in-memory status
         _discovery_status[tenant_id].update({
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": completed_at.isoformat(),
             "summary": summary
         })
     
     except Exception as e:
+        completed_at = datetime.now(timezone.utc)
+        error_message = str(e)
+        
+        # Update database record
+        result = await db.execute(
+            select(DiscoveryScan).where(DiscoveryScan.id == scan_id)
+        )
+        scan_record = result.scalar_one_or_none()
+        
+        if scan_record:
+            scan_record.status = "failed"
+            scan_record.completed_at = completed_at
+            scan_record.error_message = error_message
+            await db.commit()
+        
+        # Update in-memory status
         _discovery_status[tenant_id].update({
             "status": "failed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-            "error": str(e)
+            "completed_at": completed_at.isoformat(),
+            "error": error_message
         })
 
 
@@ -591,17 +641,35 @@ async def list_auto_sync_jobs(
 async def get_discovery_history(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
-    limit: int = 10
+    limit: int = 10,
+    skip: int = 0
 ) -> Dict[str, Any]:
     """
-    Get history of discovery scans.
-    
-    TODO: Store scan history in database
+    Get history of discovery scans from the database.
     """
-    # Placeholder - return current status
-    current_status = _discovery_status.get(tenant.id)
+    from sqlalchemy import select, func, and_
+    
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(DiscoveryScan.id)).where(
+            DiscoveryScan.tenant_id == tenant.id
+        )
+    )
+    total = count_result.scalar()
+    
+    # Get paginated scans, ordered by most recent first
+    result = await db.execute(
+        select(DiscoveryScan)
+        .where(DiscoveryScan.tenant_id == tenant.id)
+        .order_by(DiscoveryScan.started_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    scans = result.scalars().all()
     
     return {
-        "scans": [current_status] if current_status else [],
-        "total": 1 if current_status else 0
+        "scans": [scan.to_dict() for scan in scans],
+        "total": total,
+        "skip": skip,
+        "limit": limit
     }

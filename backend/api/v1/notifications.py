@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from backend.db.session import get_db
 from backend.models.notification import Notification
 from backend.models.user import User
-from backend.api.deps import get_current_user
+from backend.core.auth_workos import get_current_user
 
 
 router = APIRouter()

@@ -18,7 +18,9 @@ from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
+from backend.models.user import User
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
+from backend.services.deployment_service import deployment_service
 
 
 router = APIRouter()
@@ -192,44 +194,38 @@ async def execute_bundle(
     bundle_id: UUID,
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
-) -> Dict[str, str]:
+    # TODO: Add current_user dependency when auth is fully integrated
+    # current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
     """
     Start execution of a bundle.
     
-    This would integrate with patch deployment systems.
+    Executes the deployment workflow:
+    1. Validates bundle is approved
+    2. Checks deployment rules
+    3. Executes each patch in the bundle
+    4. Tracks progress and status
+    5. Creates audit logs
+    6. Sends notifications
+    
+    Returns execution results with success/failure counts.
     """
-    result = await db.execute(
-        select(Bundle).where(
-            and_(
-                Bundle.id == bundle_id,
-                Bundle.tenant_id == tenant.id
-            )
-        )
+    # Execute bundle using deployment service
+    result = await deployment_service.execute_bundle(
+        db=db,
+        bundle_id=bundle_id,
+        tenant_id=tenant.id,
+        # user_id=current_user.id if current_user else None
+        user_id=None  # TODO: Pass actual user ID when auth integrated
     )
-    bundle = result.scalar_one_or_none()
     
-    if not bundle:
-        raise HTTPException(404, "Bundle not found")
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Bundle execution failed")
+        )
     
-    if bundle.status != "approved":
-        raise HTTPException(400, "Bundle must be approved before execution")
-    
-    # Update bundle status
-    bundle.status = "in_progress"
-    bundle.started_at = datetime.now(timezone.utc)
-    await db.commit()
-    
-    # TODO: Integrate with actual patch deployment systems
-    # - Ansible
-    # - SCCM
-    # - AWS Systems Manager
-    # - Custom scripts
-    
-    return {
-        "message": f"Bundle '{bundle.name}' execution started",
-        "bundle_id": str(bundle_id),
-        "status": "in_progress",
-    }
+    return result
 
 async def get_bundle_stats(
     db: AsyncSession = Depends(get_db),
