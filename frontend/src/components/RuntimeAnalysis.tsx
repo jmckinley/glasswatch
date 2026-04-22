@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Activity, AlertCircle, CheckCircle, XCircle, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Activity, AlertCircle, CheckCircle, XCircle, Info, Loader2 } from "lucide-react";
 
 interface RuntimeData {
   vulnerability_id: string;
@@ -18,22 +18,93 @@ interface RuntimeAnalysisProps {
   vulnerabilityId: string;
   runtimeData?: RuntimeData;
   showDetails?: boolean;
+  apiEndpoint?: string; // Optional endpoint to fetch runtime data
 }
 
-export function RuntimeAnalysis({ vulnerabilityId, runtimeData, showDetails = true }: RuntimeAnalysisProps) {
+export function RuntimeAnalysis({ vulnerabilityId, runtimeData, showDetails = true, apiEndpoint }: RuntimeAnalysisProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [fetchedData, setFetchedData] = useState<RuntimeData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data if not provided
-  const data = runtimeData || {
-    vulnerability_id: vulnerabilityId,
-    code_executed: Math.random() > 0.5,
-    library_loaded: Math.random() > 0.3,
-    function_called: Math.random() > 0.7,
-    execution_frequency: Math.floor(Math.random() * 1000),
-    last_seen: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString(),
-    confidence: Math.floor(Math.random() * 40) + 60,
-    impact_score: Math.floor(Math.random() * 25) - 10,
-  };
+  // Fetch runtime data if apiEndpoint is provided and no runtimeData prop
+  useEffect(() => {
+    if (!runtimeData && apiEndpoint && vulnerabilityId) {
+      const fetchRuntimeData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(`${apiEndpoint}/${vulnerabilityId}/runtime`);
+          if (response.status === 404) {
+            setError('no_data');
+            setFetchedData(null);
+          } else if (!response.ok) {
+            throw new Error(`Failed to fetch runtime data: ${response.statusText}`);
+          } else {
+            const data = await response.json();
+            setFetchedData(data);
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch runtime data');
+          setFetchedData(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchRuntimeData();
+    }
+  }, [vulnerabilityId, runtimeData, apiEndpoint]);
+
+  // Use provided runtimeData, or fetched data, or show appropriate state
+  const data = runtimeData || fetchedData;
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="bg-neutral-900 rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-primary animate-spin" />
+          <span className="text-sm text-neutral-400">Loading runtime analysis...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "no data available" state
+  if (!data || error === 'no_data') {
+    return (
+      <div className="bg-neutral-900 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Activity className="w-4 h-4 text-neutral-500" />
+          <span className="text-sm font-medium text-neutral-400">Snapper Runtime Analysis</span>
+        </div>
+        <div className="flex items-center gap-2 text-neutral-500">
+          <Info className="w-4 h-4" />
+          <span className="text-sm">No runtime data available</span>
+        </div>
+        <p className="text-xs text-neutral-600 mt-2">
+          Runtime analysis data is collected by Snapper. Enable Snapper monitoring for this asset to see runtime behavior.
+        </p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && error !== 'no_data') {
+    return (
+      <div className="bg-neutral-900 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Activity className="w-4 h-4 text-neutral-500" />
+          <span className="text-sm font-medium text-neutral-400">Snapper Runtime Analysis</span>
+        </div>
+        <div className="flex items-center gap-2 text-destructive">
+          <XCircle className="w-4 h-4" />
+          <span className="text-sm">Error loading runtime data</span>
+        </div>
+        <p className="text-xs text-neutral-500 mt-2">{error}</p>
+      </div>
+    );
+  }
 
   const getStatusIcon = () => {
     if (data.code_executed) {

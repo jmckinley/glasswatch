@@ -12,6 +12,7 @@ interface Message {
 
 interface AIAssistantProps {
   onSendMessage?: (message: string) => Promise<string>;
+  apiEndpoint?: string; // Optional API endpoint for real AI integration
 }
 
 const suggestedQuestions = [
@@ -22,13 +23,16 @@ const suggestedQuestions = [
   "Explain my current risk score",
 ];
 
-export function AIAssistant({ onSendMessage }: AIAssistantProps) {
+export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
+  const isDemoMode = !apiEndpoint && !onSendMessage;
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "Hi! I'm your AI patch assistant. I can help you understand your vulnerabilities, create patching goals, and optimize your schedule. What would you like to know?",
+      content: isDemoMode
+        ? "Hi! I'm your AI patch assistant (Demo Mode). I can help you understand your vulnerabilities, create patching goals, and optimize your schedule.\n\nNote: This is a demo with mock responses. To enable full AI capabilities, contact your administrator to configure the AI integration."
+        : "Hi! I'm your AI patch assistant. I can help you understand your vulnerabilities, create patching goals, and optimize your schedule. What would you like to know?",
       timestamp: new Date(),
     },
   ]);
@@ -59,10 +63,31 @@ export function AIAssistant({ onSendMessage }: AIAssistantProps) {
     setIsLoading(true);
 
     try {
-      // Default mock responses if no handler provided
-      const response = onSendMessage
-        ? await onSendMessage(input)
-        : getMockResponse(input);
+      let response: string;
+      
+      if (apiEndpoint) {
+        // Make real API call
+        const apiResponse = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: input }),
+        });
+        
+        if (!apiResponse.ok) {
+          throw new Error(`API error: ${apiResponse.statusText}`);
+        }
+        
+        const data = await apiResponse.json();
+        response = data.response || data.message || "No response from AI";
+      } else if (onSendMessage) {
+        // Use provided handler
+        response = await onSendMessage(input);
+      } else {
+        // Demo mode - use mock responses
+        response = getMockResponse(input);
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -115,7 +140,14 @@ export function AIAssistant({ onSendMessage }: AIAssistantProps) {
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">Glasswatch Assistant</h3>
+              <div>
+                <h3 className="font-semibold">Glasswatch Assistant</h3>
+                {isDemoMode && (
+                  <span className="text-xs text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded mt-1 inline-block">
+                    Demo Mode
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}

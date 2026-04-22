@@ -142,6 +142,64 @@ async def get_vulnerability_stats(
     }
 
 
+@router.get("/{vulnerability_id}/runtime")
+async def get_vulnerability_runtime_analysis(
+    vulnerability_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Get runtime analysis data for a vulnerability.
+    
+    Returns Snapper runtime analysis data showing whether vulnerable code
+    is actually executing in the environment.
+    """
+    # Get any asset_vulnerability record for this vulnerability in this tenant
+    # that has snapper runtime data
+    query = (
+        select(AssetVulnerability)
+        .join(AssetVulnerability.asset)
+        .where(
+            and_(
+                AssetVulnerability.vulnerability_id == vulnerability_id,
+                AssetVulnerability.asset.has(tenant_id=tenant.id),
+                AssetVulnerability.snapper_data.isnot(None),
+            )
+        )
+        .limit(1)  # Get first asset with runtime data
+    )
+    
+    result = await db.execute(query)
+    asset_vuln = result.scalar_one_or_none()
+    
+    if not asset_vuln or not asset_vuln.snapper_data:
+        raise HTTPException(
+            status_code=404,
+            detail="No runtime analysis data available for this vulnerability"
+        )
+    
+    # Calculate impact score based on runtime data
+    impact_score = 0
+    if asset_vuln.code_executed:
+        impact_score = 15
+    elif asset_vuln.library_loaded:
+        impact_score = 0
+    else:
+        impact_score = -10
+    
+    # Build response from asset_vulnerability runtime fields
+    return {
+        "vulnerability_id": str(vulnerability_id),
+        "code_executed": asset_vuln.code_executed or False,
+        "library_loaded": asset_vuln.library_loaded or False,
+        "function_called": asset_vuln.snapper_data.get("function_called", False) if isinstance(asset_vuln.snapper_data, dict) else False,
+        "execution_frequency": asset_vuln.snapper_data.get("execution_frequency", 0) if isinstance(asset_vuln.snapper_data, dict) else 0,
+        "last_seen": asset_vuln.last_execution.isoformat() if asset_vuln.last_execution else None,
+        "confidence": asset_vuln.scanner_confidence * 100 if asset_vuln.scanner_confidence else 85,
+        "impact_score": impact_score,
+    }
+
+
 @router.get("/{vulnerability_id}")
 async def get_vulnerability(
     vulnerability_id: UUID,

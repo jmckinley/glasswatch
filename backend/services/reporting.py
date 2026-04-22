@@ -490,12 +490,82 @@ class ReportingService:
         end_date: datetime,
     ) -> Dict[str, Any]:
         """Get statistics for a specific time interval."""
-        # Simplified - would query historical data in production
+        # Import AssetVulnerability for join
+        from backend.models.asset_vulnerability import AssetVulnerability
+        from backend.models.bundle_item import BundleItem
+        
+        # Calculate risk_score: Sum of (CVSS scores × affected asset counts) for active vulns
+        # Join vulnerabilities through asset_vulnerabilities to get tenant scope
+        risk_score_result = await db.execute(
+            select(
+                func.coalesce(func.sum(Vulnerability.cvss_score), 0)
+            )
+            .select_from(AssetVulnerability)
+            .join(Vulnerability, AssetVulnerability.vulnerability_id == Vulnerability.id)
+            .join(Asset, AssetVulnerability.asset_id == Asset.id)
+            .where(
+                and_(
+                    Asset.tenant_id == tenant.id,
+                    AssetVulnerability.status == 'ACTIVE',
+                    AssetVulnerability.discovered_at <= end_date
+                )
+            )
+        )
+        risk_score = risk_score_result.scalar() or 0
+        
+        # Count active vulnerabilities as of end_date
+        vuln_count_result = await db.execute(
+            select(func.count(func.distinct(Vulnerability.id)))
+            .select_from(AssetVulnerability)
+            .join(Vulnerability, AssetVulnerability.vulnerability_id == Vulnerability.id)
+            .join(Asset, AssetVulnerability.asset_id == Asset.id)
+            .where(
+                and_(
+                    Asset.tenant_id == tenant.id,
+                    AssetVulnerability.status == 'ACTIVE',
+                    AssetVulnerability.discovered_at <= end_date
+                )
+            )
+        )
+        vuln_count = vuln_count_result.scalar() or 0
+        
+        # Count critical vulnerabilities
+        critical_count_result = await db.execute(
+            select(func.count(func.distinct(Vulnerability.id)))
+            .select_from(AssetVulnerability)
+            .join(Vulnerability, AssetVulnerability.vulnerability_id == Vulnerability.id)
+            .join(Asset, AssetVulnerability.asset_id == Asset.id)
+            .where(
+                and_(
+                    Asset.tenant_id == tenant.id,
+                    AssetVulnerability.status == 'ACTIVE',
+                    AssetVulnerability.discovered_at <= end_date,
+                    Vulnerability.severity == 'CRITICAL'
+                )
+            )
+        )
+        critical_count = critical_count_result.scalar() or 0
+        
+        # Count patches applied (bundle items with status='success' in the period)
+        patches_applied_result = await db.execute(
+            select(func.count(BundleItem.id))
+            .join(Bundle, BundleItem.bundle_id == Bundle.id)
+            .where(
+                and_(
+                    Bundle.tenant_id == tenant.id,
+                    BundleItem.status == 'success',
+                    BundleItem.completed_at >= start_date,
+                    BundleItem.completed_at <= end_date
+                )
+            )
+        )
+        patches_applied = patches_applied_result.scalar() or 0
+        
         return {
-            "risk_score": 84720 + (start_date.day * 100),  # Mock variation
-            "vuln_count": 234 + start_date.day,
-            "critical_count": 23 + (start_date.day % 5),
-            "patches_applied": 15 + (start_date.day % 10),
+            "risk_score": int(risk_score),
+            "vuln_count": vuln_count,
+            "critical_count": critical_count,
+            "patches_applied": patches_applied,
         }
     
     async def _generate_trend_insights(
