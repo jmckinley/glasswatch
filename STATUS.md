@@ -1,12 +1,12 @@
 # PatchGuide Implementation Status
 
-**Last Updated:** 2026-04-20 19:30 UTC  
+**Last Updated:** 2026-04-22 18:46 UTC  
 **GitHub:** https://github.com/jmckinley/glasswatch  
 **Sprint:** PatchGuide v1.0 (11-week sprint to July 2026 Glasswing deadline)
 
 ---
 
-## 🎯 Sprint Progress: 11/11 Sprints Complete ✅
+## 🎯 Sprint Progress: 15/15 Sprints Complete ✅
 
 ### Sprint 0-8: Foundation & Core Features ✅
 - All 8 core models + 3 bundle models
@@ -213,16 +213,36 @@
     - Security hardening
     - Frontend integration
 
-### Remaining (1/11 sprints)
+### Recent Sprints (12-15)
 
-11. **Launch Prep** ✅ (Sprint 11)
-    - Performance tuning
-    - Monitoring setup (Sentry, uptime)
-    - Backup and recovery
-    - Final documentation
-    - Beta testing
-    - Marketing materials
-    - Launch checklist
+12. **Multi-Tenant SaaS Architecture** ✅ (Sprint 12)
+    - Organization/team hierarchy
+    - Tenant isolation
+    - API key management
+    - Usage tracking & quotas
+    - SOC 2 foundations
+
+13. **Tag Taxonomy & Deployment Rules** ✅ (Sprint 13)
+    - Tag namespace system with autocomplete
+    - 6 default deployment rules (KEV, CVSS ≥9, internet-exposed, etc.)
+    - Rule evaluation engine
+    - Tag-based asset/vuln filtering
+
+14. **Production Data Wiring** ✅ (Sprint 14)
+    - Replaced all mock data with real DB queries
+    - Cloud health checks (AWS/Azure/GCP)
+    - Redis caching layer
+    - Discovery persistence
+    - Rate limiter
+    - Deployment service
+
+15. **UX Polish & Window Management** ✅ (Sprint 15)
+    - Full maintenance window CRUD UI (617-line dialog)
+    - Inline asset tag add (GitHub-style)
+    - Rules dialog hardening
+    - Slack integration config UX (3-state: not configured / configured / connected)
+    - Asset CSV export
+    - Visual scope grouping (environment/service/asset group)
 
 ---
 
@@ -243,7 +263,7 @@
 - **Tests:** 87 files (65 unit, 22 integration)
 - **Commits:** 46+
 
-**Status: FEATURE COMPLETE — Ready for beta and production deployment.**
+**Status: FEATURE COMPLETE + UX POLISH — Ready for Railway deployment & beta.**
 
 ---
 
@@ -372,24 +392,24 @@ pytest --cov=app --cov-report=term-missing
 - Sprint 10: Production Hardening (1 week) ✅
 - Sprint 11: Launch Prep ✅ COMPLETE
 
-**Current Status:** 91% complete (10/11 sprints)  
-**Time Remaining:** 1 week
+**Current Status:** 15 sprints complete (original 11 + 4 polish/production sprints)  
+**Next:** Railway deployment verification
 
 ---
 
 ## Code Statistics
 
-**Total Lines of Code:**
-- Backend: ~46,000 lines
-- Frontend: ~8,000 lines
+**Total Lines of Code (as of Sprint 15):**
+- Backend: ~48,000 lines
+- Frontend: ~10,500 lines  
 - Tests: 87 test files
-- Documentation: ~70KB
-- Total Commits: 170+
+- Documentation: ~75KB
+- Total Commits: 185+
 
-**Sprint 10 Additions:**
-- Backend: +13,216 lines (69+ files changed)
-- Tests: +87 test files
-- Frontend: ~3,000 new lines (login, approvals, comments, notifications)
+**Sprints 12-15 Additions:**
+- Backend: +2,000 lines (multi-tenancy, rules engine, cloud health checks, rate limiter)
+- Frontend: +2,500 lines (tag autocomplete, window dialog, inline tags, CSV export)
+- New component: MaintenanceWindowDialog.tsx (617 lines)
 
 ---
 
