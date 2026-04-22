@@ -21,6 +21,8 @@ from backend.models.asset import Asset
 from backend.models.user import User
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.deployment_service import deployment_service
+from backend.services.rule_engine import rule_engine
+from backend.services.notifications import notification_service
 
 
 router = APIRouter()
@@ -162,17 +164,64 @@ async def update_bundle_status(
         raise HTTPException(400, f"Invalid status. Must be one of: {valid_statuses}")
     
     result = await db.execute(
-        select(Bundle).where(
+        select(Bundle)
+        .where(
             and_(
                 Bundle.id == bundle_id,
                 Bundle.tenant_id == tenant.id
             )
         )
+        .options(selectinload(Bundle.items).selectinload(BundleItem.asset))
     )
     bundle = result.scalar_one_or_none()
     
     if not bundle:
         raise HTTPException(404, "Bundle not found")
+    
+    # Rule evaluation for scheduled/approved status changes
+    rule_eval_result = None
+    if new_status in ["scheduled", "approved"]:
+        # Collect assets from bundle items
+        assets = [item.asset for item in bundle.items if item.asset]
+        asset_tags = set()
+        environments = set()
+        
+        for asset in assets:
+            if asset.tags:
+                asset_tags.update(asset.tags)
+            if asset.environment:
+                environments.add(asset.environment)
+        
+        # Determine primary environment (most common)
+        primary_env = max(environments, key=list(environments).count) if environments else None
+        
+        # Get maintenance window if assigned
+        window = None
+        if bundle.maintenance_window_id:
+            from backend.models.maintenance_window import MaintenanceWindow
+            window_result = await db.execute(
+                select(MaintenanceWindow).where(MaintenanceWindow.id == bundle.maintenance_window_id)
+            )
+            window = window_result.scalar_one_or_none()
+        
+        # Evaluate deployment rules
+        rule_eval_result = await rule_engine.evaluate_deployment(
+            db=db,
+            tenant_id=str(tenant.id),
+            bundle=bundle,
+            assets=assets,
+            asset_tags=list(asset_tags),
+            environment=primary_env,
+            target_window=window
+        )
+        
+        # Block if verdict is "block"
+        if rule_eval_result.verdict == "block":
+            blocking_rule = rule_eval_result.matches[0] if rule_eval_result.matches else None
+            raise HTTPException(
+                403,
+                f"Deployment blocked by rule: {blocking_rule.message if blocking_rule else 'Unknown rule'}"
+            )
     
     # Update status and related fields
     bundle.status = new_status
@@ -192,7 +241,33 @@ async def update_bundle_status(
     await db.commit()
     await db.refresh(bundle)
     
-    return bundle.to_dict()
+    # Send notification for scheduled/approved bundles
+    if new_status in ["scheduled", "approved"]:
+        try:
+            await notification_service.send_bundle_ready_notification(
+                db=db,
+                bundle=bundle,
+                tenant_id=str(tenant.id)
+            )
+        except Exception as e:
+            # Don't fail the request if notification fails
+            import logging
+            logging.warning(f"Failed to send bundle notification: {e}")
+    
+    # Include rule evaluation results in response if available
+    response = bundle.to_dict()
+    if rule_eval_result:
+        response["rule_evaluation"] = {
+            "verdict": rule_eval_result.verdict,
+            "warnings": [
+                {"rule": m.rule_name, "message": m.message}
+                for m in rule_eval_result.matches
+                if m.action_type == "warn"
+            ],
+            "evaluated_count": rule_eval_result.evaluated_count
+        }
+    
+    return response
 
 
 @router.post("/{bundle_id}/execute")
@@ -257,7 +332,7 @@ async def assign_bundle_to_window(
                 Bundle.tenant_id == tenant.id
             )
         )
-        .options(selectinload(Bundle.items))
+        .options(selectinload(Bundle.items).selectinload(BundleItem.asset))
     )
     bundle = result.scalar_one_or_none()
     
@@ -328,6 +403,39 @@ async def assign_bundle_to_window(
                 f"Available: {window.max_assets - total_assets} of {window.max_assets} total."
             )
     
+    # Evaluate deployment rules before assigning
+    assets = [item.asset for item in bundle.items if item.asset]
+    asset_tags = set()
+    environments = set()
+    
+    for asset in assets:
+        if asset.tags:
+            asset_tags.update(asset.tags)
+        if asset.environment:
+            environments.add(asset.environment)
+    
+    # Determine primary environment
+    primary_env = max(environments, key=list(environments).count) if environments else None
+    
+    # Evaluate rules
+    rule_eval_result = await rule_engine.evaluate_deployment(
+        db=db,
+        tenant_id=str(tenant.id),
+        bundle=bundle,
+        assets=assets,
+        asset_tags=list(asset_tags),
+        environment=primary_env,
+        target_window=window
+    )
+    
+    # Block if verdict is "block"
+    if rule_eval_result.verdict == "block":
+        blocking_rule = rule_eval_result.matches[0] if rule_eval_result.matches else None
+        raise HTTPException(
+            403,
+            f"Deployment blocked by rule: {blocking_rule.message if blocking_rule else 'Unknown rule'}"
+        )
+    
     # All checks passed - assign bundle
     bundle.maintenance_window_id = window_uuid
     bundle.status = "scheduled"
@@ -337,8 +445,33 @@ async def assign_bundle_to_window(
     await db.commit()
     await db.refresh(bundle)
     
-    return bundle.to_dict()
+    # Send notification when bundle is scheduled
+    try:
+        await notification_service.send_bundle_ready_notification(
+            db=db,
+            bundle=bundle,
+            tenant_id=str(tenant.id)
+        )
+    except Exception as e:
+        # Don't fail the request if notification fails
+        import logging
+        logging.warning(f"Failed to send bundle notification: {e}")
+    
+    # Include rule evaluation results in response
+    response = bundle.to_dict()
+    response["rule_evaluation"] = {
+        "verdict": rule_eval_result.verdict,
+        "warnings": [
+            {"rule": m.rule_name, "message": m.message}
+            for m in rule_eval_result.matches
+            if m.action_type == "warn"
+        ],
+        "evaluated_count": rule_eval_result.evaluated_count
+    }
+    
+    return response
 
+@router.get("/stats")
 async def get_bundle_stats(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
