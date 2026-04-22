@@ -2,7 +2,7 @@
 Cloud asset inventory scanners for AWS, Azure, GCP
 """
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import boto3
 from azure.identity import DefaultAzureCredential
@@ -34,7 +34,7 @@ class AWSInventoryScanner(ScannerInterface):
     
     async def scan(self, target: str = "all", options: Dict[str, Any] = None) -> ScanResult:
         """Scan AWS account for assets"""
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         options = options or {}
         findings = []
         
@@ -139,7 +139,7 @@ class AWSInventoryScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=True,
                 findings=findings,
                 metadata={
@@ -155,7 +155,7 @@ class AWSInventoryScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=False,
                 error=str(e)
             )
@@ -186,7 +186,7 @@ class AzureInventoryScanner(ScannerInterface):
     
     async def scan(self, target: str = "all", options: Dict[str, Any] = None) -> ScanResult:
         """Scan Azure subscription for assets"""
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         findings = []
         
         try:
@@ -200,7 +200,7 @@ class AzureInventoryScanner(ScannerInterface):
                     target=target,
                     scan_type=self.scan_type,
                     started_at=started_at,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(timezone.utc),
                     success=False,
                     error="Azure subscription ID required"
                 )
@@ -224,7 +224,7 @@ class AzureInventoryScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=True,
                 findings=findings,
                 metadata={
@@ -240,7 +240,7 @@ class AzureInventoryScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=False,
                 error=str(e)
             )

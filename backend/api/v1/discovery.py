@@ -162,10 +162,10 @@ async def _run_discovery(
     update_existing: bool
 ):
     """Background task to run discovery."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     try:
-        _discovery_status[tenant_id]["started_at"] = datetime.utcnow().isoformat()
+        _discovery_status[tenant_id]["started_at"] = datetime.now(timezone.utc).isoformat()
         
         summary = await orchestrator.discover_all(
             db,
@@ -175,14 +175,14 @@ async def _run_discovery(
         
         _discovery_status[tenant_id].update({
             "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
             "summary": summary
         })
     
     except Exception as e:
         _discovery_status[tenant_id].update({
             "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
             "error": str(e)
         })
 

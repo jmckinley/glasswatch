@@ -2,7 +2,7 @@
 Kubescape integration for Kubernetes security posture scanning
 """
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 from . import ScannerInterface, ScanResult
@@ -31,7 +31,7 @@ class KubescapeScanner(ScannerInterface):
     
     async def scan(self, target: str = "cluster", options: Dict[str, Any] = None) -> ScanResult:
         """Scan Kubernetes cluster against security frameworks"""
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         options = options or {}
         
         # Get framework to scan
@@ -67,7 +67,7 @@ class KubescapeScanner(ScannerInterface):
                     target=target,
                     scan_type=self.scan_type,
                     started_at=started_at,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(timezone.utc),
                     success=False,
                     error="Failed to read scan results"
                 )
@@ -99,7 +99,7 @@ class KubescapeScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=True,
                 findings=findings,
                 metadata={
@@ -118,7 +118,7 @@ class KubescapeScanner(ScannerInterface):
                 target=target,
                 scan_type=self.scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=False,
                 error=str(e)
             )

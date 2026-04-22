@@ -3,7 +3,7 @@ Executive reporting service for PatchGuide.
 
 Generates PDF reports, compliance packages, and analytics exports.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from io import BytesIO
 import json
@@ -43,7 +43,7 @@ class ReportingService:
         """
         Generate executive summary report with key metrics and trends.
         """
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=period_days)
         
         # Get current vulnerability stats
@@ -62,7 +62,7 @@ class ReportingService:
         report = {
             "metadata": {
                 "report_type": ReportType.EXECUTIVE_SUMMARY,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "period": f"Last {period_days} days",
                 "tenant": tenant.name,
             },
@@ -105,7 +105,7 @@ class ReportingService:
         """
         Generate compliance evidence package for auditors.
         """
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=period_days)
         
         # Get all patches in period
@@ -145,7 +145,7 @@ class ReportingService:
             "metadata": {
                 "report_type": ReportType.COMPLIANCE_EVIDENCE,
                 "compliance_framework": compliance_type,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "period": f"{start_date.date()} to {end_date.date()}",
                 "tenant": tenant.name,
             },
@@ -175,7 +175,7 @@ class ReportingService:
             "attestation": {
                 "statement": f"PatchGuide confirms that {tenant.name} has maintained a systematic vulnerability management program during the audit period.",
                 "generated_by": "PatchGuide Reporting Service",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         }
         
@@ -193,7 +193,7 @@ class ReportingService:
         """
         # Calculate intervals
         intervals = []
-        current = datetime.utcnow()
+        current = datetime.now(timezone.utc)
         
         if interval == "daily":
             days_per_interval = 1
@@ -235,7 +235,7 @@ class ReportingService:
         report = {
             "metadata": {
                 "report_type": ReportType.RISK_TRENDS,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "period_days": period_days,
                 "interval": interval,
                 "tenant": tenant.name,

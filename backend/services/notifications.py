@@ -4,7 +4,7 @@ Notification service for alerts and updates.
 Supports Slack, Microsoft Teams, Email, and in-app notifications.
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Literal
 from enum import Enum
 import httpx
@@ -141,7 +141,7 @@ class NotificationService:
                 "fallback": f"{title}: {message}",
                 "footer": "PatchGuide",
                 "footer_icon": "https://patchguide.ai/icon.png",
-                "ts": int(datetime.utcnow().timestamp()),
+                "ts": int(datetime.now(timezone.utc).timestamp()),
             }]
         }
         
@@ -252,7 +252,7 @@ class NotificationService:
                     <p>{message}</p>
                     {"<a href='" + data['action_url'] + "' class='button'>" + data.get('action_text', 'View Details') + "</a>" if data and data.get('action_url') else ""}
                     <p style="color: #666; font-size: 12px; margin-top: 20px;">
-                        Sent by PatchGuide at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+                        Sent by PatchGuide at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
                     </p>
                 </div>
             </div>
@@ -285,7 +285,7 @@ class NotificationService:
         
         # Standard webhook payload
         payload = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "tenant_id": str(tenant.id),
             "priority": priority,
             "title": title,
@@ -322,7 +322,7 @@ class NotificationService:
         return {
             "message_sent": True,
             "channel": "in_app",
-            "notification_id": "demo-" + str(datetime.utcnow().timestamp()),
+            "notification_id": "demo-" + str(datetime.now(timezone.utc).timestamp()),
         }
     
     async def send_critical_vulnerability_alert(

@@ -9,7 +9,7 @@ Provides multiple levels of health checks:
 import time
 import psutil
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -141,7 +141,7 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)) -> Dict[str,
         "version": settings.VERSION,
         "environment": settings.ENV,
         "checks": checks,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

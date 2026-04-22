@@ -8,7 +8,7 @@ Handles:
 - API key authentication
 """
 from typing import Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import secrets
 import hashlib
@@ -51,12 +51,12 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 async def create_access_token(user_id: str, tenant_id: str) -> str:
     """Create JWT access token for authenticated user."""
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode = {
         "sub": user_id,
         "tenant_id": tenant_id,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
     }
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
@@ -93,7 +93,7 @@ async def get_current_user_from_token(
         
         # Update last login
         if user:
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             await db.commit()
             
         return user
@@ -123,7 +123,7 @@ async def get_current_user_from_api_key(
     
     if user:
         # Update last used timestamp
-        user.api_key_last_used = datetime.utcnow()
+        user.api_key_last_used = datetime.now(timezone.utc)
         await db.commit()
         
     return user
@@ -335,7 +335,7 @@ async def handle_sso_callback(
         )
     
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     await db.commit()
     
     # Create access token

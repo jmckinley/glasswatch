@@ -4,7 +4,7 @@ Optimization service for goal-based patch scheduling.
 This is the secret sauce - uses OR-Tools constraint solver to find optimal
 patch schedules that meet business objectives.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, Set, Tuple
 from uuid import UUID, uuid4
 import logging
@@ -143,7 +143,7 @@ class OptimizationService:
             }
         
         # Get maintenance windows
-        start_date = datetime.utcnow()
+        start_date = datetime.now(timezone.utc)
         end_date = start_date + timedelta(weeks=max_future_windows * 4)  # Roughly months
         windows = await self.get_maintenance_windows(db, goal.tenant_id, start_date, end_date)
         

@@ -114,8 +114,8 @@ class PatchBundle(Base):
     notifications_sent = Column(JSON)  # Track what notifications went out
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     goal = relationship("Goal")  # no back_populates — Goal.bundles points to Bundle
@@ -200,8 +200,8 @@ class BundlePatch(Base):
     verified_at = Column(DateTime(timezone=True))
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     bundle = relationship("PatchBundle", back_populates="bundle_patches")

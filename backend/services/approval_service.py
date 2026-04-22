@@ -4,7 +4,7 @@ Approval workflow service.
 Handles creation, processing, and management of approval requests
 for bundle deployments.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +66,7 @@ class ApprovalService:
         if policy and policy.auto_approve_low_risk and risk_level == RiskLevel.LOW:
             status = ApprovalStatus.APPROVED
             current_approvals = required_approvals
-            approved_at = datetime.utcnow()
+            approved_at = datetime.now(timezone.utc)
         else:
             status = ApprovalStatus.PENDING
             current_approvals = 0
@@ -74,7 +74,7 @@ class ApprovalService:
         
         # Calculate expiration (48 hours default)
         escalation_hours = policy.escalation_hours if policy else 48
-        expires_at = datetime.utcnow() + timedelta(hours=escalation_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=escalation_hours)
         
         # Create approval request
         approval_request = ApprovalRequest(
@@ -148,7 +148,7 @@ class ApprovalService:
             raise ValueError(f"Approval request is {approval_request.status}, cannot approve")
         
         # Check if expired
-        if approval_request.expires_at and datetime.utcnow() > approval_request.expires_at:
+        if approval_request.expires_at and datetime.now(timezone.utc) > approval_request.expires_at:
             approval_request.status = ApprovalStatus.EXPIRED
             await db.flush()
             raise ValueError("Approval request has expired")
@@ -182,19 +182,19 @@ class ApprovalService:
             user_id=user_id,
             status=ApprovalStatus.APPROVED,
             comment=comment,
-            acted_at=datetime.utcnow(),
+            acted_at=datetime.now(timezone.utc),
         )
         
         db.add(approval_action)
         
         # Update approval request
         approval_request.current_approvals += 1
-        approval_request.updated_at = datetime.utcnow()
+        approval_request.updated_at = datetime.now(timezone.utc)
         
         # Check if we have enough approvals
         if approval_request.current_approvals >= approval_request.required_approvals:
             approval_request.status = ApprovalStatus.APPROVED
-            approval_request.approved_at = datetime.utcnow()
+            approval_request.approved_at = datetime.now(timezone.utc)
             
             # Update bundle status
             bundle_result = await db.execute(
@@ -202,7 +202,7 @@ class ApprovalService:
             )
             bundle = bundle_result.scalar_one()
             bundle.approved_by = user.email
-            bundle.approved_at = datetime.utcnow()
+            bundle.approved_at = datetime.now(timezone.utc)
             bundle.status = "approved"
             
             # Send notification
@@ -275,14 +275,14 @@ class ApprovalService:
             user_id=user_id,
             status=ApprovalStatus.REJECTED,
             comment=comment,
-            acted_at=datetime.utcnow(),
+            acted_at=datetime.now(timezone.utc),
         )
         
         db.add(approval_action)
         
         # Update approval request
         approval_request.status = ApprovalStatus.REJECTED
-        approval_request.updated_at = datetime.utcnow()
+        approval_request.updated_at = datetime.now(timezone.utc)
         
         # Update bundle status
         bundle_result = await db.execute(
@@ -348,7 +348,7 @@ class ApprovalService:
         query = select(ApprovalRequest).where(
             and_(
                 ApprovalRequest.status == ApprovalStatus.PENDING,
-                ApprovalRequest.expires_at < datetime.utcnow(),
+                ApprovalRequest.expires_at < datetime.now(timezone.utc),
             )
         )
         
@@ -360,7 +360,7 @@ class ApprovalService:
         
         for request in expired_requests:
             request.status = ApprovalStatus.EXPIRED
-            request.updated_at = datetime.utcnow()
+            request.updated_at = datetime.now(timezone.utc)
         
         await db.flush()
         

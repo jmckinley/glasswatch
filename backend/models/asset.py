@@ -4,7 +4,7 @@ Asset model - represents infrastructure components that may have vulnerabilities
 Tracks servers, containers, applications, databases, and other infrastructure.
 Includes criticality scoring and exposure assessment for prioritization.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -89,8 +89,8 @@ class Asset(Base):
     monitoring_id = Column(String(255))  # Datadog, New Relic ID
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     tenant = relationship("Tenant", back_populates="assets")

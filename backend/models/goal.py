@@ -80,8 +80,8 @@ class Goal(Base):
     patches_remaining = Column(Integer)
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     activated_at = Column(DateTime(timezone=True))  # When goal was activated
     completed_at = Column(DateTime(timezone=True))  # When goal was achieved
     
@@ -243,8 +243,8 @@ class EnhancedGoal(Base):
     notification_channels = Column(JSON)  # {"email": ["ops@company.com"], "slack": ["#patches"]}
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     goal = relationship("Goal", backref="enhanced_settings")

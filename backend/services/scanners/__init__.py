@@ -5,7 +5,7 @@ Provides a unified interface for various security scanning tools.
 """
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import asyncio
 import subprocess
@@ -86,7 +86,7 @@ class TrivyScanner(ScannerInterface):
     
     async def scan(self, target: str, options: Dict[str, Any] = None) -> ScanResult:
         """Scan container image or kubernetes cluster"""
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         options = options or {}
         
         # Build command
@@ -116,7 +116,7 @@ class TrivyScanner(ScannerInterface):
                     target=target,
                     scan_type=scan_type,
                     started_at=started_at,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(timezone.utc),
                     success=False,
                     error=stderr or "Scan failed"
                 )
@@ -146,7 +146,7 @@ class TrivyScanner(ScannerInterface):
                 target=target,
                 scan_type=scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=True,
                 findings=findings,
                 metadata={
@@ -161,7 +161,7 @@ class TrivyScanner(ScannerInterface):
                 target=target,
                 scan_type=scan_type,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 success=False,
                 error=str(e)
             )

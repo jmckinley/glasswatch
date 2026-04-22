@@ -3,7 +3,7 @@ Bundle API endpoints.
 
 Manages patch bundles created by the optimization engine.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 
@@ -168,15 +168,15 @@ async def update_bundle_status(
     
     # Update status and related fields
     bundle.status = new_status
-    bundle.updated_at = datetime.utcnow()
+    bundle.updated_at = datetime.now(timezone.utc)
     
     if new_status == "approved":
         bundle.approved_by = status_update.get("approved_by", "system")
-        bundle.approved_at = datetime.utcnow()
+        bundle.approved_at = datetime.now(timezone.utc)
     elif new_status == "in_progress":
-        bundle.started_at = datetime.utcnow()
+        bundle.started_at = datetime.now(timezone.utc)
     elif new_status in ["completed", "failed"]:
-        bundle.completed_at = datetime.utcnow()
+        bundle.completed_at = datetime.now(timezone.utc)
         if bundle.started_at:
             duration = (bundle.completed_at - bundle.started_at).total_seconds() / 60
             bundle.actual_duration_minutes = int(duration)
@@ -216,7 +216,7 @@ async def execute_bundle(
     
     # Update bundle status
     bundle.status = "in_progress"
-    bundle.started_at = datetime.utcnow()
+    bundle.started_at = datetime.now(timezone.utc)
     await db.commit()
     
     # TODO: Integrate with actual patch deployment systems
@@ -257,7 +257,7 @@ async def get_bundle_stats(
             and_(
                 Bundle.tenant_id == tenant.id,
                 Bundle.status.in_(["scheduled", "approved"]),
-                Bundle.scheduled_for > datetime.utcnow()
+                Bundle.scheduled_for > datetime.now(timezone.utc)
             )
         )
         .order_by(Bundle.scheduled_for)

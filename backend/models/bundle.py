@@ -4,7 +4,7 @@ Bundle model for patch scheduling.
 Represents a collection of vulnerabilities to be patched together
 in a maintenance window.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from uuid import UUID, uuid4
 
@@ -84,8 +84,8 @@ class Bundle(Base):
     tags = Column(JSON, nullable=True)  # Custom tags
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     tenant = relationship("Tenant", back_populates="bundles")

@@ -8,7 +8,7 @@ Provides team collaboration features:
 - Activity feed
 """
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
@@ -161,7 +161,7 @@ class CollaborationService:
         
         comment.content = new_content
         comment.is_edited = True
-        comment.updated_at = datetime.utcnow()
+        comment.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         await db.refresh(comment)
@@ -192,7 +192,7 @@ class CollaborationService:
             raise ValueError("Comment not found or you don't have permission to delete it")
         
         comment.is_deleted = True
-        comment.updated_at = datetime.utcnow()
+        comment.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         await db.refresh(comment)

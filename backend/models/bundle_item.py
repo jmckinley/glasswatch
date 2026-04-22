@@ -3,7 +3,7 @@ BundleItem model for individual patches within a bundle.
 
 Each item represents a specific vulnerability-asset pair to be patched.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from uuid import UUID, uuid4
 
@@ -77,8 +77,8 @@ class BundleItem(Base):
     notes = Column(Text, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     bundle = relationship("Bundle", back_populates="items")

@@ -3,7 +3,7 @@ Asset API endpoints.
 
 Provides CRUD operations for infrastructure assets and bulk import capabilities.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 import json
@@ -322,7 +322,7 @@ async def update_asset(
         if hasattr(asset, field) and field not in ["id", "tenant_id", "created_at"]:
             setattr(asset, field, value)
     
-    asset.updated_at = datetime.utcnow()
+    asset.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(asset)
@@ -432,7 +432,7 @@ async def bulk_import_assets(
                             value = int(value) if value.isdigit() else 3
                         setattr(existing_asset, field, value)
                 
-                existing_asset.updated_at = datetime.utcnow()
+                existing_asset.updated_at = datetime.now(timezone.utc)
                 updated_count += 1
             else:
                 # Create new
@@ -581,7 +581,7 @@ async def patch_asset_tags(
     
     # Update asset
     asset.tags = list(current_tags)
-    asset.updated_at = datetime.utcnow()
+    asset.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(asset)
@@ -638,7 +638,7 @@ async def bulk_tag_assets(
         
         if current_tags != original_tags:
             asset.tags = list(current_tags)
-            asset.updated_at = datetime.utcnow()
+            asset.updated_at = datetime.now(timezone.utc)
             modified_count += 1
     
     await db.commit()
@@ -760,7 +760,7 @@ async def enrich_assets(
                     updated = True
         
         if updated:
-            asset.updated_at = datetime.utcnow()
+            asset.updated_at = datetime.now(timezone.utc)
             updated_count += 1
     
     await db.commit()

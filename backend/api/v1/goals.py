@@ -4,7 +4,7 @@ Goals API endpoints.
 The secret sauce - converts business objectives into optimized patch schedules
 using constraint solving.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 import json
@@ -69,7 +69,7 @@ class GoalCreate(BaseModel):
     
     @validator('target_date')
     def target_date_future(cls, v):
-        if v and v < datetime.utcnow():
+        if v and v < datetime.now(timezone.utc):
             raise ValueError("Target date must be in the future")
         return v
 
@@ -421,7 +421,7 @@ async def update_goal(
     for field, value in update_data.items():
         setattr(goal, field, value)
     
-    goal.updated_at = datetime.utcnow()
+    goal.updated_at = datetime.now(timezone.utc)
     await db.commit()
     
     # Get next bundle for response
@@ -510,7 +510,7 @@ async def optimize_goal(
             .where(
                 and_(
                     Bundle.goal_id == goal.id,
-                    Bundle.created_at > datetime.utcnow() - timedelta(hours=24)
+                    Bundle.created_at > datetime.now(timezone.utc) - timedelta(hours=24)
                 )
             )
             .limit(1)

@@ -3,7 +3,7 @@ Snapshot and rollback models for patch state management.
 
 Captures system state before/after patches for safe rollback operations.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum as PyEnum
 from uuid import uuid4
 import hashlib
@@ -90,11 +90,11 @@ class PatchSnapshot(Base):
     size_bytes = Column(Integer, nullable=False, default=0)
     
     # Lifecycle
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.utcnow() + timedelta(days=90)
+        default=lambda: datetime.now(timezone.utc) + timedelta(days=90)
     )
     
     # Relationships
@@ -152,7 +152,7 @@ class RollbackRecord(Base):
     reason = Column(Text, nullable=False)
     
     # Execution tracking
-    started_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
     

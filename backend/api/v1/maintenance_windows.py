@@ -3,7 +3,7 @@ Maintenance Window API endpoints.
 
 Manages approved time windows for patching activities.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 
@@ -78,7 +78,7 @@ async def list_maintenance_windows(
     if active_only:
         query = query.where(MaintenanceWindow.active == True)
     if future_only:
-        query = query.where(MaintenanceWindow.start_time > datetime.utcnow())
+        query = query.where(MaintenanceWindow.start_time > datetime.now(timezone.utc))
     if approved_only:
         query = query.where(MaintenanceWindow.approved == True)
     
@@ -154,7 +154,7 @@ async def create_maintenance_window(
     if window_data.end_time <= window_data.start_time:
         raise HTTPException(400, "End time must be after start time")
     
-    if window_data.start_time < datetime.utcnow():
+    if window_data.start_time < datetime.now(timezone.utc):
         if window_data.type != "emergency":
             raise HTTPException(400, "Only emergency windows can be created in the past")
     
@@ -199,7 +199,7 @@ async def create_maintenance_window(
         approved_activities=window_data.approved_activities,
         active=True,
         approved=window_data.type == "emergency",  # Auto-approve emergency windows
-        approved_at=datetime.utcnow() if window_data.type == "emergency" else None,
+        approved_at=datetime.now(timezone.utc) if window_data.type == "emergency" else None,
         approved_by="system" if window_data.type == "emergency" else None,
     )
     
@@ -272,7 +272,7 @@ async def update_maintenance_window(
         raise HTTPException(404, "Maintenance window not found")
     
     # Don't allow changes to past windows
-    if window.end_time < datetime.utcnow():
+    if window.end_time < datetime.now(timezone.utc):
         raise HTTPException(400, "Cannot modify past maintenance windows")
     
     # Apply updates
@@ -281,7 +281,7 @@ async def update_maintenance_window(
     # Handle approval specially
     if "approved" in update_data and update_data["approved"]:
         window.approved = True
-        window.approved_at = datetime.utcnow()
+        window.approved_at = datetime.now(timezone.utc)
         window.approved_by = update_data.get("approved_by", "system")
         update_data.pop("approved")
         update_data.pop("approved_by", None)
@@ -289,7 +289,7 @@ async def update_maintenance_window(
     for field, value in update_data.items():
         setattr(window, field, value)
     
-    window.updated_at = datetime.utcnow()
+    window.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(window)
     
@@ -322,7 +322,7 @@ async def delete_maintenance_window(
     if not window:
         raise HTTPException(404, "Maintenance window not found")
     
-    if window.start_time < datetime.utcnow():
+    if window.start_time < datetime.now(timezone.utc):
         raise HTTPException(400, "Cannot delete past or active maintenance windows")
     
     scheduled_bundles = [b for b in window.bundles if b.status in ["scheduled", "approved"]]
@@ -358,13 +358,13 @@ async def create_recurring_windows(
     environment = recurrence_data.get("environment", "production")
     
     # Find next occurrence
-    current = datetime.utcnow()
+    current = datetime.now(timezone.utc)
     while current.weekday() != day_of_week:
         current += timedelta(days=1)
     current = current.replace(hour=start_hour, minute=0, second=0, microsecond=0)
     
     # If the first window would be in the past, skip to next week
-    if current < datetime.utcnow():
+    if current < datetime.now(timezone.utc):
         current += timedelta(weeks=1)
     
     created_windows = []

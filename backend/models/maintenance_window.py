@@ -78,8 +78,8 @@ class MaintenanceWindow(Base):
     tags = Column(JSON, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     tenant = relationship("Tenant", back_populates="maintenance_windows")

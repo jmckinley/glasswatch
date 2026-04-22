@@ -7,7 +7,7 @@ import time
 from typing import Dict, List, Optional, Any, Callable
 from enum import Enum
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class AlertSeverity(str, Enum):
@@ -285,7 +285,7 @@ class AlertManager:
             "current_value": current_value,
             "threshold": rule.threshold,
             "operator": rule.operator,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "escalated": should_escalate,
         }
         

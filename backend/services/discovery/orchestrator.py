@@ -5,7 +5,7 @@ Manages parallel scanning, deduplication, and database persistence.
 """
 import asyncio
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 import logging
 
@@ -66,7 +66,7 @@ class DiscoveryOrchestrator:
         Returns:
             Summary of discovery operation
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Run scanners
         if parallel:
@@ -91,7 +91,7 @@ class DiscoveryOrchestrator:
         
         # Calculate summary
         total_errors = sum(len(result.errors) for result in scan_results)
-        duration = (datetime.utcnow() - start_time).total_seconds()
+        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         
         summary = {
             "status": "completed",
@@ -255,7 +255,7 @@ class DiscoveryOrchestrator:
                         if hasattr(existing, key) and value is not None:
                             setattr(existing, key, value)
                     
-                    existing.updated_at = datetime.utcnow()
+                    existing.updated_at = datetime.now(timezone.utc)
                     updated += 1
             else:
                 # Create new asset
@@ -316,7 +316,7 @@ class DiscoveryScheduler:
         Args:
             db: Database session
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         for tenant_id, config in self.scheduled_scans.items():
             next_run = config.get("next_run")

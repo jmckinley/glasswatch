@@ -19,7 +19,7 @@ import os
 import shutil
 import subprocess
 import tarfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -176,22 +176,22 @@ class BackupService:
         Returns:
             BackupMetadata object
         """
-        backup_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        backup_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         metadata = BackupMetadata(
             id=backup_id,
             type=backup_type,
             status=BackupStatus.IN_PROGRESS,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             completed_at=None,
             size_bytes=None,
             checksum=None,
             encryption_enabled=encrypt,
             s3_uploaded=False,
-            retention_category=self._determine_retention_category(datetime.utcnow()),
+            retention_category=self._determine_retention_category(datetime.now(timezone.utc)),
         )
         
         try:
-            start_time = datetime.utcnow()
+            start_time = datetime.now(timezone.utc)
             
             # Create backup using pg_dump
             backup_file = self.backup_dir / f"backup_{backup_id}.sql"
@@ -217,8 +217,8 @@ class BackupService:
             # Update metadata
             metadata.size_bytes = final_file.stat().st_size
             metadata.checksum = checksum
-            metadata.completed_at = datetime.utcnow()
-            metadata.duration_seconds = (datetime.utcnow() - start_time).total_seconds()
+            metadata.completed_at = datetime.now(timezone.utc)
+            metadata.duration_seconds = (datetime.now(timezone.utc) - start_time).total_seconds()
             metadata.status = BackupStatus.COMPLETED
             
             # Upload to S3 if configured
@@ -241,7 +241,7 @@ class BackupService:
         except Exception as e:
             metadata.status = BackupStatus.FAILED
             metadata.error_message = str(e)
-            metadata.completed_at = datetime.utcnow()
+            metadata.completed_at = datetime.now(timezone.utc)
             await self._save_metadata(metadata)
             
             # Send failure notification
@@ -516,7 +516,7 @@ class BackupService:
     async def prune_backups(self):
         """Remove expired backups according to retention policy"""
         backups = await self.list_backups()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Group backups by category
         categorized = {"daily": [], "weekly": [], "monthly": []}
@@ -568,7 +568,7 @@ class BackupService:
         """Get overall backup health status"""
         backups = await self.list_backups()
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         completed_backups = [
             b for b in backups 
             if b.status in (BackupStatus.COMPLETED, BackupStatus.VERIFIED)

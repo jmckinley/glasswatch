@@ -4,7 +4,7 @@ Approval workflow API endpoints.
 Handles approval request creation, approval/rejection actions,
 policy management, and approval statistics.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
@@ -422,7 +422,7 @@ async def update_approval_policy(
     for field, value in update_data.items():
         setattr(policy, field, value)
     
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(policy)

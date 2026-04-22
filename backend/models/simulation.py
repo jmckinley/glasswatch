@@ -3,7 +3,7 @@ Patch simulation model for impact prediction and dry-run testing.
 
 Enables "what-if" analysis before executing patches.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from uuid import uuid4
 
@@ -112,7 +112,7 @@ class PatchSimulation(Base):
     # }
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
