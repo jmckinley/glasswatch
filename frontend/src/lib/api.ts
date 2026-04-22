@@ -249,8 +249,10 @@ export const dashboardApi = {
       goals: goalsList,
       risk_score: {
         total: vulnStats.total_risk_score || 0,
-        trend: "down" as const, // TODO: Calculate from history
-        reduction_7d: 12.4, // TODO: Calculate from history
+        // No historical data available yet - show stable trend
+        // Future: Calculate from time-series vulnerability stats
+        trend: "stable" as const,
+        reduction_7d: 0,
       },
       bundles: {
         scheduled: bundles.filter((b: any) => b.status === "scheduled" || b.status === "approved").length,

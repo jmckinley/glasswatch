@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from backend.db.session import get_db
 from backend.models.maintenance_window import MaintenanceWindow
 from backend.models.bundle import Bundle
+from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 
@@ -89,8 +90,12 @@ async def list_maintenance_windows(
     total_result = await db.execute(count_query)
     total = total_result.scalar()
     
-    # Get paginated results with bundles
-    query = query.options(selectinload(MaintenanceWindow.bundles)).offset(skip).limit(limit)
+    # Get paginated results with bundles and their items with vulnerability data
+    query = query.options(
+        selectinload(MaintenanceWindow.bundles)
+        .selectinload(Bundle.items)
+        .selectinload(BundleItem.vulnerability)
+    ).offset(skip).limit(limit)
     result = await db.execute(query)
     windows = result.scalars().all()
     
@@ -106,6 +111,19 @@ async def list_maintenance_windows(
                 "status": bundle.status,
                 "risk_score": bundle.risk_score,
                 "estimated_duration_minutes": bundle.estimated_duration_minutes,
+                "assets_affected_count": bundle.assets_affected_count,
+                "items_count": len(bundle.items),
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "vulnerability": {
+                            "identifier": item.vulnerability.identifier,
+                            "title": item.vulnerability.title,
+                            "severity": item.vulnerability.severity,
+                        } if item.vulnerability else None,
+                    }
+                    for item in bundle.items
+                ],
             }
             for bundle in window.bundles
             if bundle.status in ["scheduled", "approved"]
