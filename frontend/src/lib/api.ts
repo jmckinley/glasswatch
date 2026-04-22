@@ -196,6 +196,11 @@ export const goalsApi = {
       method: "POST",
       body: options,
     }),
+
+  recommend: (id: string) =>
+    apiCall<any>(`/goals/${id}/recommend`, {
+      method: "POST",
+    }),
 };
 
 // Bundles API
