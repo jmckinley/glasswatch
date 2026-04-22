@@ -29,6 +29,14 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
     "X-Tenant-ID": DEMO_TENANT,
     ...options.headers,
   };
+  
+  // Add auth token if available (Sprint 13: OAuth support)
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("glasswatch_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
 
   const response = await fetch(url, {
     method: options.method || "GET",
@@ -39,6 +47,14 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
   const data = await response.json();
 
   if (!response.ok) {
+    // TODO Sprint 13: Implement token refresh on 401
+    // For now, clear token and redirect to login
+    if (response.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("glasswatch_token");
+      if (!window.location.pathname.includes("/auth/login")) {
+        window.location.href = "/auth/login";
+      }
+    }
     throw new ApiError(response.status, data.detail || "API Error", data);
   }
 
@@ -274,6 +290,8 @@ export const maintenanceWindowsApi = {
   list: (params?: {
     active?: boolean;
     environment?: string;
+    asset_group?: string;
+    service_name?: string;
     skip?: number;
     limit?: number;
   }) => {
@@ -296,6 +314,21 @@ export const maintenanceWindowsApi = {
 
   getBundlesForWindow: (windowId: string) => 
     apiCall<any>(`/maintenance-windows/${windowId}/bundles`),
+  
+  // Sprint 13: New endpoints
+  resolve: (params: { asset_id?: string; environment?: string }) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        query.append(key, String(value));
+      }
+    });
+    return apiCall<any>(`/maintenance-windows/resolve?${query}`);
+  },
+  
+  listEnvironments: () => apiCall<{environments: string[]}>("/maintenance-windows/environments"),
+  
+  listAssetGroups: () => apiCall<{asset_groups: string[]}>("/maintenance-windows/asset-groups"),
 };
 
 export { apiCall };

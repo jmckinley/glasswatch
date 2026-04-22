@@ -50,15 +50,28 @@ def seed_tenant(cur):
     if exists(cur, "tenants", id=TENANT_ID):
         print("  ✓ Tenant already exists")
         return
+    
+    # Include mock Slack config in tenant settings for demo
+    settings = {
+        "features": ["goals", "approvals", "collaboration"],
+        "slack": {
+            "access_token": "xoxb-demo-token-for-testing",
+            "team_id": "T0DEMO123",
+            "team_name": "Demo Workspace",
+            "bot_user_id": "U0DEMOBOT",
+            "installed_at": NOW.isoformat(),
+        }
+    }
+    
     cur.execute("""
         INSERT INTO tenants (id, name, email, region, tier, is_active, encryption_key_id, settings, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         TENANT_ID, "Demo Organization", "admin@demo.patchguide.ai",
         "us-east-1", "enterprise", True, "demo-key-001",
-        Json({"features": ["goals", "approvals", "collaboration"]}), NOW
+        Json(settings), NOW
     ))
-    print("  ✓ Created tenant: Demo Organization")
+    print("  ✓ Created tenant: Demo Organization (with mock Slack connection)")
 
 
 def seed_user(cur):
@@ -473,6 +486,61 @@ def seed_maintenance_windows(cur, goal_ids):
     return mw_ids
 
 
+def seed_connections(cur):
+    """Create sample external connections."""
+    connections = [
+        {
+            "provider": "aws",
+            "name": "AWS Production Account",
+            "config": {
+                "access_key_id": "AKIADEMO12345678",
+                "secret_access_key": "demo-secret-key-for-testing",
+                "region": "us-east-1",
+            },
+            "status": "active",
+        },
+        {
+            "provider": "azure",
+            "name": "Azure Enterprise Subscription",
+            "config": {
+                "tenant_id": "demo-tenant-id",
+                "client_id": "demo-client-id",
+                "client_secret": "demo-client-secret",
+                "subscription_id": "demo-subscription-id",
+            },
+            "status": "pending",
+        },
+        {
+            "provider": "jira",
+            "name": "Jira Cloud",
+            "config": {
+                "url": "https://demo.atlassian.net",
+                "email": "admin@demo.patchguide.ai",
+                "api_token": "demo-jira-token",
+                "project_key": "PATCH",
+            },
+            "status": "error",
+            "last_error": "Authentication failed: Invalid credentials",
+        },
+    ]
+    
+    conn_count = 0
+    for conn_data in connections:
+        conn_id = uid()
+        if not exists(cur, "connections", id=conn_id):
+            cur.execute("""
+                INSERT INTO connections (id, tenant_id, provider, name, config, status, last_error, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                conn_id, TENANT_ID, conn_data["provider"], conn_data["name"],
+                Json(conn_data["config"]), conn_data["status"],
+                conn_data.get("last_error"), NOW
+            ))
+            conn_count += 1
+    
+    print(f"  ✓ Seeded {conn_count} connections")
+
+
 # ── Main ───────────────────────────────────────────────────────────────
 
 def main():
@@ -493,6 +561,7 @@ def main():
         print("\nSeeding demo data...")
         seed_tenant(cur)
         seed_user(cur)
+        seed_connections(cur)
         vuln_ids = seed_vulnerabilities(cur)
         asset_ids = seed_assets(cur)
         seed_asset_vulnerabilities(cur, vuln_ids, asset_ids)
@@ -515,6 +584,8 @@ def main():
         print(f"   Maintenance Windows: {cur.fetchone()[0]}")
         cur.execute("SELECT COUNT(*) FROM bundles WHERE tenant_id = %s", (TENANT_ID,))
         print(f"   Bundles: {cur.fetchone()[0]}")
+        cur.execute("SELECT COUNT(*) FROM connections WHERE tenant_id = %s", (TENANT_ID,))
+        print(f"   Connections: {cur.fetchone()[0]}")
         
     except Exception as e:
         conn.rollback()

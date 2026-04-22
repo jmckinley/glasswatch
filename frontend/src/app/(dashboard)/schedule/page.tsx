@@ -18,6 +18,11 @@ interface MaintenanceWindow {
   max_assets?: number;
   max_risk_score?: number;
   scheduled_bundles: Bundle[];
+  // Sprint 13 additions
+  priority?: number;
+  asset_group?: string;
+  service_name?: string;
+  is_default?: boolean;
 }
 
 interface Bundle {
@@ -79,20 +84,33 @@ export default function SchedulePage() {
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  // Sprint 13: Filtering
+  const [filterEnvironment, setFilterEnvironment] = useState<string>("");
+  const [filterAssetGroup, setFilterAssetGroup] = useState<string>("");
+  const [environments, setEnvironments] = useState<string[]>([]);
+  const [assetGroups, setAssetGroups] = useState<string[]>([]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filterEnvironment, filterAssetGroup]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [windowsData, goalsData] = await Promise.all([
-        maintenanceWindowsApi.list(),
+      const params: any = {};
+      if (filterEnvironment) params.environment = filterEnvironment;
+      if (filterAssetGroup) params.asset_group = filterAssetGroup;
+      
+      const [windowsData, goalsData, envsData, groupsData] = await Promise.all([
+        maintenanceWindowsApi.list(params),
         goalsApi.list({ active_only: true }),
+        maintenanceWindowsApi.listEnvironments().catch(() => ({ environments: [] })),
+        maintenanceWindowsApi.listAssetGroups().catch(() => ({ asset_groups: [] })),
       ]);
       setWindows(windowsData.items || []);
       setGoals(goalsData || []);
+      setEnvironments(envsData.environments || []);
+      setAssetGroups(groupsData.asset_groups || []);
     } catch (error) {
       console.error("Failed to fetch schedule data:", error);
       setWindows([]);
@@ -183,7 +201,28 @@ export default function SchedulePage() {
             Maintenance windows and scheduled patch bundles
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Filters */}
+          <select
+            value={filterEnvironment}
+            onChange={(e) => setFilterEnvironment(e.target.value)}
+            className="px-3 py-2 bg-neutral-800 text-white rounded-lg border border-neutral-700"
+          >
+            <option value="">All Environments</option>
+            {environments.map((env) => (
+              <option key={env} value={env}>{env}</option>
+            ))}
+          </select>
+          <select
+            value={filterAssetGroup}
+            onChange={(e) => setFilterAssetGroup(e.target.value)}
+            className="px-3 py-2 bg-neutral-800 text-white rounded-lg border border-neutral-700"
+          >
+            <option value="">All Asset Groups</option>
+            {assetGroups.map((group) => (
+              <option key={group} value={group}>{group}</option>
+            ))}
+          </select>
           <button
             onClick={handleAnalyze}
             disabled={analyzing || loading}
@@ -417,13 +456,35 @@ function WindowCard({
             <span>•</span>
             <span>{duration}h window</span>
             <span>•</span>
-            <span>{window.environment}</span>
+            <span>{window.environment || "default"}</span>
+            {window.service_name && (
+              <>
+                <span>•</span>
+                <span className="text-primary">{window.service_name}</span>
+              </>
+            )}
+            {window.asset_group && (
+              <>
+                <span>•</span>
+                <span className="text-secondary">{window.asset_group}</span>
+              </>
+            )}
           </div>
           {window.description && (
             <p className="text-sm text-neutral-400 mt-2">{window.description}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
+          {window.priority !== undefined && window.priority > 0 && (
+            <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded border border-purple-500/30">
+              Priority {window.priority}
+            </span>
+          )}
+          {window.is_default && (
+            <span className="text-xs px-2 py-1 bg-neutral-700 text-neutral-300 rounded">
+              DEFAULT
+            </span>
+          )}
           <span
             className={`text-xs px-2 py-1 rounded font-medium ${
               window.type === "emergency"
