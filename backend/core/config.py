@@ -58,6 +58,22 @@ class Settings(BaseSettings):
     WORKOS_API_KEY: Optional[str] = None
     WORKOS_CLIENT_ID: Optional[str] = None
     
+    # OAuth providers (Sprint 13)
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+    
+    # Slack integration (Sprint 13)
+    SLACK_CLIENT_ID: Optional[str] = None
+    SLACK_CLIENT_SECRET: Optional[str] = None
+    SLACK_SIGNING_SECRET: Optional[str] = None
+    SLACK_REDIRECT_URI: Optional[str] = None
+    SLACK_ALERT_CHANNEL: str = "#alerts"
+    
+    # Frontend URL (for links in Slack messages)
+    FRONTEND_URL: Optional[str] = "http://localhost:3000"
+    
     # AWS (for KMS encryption)
     AWS_REGION: str = "us-east-1"
     AWS_ACCESS_KEY_ID: Optional[str] = None

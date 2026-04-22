@@ -299,59 +299,81 @@ def seed_goals(cur):
 
 
 def seed_maintenance_windows(cur, goal_ids):
-    """Create 6 maintenance windows with bundles across different environments."""
+    """Create maintenance windows with varied scopes (Sprint 13)."""
     mw1_id = uid()
     mw2_id = uid()
     mw3_id = uid()
     mw4_id = uid()
     mw5_id = uid()
     mw6_id = uid()
+    mw7_id = uid()
     
+    # Sprint 13: Windows with priority/scoping
+    # Format: (id, name, desc, type, start, end, env, max_hrs, max_assets, max_risk,
+    #          priority, asset_group, service_name, is_default)
     windows = [
-        (mw1_id, "Production - Web Tier Emergency Patch",
-         "Emergency patching window for critical KEV-listed vulnerabilities. "
-         "Focus on internet-facing production web systems. Zero-downtime deployment required.",
-         "emergency",
-         NOW + timedelta(days=3, hours=2),
-         NOW + timedelta(days=3, hours=4),
-         "production", 2.0, 8, 90.0),
-        (mw2_id, "Production - Database Tier Scheduled",
-         "Scheduled maintenance for database systems. Includes primary and replica patching. "
-         "Requires database downtime and application quiesce.",
+        # Default window (priority=0, is_default=True)
+        (mw1_id, "Default Maintenance Window",
+         "Fallback window for assets without specific matches. General purpose patching.",
+         "scheduled",
+         NOW + timedelta(days=28, hours=2),
+         NOW + timedelta(days=28, hours=6),
+         None, 4.0, 50, 70.0,
+         0, None, None, True),
+        
+        # Environment-specific windows (priority=10)
+        (mw2_id, "Production - General Patching",
+         "Standard production maintenance window. All production systems.",
          "scheduled",
          NOW + timedelta(days=10, hours=2),
          NOW + timedelta(days=10, hours=8),
-         "production", 6.0, 12, 75.0),
+         "production", 6.0, 30, 80.0,
+         10, None, None, False),
         (mw3_id, "Staging - Full Environment",
          "Full staging environment patch cycle. Used to validate patches before production rollout.",
          "scheduled",
          NOW + timedelta(days=5, hours=14),
          NOW + timedelta(days=5, hours=18),
-         "staging", 4.0, 30, 60.0),
-        (mw4_id, "DR/Backup Systems Weekly",
-         "Weekly maintenance window for disaster recovery and backup infrastructure. "
-         "Lower priority patches and configuration updates.",
+         "staging", 4.0, 40, 60.0,
+         10, None, None, False),
+        
+        # Service-specific windows (priority=20)
+        (mw4_id, "Production - Payment Service",
+         "High-priority window for payment processing service. Requires PCI compliance.",
          "scheduled",
-         NOW + timedelta(days=7, hours=3),
-         NOW + timedelta(days=7, hours=6),
-         "dr", 3.0, 20, 50.0),
-        (mw5_id, "Production - Network Infrastructure",
-         "Biweekly maintenance for firewalls, load balancers, and edge devices. "
-         "Requires careful coordination with network team.",
+         NOW + timedelta(days=7, hours=22),
+         NOW + timedelta(days=8, hours=2),
+         "production", 4.0, 6, 95.0,
+         20, None, "payment-service", False),
+        (mw5_id, "Staging - API Gateway",
+         "Staging window for API gateway service testing before prod rollout.",
          "scheduled",
-         NOW + timedelta(days=14, hours=1),
-         NOW + timedelta(days=14, hours=5),
-         "production", 4.0, 6, 95.0),
-        (mw6_id, "Development - Platform Updates",
+         NOW + timedelta(days=3, hours=14),
+         NOW + timedelta(days=3, hours=18),
+         "staging", 4.0, 8, 70.0,
+         20, None, "api-gateway", False),
+        
+        # Emergency window
+        (mw6_id, "Production - Emergency KEV Patch",
+         "Emergency patching window for critical KEV-listed vulnerabilities.",
+         "emergency",
+         NOW + timedelta(days=1, hours=2),
+         NOW + timedelta(days=1, hours=4),
+         "production", 2.0, 10, 90.0,
+         30, None, None, False),
+        
+        # Development window
+        (mw7_id, "Development - Platform Updates",
          "Monthly maintenance window for development and CI/CD infrastructure.",
          "scheduled",
          NOW + timedelta(days=21, hours=10),
          NOW + timedelta(days=21, hours=14),
-         "development", 4.0, 40, 40.0),
+         "development", 4.0, 40, 40.0,
+         10, None, None, False),
     ]
     
     mw_ids = []
-    for mid, name, desc, mtype, start, end, env, max_hrs, max_assets, max_risk in windows:
+    for mid, name, desc, mtype, start, end, env, max_hrs, max_assets, max_risk, priority, asset_group, service_name, is_default in windows:
         if exists(cur, "maintenance_windows", name=name, tenant_id=TENANT_ID):
             cur.execute("SELECT id FROM maintenance_windows WHERE name = %s AND tenant_id = %s", (name, TENANT_ID))
             mw_ids.append(cur.fetchone()[0])
@@ -360,16 +382,17 @@ def seed_maintenance_windows(cur, goal_ids):
         cur.execute("""
             INSERT INTO maintenance_windows (id, tenant_id, name, description, type,
                 start_time, end_time, timezone, max_duration_hours, max_assets,
-                max_risk_score, environment, active, approved, change_freeze,
-                notification_sent, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                max_risk_score, environment, priority, asset_group, service_name, is_default,
+                active, approved, change_freeze, notification_sent, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             mid, TENANT_ID, name, desc, mtype,
             start, end, "America/New_York", max_hrs, max_assets,
-            max_risk, env, True, True, False, False, NOW, NOW
+            max_risk, env, priority, asset_group, service_name, is_default,
+            True, True, False, False, NOW, NOW
         ))
     
-    print(f"  ✓ Seeded {len(windows)} maintenance windows")
+    print(f"  ✓ Seeded {len(windows)} maintenance windows (Sprint 13: with priority/scoping)")
     
     # Create bundles for maintenance windows with realistic assignments
     bundles = [

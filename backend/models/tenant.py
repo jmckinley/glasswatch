@@ -48,6 +48,11 @@ class Tenant(Base):
     # Settings
     settings = Column(JSON, default=dict, nullable=False)
     
+    # Onboarding state
+    onboarding_completed = Column(Boolean, default=False, nullable=False)
+    onboarding_step = Column(Integer, default=0, nullable=False)
+    onboarding_data = Column(JSON, nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -57,6 +62,7 @@ class Tenant(Base):
     goals = relationship("Goal", back_populates="tenant")
     bundles = relationship("Bundle", back_populates="tenant")
     maintenance_windows = relationship("MaintenanceWindow", back_populates="tenant")
+    connections = relationship("Connection", back_populates="tenant")
     
     def __repr__(self):
         return f"<Tenant {self.name} ({self.id})>"

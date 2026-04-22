@@ -1,0 +1,206 @@
+"""
+Onboarding API endpoints.
+
+Handles tenant onboarding flow with multi-step wizard support.
+"""
+from typing import Optional, Dict, Any
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel
+
+from backend.db.session import get_db
+from backend.models.tenant import Tenant
+from backend.models.user import User
+from backend.core.auth_workos import get_current_user
+
+
+router = APIRouter()
+
+
+# Pydantic models
+class OnboardingStatus(BaseModel):
+    onboarding_completed: bool
+    onboarding_step: int
+    onboarding_data: Optional[Dict[str, Any]] = None
+    tenant_id: str
+    tenant_name: str
+
+
+class StepData(BaseModel):
+    data: Dict[str, Any]
+
+
+class StepResponse(BaseModel):
+    success: bool
+    current_step: int
+    message: str
+
+
+class CompleteResponse(BaseModel):
+    success: bool
+    message: str
+    redirect_to: str = "/dashboard"
+
+
+@router.get("/status", response_model=OnboardingStatus)
+async def get_onboarding_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get current onboarding state for the tenant.
+    
+    Returns:
+        OnboardingStatus with current step and data
+    """
+    # Get tenant
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == current_user.tenant_id)
+    )
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    return OnboardingStatus(
+        onboarding_completed=tenant.onboarding_completed,
+        onboarding_step=tenant.onboarding_step,
+        onboarding_data=tenant.onboarding_data,
+        tenant_id=str(tenant.id),
+        tenant_name=tenant.name,
+    )
+
+
+@router.post("/step/{step_number}", response_model=StepResponse)
+async def save_step(
+    step_number: int,
+    step_data: StepData,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Save step data and advance to next step.
+    
+    Steps:
+    1. Organization Setup - tenant name, industry, size
+    2. Connect Your Tools - connection creation
+    3. Asset Discovery - trigger discovery scan
+    4. Create First Goal - create patching goal
+    5. Schedule Setup - create maintenance window
+    6. Review & Launch - confirmation
+    
+    Args:
+        step_number: Step number (1-6)
+        step_data: Data for this step
+        
+    Returns:
+        StepResponse with updated step number
+    """
+    if step_number < 1 or step_number > 6:
+        raise HTTPException(status_code=400, detail="Invalid step number (must be 1-6)")
+    
+    # Get tenant
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == current_user.tenant_id)
+    )
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    # Initialize onboarding_data if None
+    if tenant.onboarding_data is None:
+        tenant.onboarding_data = {}
+    
+    # Save step data
+    tenant.onboarding_data[f"step_{step_number}"] = {
+        **step_data.data,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    # Handle step-specific actions
+    if step_number == 1:
+        # Organization Setup - update tenant name if provided
+        if "tenant_name" in step_data.data:
+            tenant.name = step_data.data["tenant_name"]
+    
+    # Update step number to the next step (but don't mark complete yet)
+    tenant.onboarding_step = step_number
+    
+    await db.commit()
+    await db.refresh(tenant)
+    
+    return StepResponse(
+        success=True,
+        current_step=tenant.onboarding_step,
+        message=f"Step {step_number} saved successfully",
+    )
+
+
+@router.post("/complete", response_model=CompleteResponse)
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mark onboarding as complete.
+    
+    Returns:
+        CompleteResponse with redirect URL
+    """
+    # Get tenant
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == current_user.tenant_id)
+    )
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    # Mark as completed
+    tenant.onboarding_completed = True
+    tenant.onboarding_step = 6  # All steps done
+    
+    await db.commit()
+    
+    return CompleteResponse(
+        success=True,
+        message="Onboarding completed successfully",
+        redirect_to="/dashboard",
+    )
+
+
+@router.post("/skip", response_model=CompleteResponse)
+async def skip_onboarding(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Skip onboarding and mark as complete without data.
+    
+    Returns:
+        CompleteResponse with redirect URL
+    """
+    # Get tenant
+    result = await db.execute(
+        select(Tenant).where(Tenant.id == current_user.tenant_id)
+    )
+    tenant = result.scalar_one_or_none()
+    
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    # Mark as completed (skipped)
+    tenant.onboarding_completed = True
+    tenant.onboarding_step = 0  # Indicates skipped
+    
+    await db.commit()
+    
+    return CompleteResponse(
+        success=True,
+        message="Onboarding skipped",
+        redirect_to="/dashboard",
+    )

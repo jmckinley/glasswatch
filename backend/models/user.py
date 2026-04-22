@@ -50,6 +50,8 @@ class User(Base):
     
     # Authentication
     workos_user_id = Column(String(255), nullable=True, unique=True)  # WorkOS user ID
+    oauth_provider = Column(String(50), nullable=True)  # google, github, etc.
+    oauth_id = Column(String(255), nullable=True)  # Provider-specific user ID
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Authorization

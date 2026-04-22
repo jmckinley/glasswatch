@@ -59,6 +59,12 @@ class MaintenanceWindow(Base):
     asset_tags = Column(JSON, nullable=True)  # Which assets can use this window
     excluded_assets = Column(JSON, nullable=True)  # Specific exclusions
     
+    # Enhanced scoping (Sprint 13)
+    priority = Column(Integer, nullable=False, default=0)  # Higher = more specific
+    asset_group = Column(String(100), nullable=True)  # e.g., "web-servers", "databases"
+    service_name = Column(String(100), nullable=True)  # Scope to specific app/service
+    is_default = Column(Boolean, nullable=False, default=False)  # Fallback window
+    
     # Status
     active = Column(Boolean, nullable=False, default=True)
     approved = Column(Boolean, nullable=False, default=False)
@@ -129,6 +135,90 @@ class MaintenanceWindow(Base):
         
         return True
     
+    @classmethod
+    async def find_best_window(
+        cls,
+        db,
+        tenant_id: UUID,
+        asset=None,
+        environment: Optional[str] = None
+    ) -> Optional["MaintenanceWindow"]:
+        """
+        Find the most specific matching maintenance window.
+        
+        Priority order:
+        1. Exact service_name + environment match (highest priority)
+        2. Asset group + environment match
+        3. Environment-only match
+        4. Default window (is_default=True)
+        """
+        from sqlalchemy import select, and_
+        
+        now = datetime.now(timezone.utc)
+        
+        # Base query: active windows in the future for this tenant
+        base_conditions = [
+            cls.tenant_id == tenant_id,
+            cls.active == True,
+            cls.start_time > now,
+        ]
+        
+        # Try to extract service name and asset group from asset if provided
+        service_name = None
+        asset_group = None
+        if asset:
+            # Assume asset has tags or metadata
+            if hasattr(asset, 'tags') and asset.tags:
+                service_name = asset.tags.get('service_name')
+                asset_group = asset.tags.get('asset_group')
+            if not environment and hasattr(asset, 'environment'):
+                environment = asset.environment
+        
+        # Priority 1: service_name + environment match
+        if service_name and environment:
+            result = await db.execute(
+                select(cls)
+                .where(and_(*base_conditions, cls.service_name == service_name, cls.environment == environment))
+                .order_by(cls.priority.desc(), cls.start_time.asc())
+                .limit(1)
+            )
+            window = result.scalar_one_or_none()
+            if window:
+                return window
+        
+        # Priority 2: asset_group + environment match
+        if asset_group and environment:
+            result = await db.execute(
+                select(cls)
+                .where(and_(*base_conditions, cls.asset_group == asset_group, cls.environment == environment))
+                .order_by(cls.priority.desc(), cls.start_time.asc())
+                .limit(1)
+            )
+            window = result.scalar_one_or_none()
+            if window:
+                return window
+        
+        # Priority 3: environment-only match
+        if environment:
+            result = await db.execute(
+                select(cls)
+                .where(and_(*base_conditions, cls.environment == environment, cls.service_name.is_(None), cls.asset_group.is_(None)))
+                .order_by(cls.priority.desc(), cls.start_time.asc())
+                .limit(1)
+            )
+            window = result.scalar_one_or_none()
+            if window:
+                return window
+        
+        # Priority 4: default window
+        result = await db.execute(
+            select(cls)
+            .where(and_(*base_conditions, cls.is_default == True))
+            .order_by(cls.start_time.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
         return {
@@ -145,6 +235,10 @@ class MaintenanceWindow(Base):
             "max_assets": self.max_assets,
             "max_risk_score": self.max_risk_score,
             "environment": self.environment,
+            "priority": self.priority,
+            "asset_group": self.asset_group,
+            "service_name": self.service_name,
+            "is_default": self.is_default,
             "active": self.active,
             "approved": self.approved,
             "approved_by": self.approved_by,

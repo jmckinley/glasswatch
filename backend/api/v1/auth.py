@@ -23,6 +23,10 @@ from backend.core.auth_workos import (
     handle_sso_callback,
     generate_api_key,
     create_access_token,
+    create_google_auth_url,
+    handle_google_callback,
+    create_github_auth_url,
+    handle_github_callback,
 )
 from backend.core.config import settings
 
@@ -313,3 +317,136 @@ async def logout(
     response.delete_cookie("access_token")
     
     return {"message": "Logged out successfully"}
+
+
+@router.get("/providers")
+async def get_auth_providers():
+    """
+    List available authentication providers based on configuration.
+    """
+    providers = {
+        "demo": True,  # Always available for development
+    }
+    
+    if settings.WORKOS_API_KEY and settings.WORKOS_CLIENT_ID:
+        providers["workos"] = True
+    
+    if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+        providers["google"] = True
+    
+    if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
+        providers["github"] = True
+    
+    return {"providers": providers}
+
+
+@router.get("/google", response_model=LoginResponse)
+async def initiate_google_login(
+    redirect_uri: Optional[str] = Query(None),
+    request: Request = None,
+):
+    """
+    Initiate Google OAuth flow.
+    """
+    if not redirect_uri:
+        redirect_uri = f"{request.base_url}api/v1/auth/google/callback"
+    
+    authorization_url = await create_google_auth_url(redirect_uri=redirect_uri)
+    
+    return LoginResponse(authorization_url=authorization_url)
+
+
+@router.get("/google/callback", response_model=CallbackResponse)
+async def handle_google_callback_endpoint(
+    code: str = Query(..., description="Authorization code from Google"),
+    state: Optional[str] = Query(None),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Handle Google OAuth callback.
+    """
+    redirect_uri = f"{request.base_url}api/v1/auth/google/callback"
+    
+    try:
+        user, access_token = await handle_google_callback(
+            code=code,
+            redirect_uri=redirect_uri,
+            db=db,
+        )
+        
+        # Get tenant name for response
+        await db.refresh(user, ["tenant"])
+        
+        return CallbackResponse(
+            access_token=access_token,
+            user={
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+                "avatar_url": user.avatar_url,
+            },
+            redirect_to="/dashboard",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google OAuth callback failed: {str(e)}"
+        )
+
+
+@router.get("/github", response_model=LoginResponse)
+async def initiate_github_login(
+    redirect_uri: Optional[str] = Query(None),
+    request: Request = None,
+):
+    """
+    Initiate GitHub OAuth flow.
+    """
+    if not redirect_uri:
+        redirect_uri = f"{request.base_url}api/v1/auth/github/callback"
+    
+    authorization_url = await create_github_auth_url(redirect_uri=redirect_uri)
+    
+    return LoginResponse(authorization_url=authorization_url)
+
+
+@router.get("/github/callback", response_model=CallbackResponse)
+async def handle_github_callback_endpoint(
+    code: str = Query(..., description="Authorization code from GitHub"),
+    state: Optional[str] = Query(None),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Handle GitHub OAuth callback.
+    """
+    redirect_uri = f"{request.base_url}api/v1/auth/github/callback"
+    
+    try:
+        user, access_token = await handle_github_callback(
+            code=code,
+            redirect_uri=redirect_uri,
+            db=db,
+        )
+        
+        # Get tenant name for response
+        await db.refresh(user, ["tenant"])
+        
+        return CallbackResponse(
+            access_token=access_token,
+            user={
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+                "avatar_url": user.avatar_url,
+            },
+            redirect_to="/dashboard",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"GitHub OAuth callback failed: {str(e)}"
+        )

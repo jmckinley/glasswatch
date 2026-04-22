@@ -7,11 +7,12 @@ Handles:
 - Session management
 - API key authentication
 """
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import secrets
 import hashlib
+import httpx
 
 from fastapi import Depends, HTTPException, Header, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -383,3 +384,396 @@ async def generate_api_key(
     )
     
     return api_key
+
+
+# ── OAuth Helpers ───────────────────────────────────────────────────────
+
+async def create_google_auth_url(
+    redirect_uri: str,
+    state: Optional[str] = None,
+) -> str:
+    """
+    Create Google OAuth authorization URL.
+    """
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=501,
+            detail="Google OAuth not configured"
+        )
+    
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state or secrets.token_urlsafe(32),
+    }
+    
+    from urllib.parse import urlencode
+    base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+    return f"{base_url}?{urlencode(params)}"
+
+
+async def handle_google_callback(
+    code: str,
+    redirect_uri: str,
+    db: AsyncSession,
+) -> Tuple[User, str]:
+    """
+    Handle Google OAuth callback.
+    
+    Returns user and access token.
+    """
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=501,
+            detail="Google OAuth not configured"
+        )
+    
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        
+        if token_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Token exchange failed: {token_response.text}"
+            )
+        
+        token_data = token_response.json()
+        access_token = token_data["access_token"]
+        
+        # Get user info
+        user_response = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        
+        if user_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to get user info: {user_response.text}"
+            )
+        
+        user_info = user_response.json()
+    
+    # Get or create user
+    oauth_id = user_info["id"]
+    email = user_info["email"]
+    name = user_info.get("name", email)
+    avatar_url = user_info.get("picture")
+    
+    result = await db.execute(
+        select(User).where(
+            User.oauth_provider == "google",
+            User.oauth_id == oauth_id,
+        )
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        # Check if user exists by email in demo tenant
+        demo_tenant_id = UUID("550e8400-e29b-41d4-a716-446655440000")
+        result = await db.execute(
+            select(User).where(
+                User.email == email,
+                User.tenant_id == demo_tenant_id,
+            )
+        )
+        user = result.scalar_one_or_none()
+        
+        if user:
+            # Link OAuth to existing user
+            user.oauth_provider = "google"
+            user.oauth_id = oauth_id
+            if avatar_url:
+                user.avatar_url = avatar_url
+        else:
+            # Get demo tenant
+            result = await db.execute(
+                select(Tenant).where(Tenant.id == demo_tenant_id)
+            )
+            tenant = result.scalar_one_or_none()
+            
+            if not tenant:
+                # Create demo tenant if it doesn't exist
+                tenant = Tenant(
+                    id=demo_tenant_id,
+                    name="Demo Organization",
+                    email="demo@patchguide.ai",
+                    region="us-east-1",
+                    tier="trial",
+                    is_active=True,
+                    encryption_key_id="demo-key",
+                    settings={"features": {"patch_weather": True, "ai_assistant": True}}
+                )
+                db.add(tenant)
+            
+            # Create new user
+            user = User(
+                tenant_id=demo_tenant_id,
+                email=email,
+                name=name,
+                avatar_url=avatar_url,
+                oauth_provider="google",
+                oauth_id=oauth_id,
+                is_active=True,
+                role=UserRole.VIEWER,
+                permissions={},
+                preferences={},
+            )
+            db.add(user)
+        
+        await db.commit()
+        await db.refresh(user)
+        
+        # Log user creation or linking
+        await AuditLog.log_action(
+            db_session=db,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            action="user.oauth_linked" if user.workos_user_id else "user.created",
+            resource_type="user",
+            resource_id=str(user.id),
+            details={"provider": "google"},
+        )
+    
+    # Update last login
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
+    
+    # Create access token
+    access_token = await create_access_token(
+        user_id=str(user.id),
+        tenant_id=str(user.tenant_id),
+    )
+    
+    # Log successful login
+    await AuditLog.log_action(
+        db_session=db,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="user.login",
+        details={"method": "google_oauth"},
+    )
+    
+    return user, access_token
+
+
+async def create_github_auth_url(
+    redirect_uri: str,
+    state: Optional[str] = None,
+) -> str:
+    """
+    Create GitHub OAuth authorization URL.
+    """
+    if not settings.GITHUB_CLIENT_ID:
+        raise HTTPException(
+            status_code=501,
+            detail="GitHub OAuth not configured"
+        )
+    
+    params = {
+        "client_id": settings.GITHUB_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "read:user user:email",
+        "state": state or secrets.token_urlsafe(32),
+    }
+    
+    from urllib.parse import urlencode
+    base_url = "https://github.com/login/oauth/authorize"
+    return f"{base_url}?{urlencode(params)}"
+
+
+async def handle_github_callback(
+    code: str,
+    redirect_uri: str,
+    db: AsyncSession,
+) -> Tuple[User, str]:
+    """
+    Handle GitHub OAuth callback.
+    
+    Returns user and access token.
+    """
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=501,
+            detail="GitHub OAuth not configured"
+        )
+    
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "code": code,
+                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Accept": "application/json"},
+        )
+        
+        if token_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Token exchange failed: {token_response.text}"
+            )
+        
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(
+                status_code=400,
+                detail="No access token in response"
+            )
+        
+        # Get user info
+        user_response = await client.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        
+        if user_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to get user info: {user_response.text}"
+            )
+        
+        user_info = user_response.json()
+        
+        # Get primary email if not in profile
+        email = user_info.get("email")
+        if not email:
+            emails_response = await client.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            if emails_response.status_code == 200:
+                emails = emails_response.json()
+                primary = next((e for e in emails if e.get("primary")), None)
+                if primary:
+                    email = primary["email"]
+        
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not get email from GitHub"
+            )
+    
+    # Get or create user
+    oauth_id = str(user_info["id"])
+    name = user_info.get("name") or user_info.get("login") or email
+    avatar_url = user_info.get("avatar_url")
+    
+    result = await db.execute(
+        select(User).where(
+            User.oauth_provider == "github",
+            User.oauth_id == oauth_id,
+        )
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        # Check if user exists by email in demo tenant
+        demo_tenant_id = UUID("550e8400-e29b-41d4-a716-446655440000")
+        result = await db.execute(
+            select(User).where(
+                User.email == email,
+                User.tenant_id == demo_tenant_id,
+            )
+        )
+        user = result.scalar_one_or_none()
+        
+        if user:
+            # Link OAuth to existing user
+            user.oauth_provider = "github"
+            user.oauth_id = oauth_id
+            if avatar_url:
+                user.avatar_url = avatar_url
+        else:
+            # Get demo tenant
+            result = await db.execute(
+                select(Tenant).where(Tenant.id == demo_tenant_id)
+            )
+            tenant = result.scalar_one_or_none()
+            
+            if not tenant:
+                # Create demo tenant if it doesn't exist
+                tenant = Tenant(
+                    id=demo_tenant_id,
+                    name="Demo Organization",
+                    email="demo@patchguide.ai",
+                    region="us-east-1",
+                    tier="trial",
+                    is_active=True,
+                    encryption_key_id="demo-key",
+                    settings={"features": {"patch_weather": True, "ai_assistant": True}}
+                )
+                db.add(tenant)
+            
+            # Create new user
+            user = User(
+                tenant_id=demo_tenant_id,
+                email=email,
+                name=name,
+                avatar_url=avatar_url,
+                oauth_provider="github",
+                oauth_id=oauth_id,
+                is_active=True,
+                role=UserRole.VIEWER,
+                permissions={},
+                preferences={},
+            )
+            db.add(user)
+        
+        await db.commit()
+        await db.refresh(user)
+        
+        # Log user creation or linking
+        await AuditLog.log_action(
+            db_session=db,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            action="user.oauth_linked" if user.workos_user_id else "user.created",
+            resource_type="user",
+            resource_id=str(user.id),
+            details={"provider": "github"},
+        )
+    
+    # Update last login
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
+    
+    # Create access token
+    access_token = await create_access_token(
+        user_id=str(user.id),
+        tenant_id=str(user.tenant_id),
+    )
+    
+    # Log successful login
+    await AuditLog.log_action(
+        db_session=db,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="user.login",
+        details={"method": "github_oauth"},
+    )
+    
+    return user, access_token

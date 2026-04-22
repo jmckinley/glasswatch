@@ -36,6 +36,11 @@ class WindowCreate(BaseModel):
     max_duration_hours: Optional[float] = Field(None, ge=0.5, le=24)
     max_assets: Optional[int] = Field(None, ge=1)
     approved_activities: List[str] = Field(default_factory=lambda: ["patching"])
+    # Sprint 13 additions
+    priority: int = Field(default=0, ge=0, le=100)
+    asset_group: Optional[str] = Field(None, max_length=100)
+    service_name: Optional[str] = Field(None, max_length=100)
+    is_default: bool = Field(default=False)
     
 
 class WindowUpdate(BaseModel):
@@ -49,6 +54,11 @@ class WindowUpdate(BaseModel):
     max_assets: Optional[int] = Field(None, ge=1)
     change_freeze: Optional[bool] = None
     change_freeze_reason: Optional[str] = None
+    # Sprint 13 additions
+    priority: Optional[int] = Field(None, ge=0, le=100)
+    asset_group: Optional[str] = Field(None, max_length=100)
+    service_name: Optional[str] = Field(None, max_length=100)
+    is_default: Optional[bool] = None
 
 
 @router.get("")
@@ -57,6 +67,8 @@ async def list_maintenance_windows(
     tenant: Tenant = Depends(get_current_tenant),
     type: Optional[str] = Query(None, description="Filter by type"),
     environment: Optional[str] = Query(None, description="Filter by environment"),
+    asset_group: Optional[str] = Query(None, description="Filter by asset group"),
+    service_name: Optional[str] = Query(None, description="Filter by service name"),
     active_only: bool = Query(True, description="Only show active windows"),
     future_only: bool = Query(True, description="Only show future windows"),
     approved_only: bool = Query(False, description="Only show approved windows"),
@@ -75,6 +87,10 @@ async def list_maintenance_windows(
         query = query.where(MaintenanceWindow.type == type)
     if environment:
         query = query.where(MaintenanceWindow.environment == environment)
+    if asset_group:
+        query = query.where(MaintenanceWindow.asset_group == asset_group)
+    if service_name:
+        query = query.where(MaintenanceWindow.service_name == service_name)
     if active_only:
         query = query.where(MaintenanceWindow.active == True)
     if future_only:
@@ -197,6 +213,10 @@ async def create_maintenance_window(
         max_duration_hours=window_data.max_duration_hours,
         max_assets=window_data.max_assets,
         approved_activities=window_data.approved_activities,
+        priority=window_data.priority,
+        asset_group=window_data.asset_group,
+        service_name=window_data.service_name,
+        is_default=window_data.is_default,
         active=True,
         approved=window_data.type == "emergency",  # Auto-approve emergency windows
         approved_at=datetime.now(timezone.utc) if window_data.type == "emergency" else None,
@@ -402,3 +422,112 @@ async def create_recurring_windows(
         "message": f"Created {len(created_windows)} recurring maintenance windows",
         "windows": [w.to_dict() for w in created_windows],
     }
+
+
+@router.get("/resolve")
+async def resolve_maintenance_window(
+    asset_id: Optional[UUID] = Query(None, description="Asset ID to resolve window for"),
+    environment: Optional[str] = Query(None, description="Environment override"),
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Resolve the best matching maintenance window for a given asset.
+    
+    Uses priority/specificity rules to find the most appropriate window.
+    """
+    from backend.models.asset import Asset
+    
+    asset = None
+    if asset_id:
+        result = await db.execute(
+            select(Asset).where(
+                and_(
+                    Asset.id == asset_id,
+                    Asset.tenant_id == tenant.id
+                )
+            )
+        )
+        asset = result.scalar_one_or_none()
+        
+        if not asset:
+            raise HTTPException(404, "Asset not found")
+    
+    # Find best matching window
+    window = await MaintenanceWindow.find_best_window(
+        db=db,
+        tenant_id=tenant.id,
+        asset=asset,
+        environment=environment,
+    )
+    
+    if not window:
+        return {
+            "window": None,
+            "message": "No matching maintenance window found",
+        }
+    
+    return {
+        "window": window.to_dict(),
+        "match_reason": _get_match_reason(window, asset, environment),
+    }
+
+
+def _get_match_reason(window: MaintenanceWindow, asset, environment: Optional[str]) -> str:
+    """Helper to explain why this window was selected."""
+    if window.service_name and window.environment:
+        return f"Exact match: service '{window.service_name}' in environment '{window.environment}'"
+    elif window.asset_group and window.environment:
+        return f"Asset group match: '{window.asset_group}' in environment '{window.environment}'"
+    elif window.environment:
+        return f"Environment match: '{window.environment}'"
+    elif window.is_default:
+        return "Default fallback window"
+    else:
+        return "Generic window"
+
+
+@router.get("/environments")
+async def list_environments(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    List distinct environments across all maintenance windows.
+    """
+    result = await db.execute(
+        select(MaintenanceWindow.environment)
+        .where(
+            and_(
+                MaintenanceWindow.tenant_id == tenant.id,
+                MaintenanceWindow.environment.isnot(None),
+            )
+        )
+        .distinct()
+    )
+    environments = [row[0] for row in result.fetchall()]
+    
+    return {"environments": sorted(environments)}
+
+
+@router.get("/asset-groups")
+async def list_asset_groups(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    List distinct asset groups across all maintenance windows.
+    """
+    result = await db.execute(
+        select(MaintenanceWindow.asset_group)
+        .where(
+            and_(
+                MaintenanceWindow.tenant_id == tenant.id,
+                MaintenanceWindow.asset_group.isnot(None),
+            )
+        )
+        .distinct()
+    )
+    asset_groups = [row[0] for row in result.fetchall()]
+    
+    return {"asset_groups": sorted(asset_groups)}
