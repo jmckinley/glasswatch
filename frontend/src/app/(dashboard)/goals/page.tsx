@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { goalsApi } from "@/lib/api";
 import TagAutocomplete from "@/components/TagAutocomplete";
 
@@ -36,6 +37,7 @@ const RISK_TOLERANCE_COLORS: Record<string, string> = {
 };
 
 export default function GoalsPage() {
+  const router = useRouter();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -56,15 +58,8 @@ export default function GoalsPage() {
     }
   };
 
-  const handleOptimize = async (goalId: string) => {
-    try {
-      await goalsApi.optimize(goalId);
-      await fetchGoals();
-      alert("Optimization complete! Check the schedule for new bundles.");
-    } catch (error) {
-      console.error("Failed to optimize goal:", error);
-      alert("Optimization failed. Please try again.");
-    }
+  const handleOptimize = (goalId: string) => {
+    router.push(`/goals/${goalId}/recommend`);
   };
 
   if (loading) {

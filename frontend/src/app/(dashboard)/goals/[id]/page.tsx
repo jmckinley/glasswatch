@@ -241,8 +241,14 @@ export default function GoalDetailPage() {
           Back to Dashboard
         </Link>
         <Link
-          href="/schedule"
+          href={`/goals/${id}/recommend`}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Get Recommendations
+        </Link>
+        <Link
+          href="/schedule"
+          className="px-4 py-2 bg-neutral-700 text-white rounded-lg hover:bg-neutral-600 transition-colors"
         >
           View Schedule
         </Link>
