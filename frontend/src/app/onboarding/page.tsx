@@ -75,8 +75,12 @@ export default function OnboardingPage() {
   });
   const [scheduleData, setScheduleData] = useState({
     weekly_enabled: true,
+    weekly_day: "Sunday",
+    weekly_start_hour: "02:00",
+    weekly_duration: "4",
     emergency_enabled: false,
     freeze_enabled: false,
+    environment: "production",
   });
 
   // Load onboarding status on mount
@@ -420,15 +424,15 @@ export default function OnboardingPage() {
           {currentStep === 5 && (
             <div>
               <h2 className="text-2xl font-bold text-white mb-4">Configure Maintenance Windows</h2>
-              <p className="text-gray-400 mb-6">When can we schedule patches?</p>
-              
+              <p className="text-gray-400 mb-6">When can patches be deployed? You can add more windows later.</p>
+
               <div className="space-y-4">
-                <div className="p-4 bg-gray-700 rounded-lg">
-                  <label className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-white">Weekly Maintenance Window</div>
-                      <div className="text-sm text-gray-400">Sundays 2:00 AM - 6:00 AM</div>
-                    </div>
+                {/* Weekly window */}
+                <div className={`p-4 bg-gray-700 rounded-lg border-2 transition-colors ${
+                  scheduleData.weekly_enabled ? 'border-blue-500' : 'border-transparent'
+                }`}>
+                  <label className="flex items-center justify-between mb-3 cursor-pointer">
+                    <div className="font-medium text-white">📅 Weekly Maintenance Window</div>
                     <input
                       type="checkbox"
                       checked={scheduleData.weekly_enabled}
@@ -436,13 +440,68 @@ export default function OnboardingPage() {
                       className="w-5 h-5 rounded text-blue-500"
                     />
                   </label>
+                  {scheduleData.weekly_enabled && (
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Day of week</label>
+                        <select
+                          value={scheduleData.weekly_day}
+                          onChange={(e) => setScheduleData({ ...scheduleData, weekly_day: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        >
+                          {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Start time</label>
+                        <input
+                          type="time"
+                          value={scheduleData.weekly_start_hour}
+                          onChange={(e) => setScheduleData({ ...scheduleData, weekly_start_hour: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Duration (hours)</label>
+                        <select
+                          value={scheduleData.weekly_duration}
+                          onChange={(e) => setScheduleData({ ...scheduleData, weekly_duration: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        >
+                          {['1','2','3','4','6','8'].map(h => (
+                            <option key={h} value={h}>{h} {h === '1' ? 'hour' : 'hours'}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Environment</label>
+                        <select
+                          value={scheduleData.environment}
+                          onChange={(e) => setScheduleData({ ...scheduleData, environment: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="production">Production</option>
+                          <option value="staging">Staging</option>
+                          <option value="all">All environments</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {scheduleData.weekly_enabled && (
+                    <p className="text-xs text-blue-300 mt-3">
+                      ✓ {scheduleData.weekly_day}s at {scheduleData.weekly_start_hour} · {scheduleData.weekly_duration}h · {scheduleData.environment}
+                    </p>
+                  )}
                 </div>
-                
+
+                {/* Emergency window */}
                 <div className="p-4 bg-gray-700 rounded-lg">
-                  <label className="flex items-center justify-between">
+                  <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <div className="font-medium text-white">Emergency Windows</div>
-                      <div className="text-sm text-gray-400">Allow critical patches anytime</div>
+                      <div className="font-medium text-white">🚨 Emergency Windows</div>
+                      <div className="text-sm text-gray-400 mt-0.5">Allow critical/KEV patches to deploy outside scheduled windows</div>
                     </div>
                     <input
                       type="checkbox"
@@ -452,12 +511,13 @@ export default function OnboardingPage() {
                     />
                   </label>
                 </div>
-                
+
+                {/* Freeze */}
                 <div className="p-4 bg-gray-700 rounded-lg">
-                  <label className="flex items-center justify-between">
+                  <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <div className="font-medium text-white">Change Freeze Periods</div>
-                      <div className="text-sm text-gray-400">Block patches during holidays</div>
+                      <div className="font-medium text-white">❄️ Change Freeze Periods</div>
+                      <div className="text-sm text-gray-400 mt-0.5">Block all patches during holidays and critical business periods</div>
                     </div>
                     <input
                       type="checkbox"
@@ -468,6 +528,7 @@ export default function OnboardingPage() {
                   </label>
                 </div>
               </div>
+              <p className="text-xs text-gray-500 mt-4">You can add and edit maintenance windows anytime from the Schedule page.</p>
             </div>
           )}
 
