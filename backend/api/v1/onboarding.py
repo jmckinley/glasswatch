@@ -126,7 +126,86 @@ async def save_step(
         # Organization Setup - update tenant name if provided
         if "tenant_name" in step_data.data:
             tenant.name = step_data.data["tenant_name"]
-    
+
+    elif step_number == 2:
+        # Connect Tools — create Connection records for each configured provider
+        connections_data = step_data.data.get("connections", [])
+        if connections_data:
+            from backend.models.connection import Connection
+            for conn_info in connections_data:
+                provider = conn_info.get("provider")
+                if not provider:
+                    continue
+                connection = Connection(
+                    tenant_id=tenant.id,
+                    provider=provider,
+                    name=conn_info.get("name", f"{provider.upper()} Production"),
+                    config=conn_info.get("config", {}),
+                    status="pending",
+                )
+                db.add(connection)
+
+    elif step_number == 4:
+        # Create Goal record
+        goal_info = step_data.data.get("goal", {})
+        if goal_info.get("name"):
+            from backend.models.goal import Goal
+            from datetime import datetime, timezone as tz
+            target_date = None
+            if goal_info.get("target_date"):
+                try:
+                    target_date = datetime.fromisoformat(goal_info["target_date"]).replace(tzinfo=tz.utc)
+                except Exception:
+                    pass
+            goal = Goal(
+                tenant_id=tenant.id,
+                name=goal_info["name"],
+                description=goal_info.get("description", ""),
+                goal_type=step_data.data.get("template", "TIME_BASED").upper().replace("-", "_"),
+                target_completion_date=target_date,
+            )
+            db.add(goal)
+            await db.flush()
+            # Store goal_id back in onboarding data
+            tenant.onboarding_data[f"step_{step_number}"]["goal_id"] = str(goal.id)
+
+    elif step_number == 5:
+        # Create MaintenanceWindow if weekly_enabled
+        if step_data.data.get("weekly_enabled"):
+            from backend.models.maintenance_window import MaintenanceWindow
+            from datetime import datetime, timezone as tz, timedelta
+            import calendar
+
+            day_name = step_data.data.get("weekly_day", "Sunday")
+            start_hour_str = step_data.data.get("weekly_start_hour", "02:00")
+            duration_hours = int(step_data.data.get("weekly_duration", 4))
+            environment = step_data.data.get("environment", "production")
+
+            # Compute next occurrence of the given day/time
+            days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            target_weekday = days_of_week.index(day_name) if day_name in days_of_week else 6
+            now = datetime.now(tz.utc)
+            hour, minute = (int(x) for x in start_hour_str.split(":"))
+            days_ahead = (target_weekday - now.weekday()) % 7
+            if days_ahead == 0 and (now.hour, now.minute) >= (hour, minute):
+                days_ahead = 7
+            next_start = (now + timedelta(days=days_ahead)).replace(
+                hour=hour, minute=minute, second=0, microsecond=0
+            )
+            next_end = next_start + timedelta(hours=duration_hours)
+
+            mw = MaintenanceWindow(
+                tenant_id=tenant.id,
+                name="Weekly Maintenance",
+                type="scheduled",
+                start_time=next_start,
+                end_time=next_end,
+                timezone="America/New_York",
+                environment=environment,
+                max_duration_hours=float(duration_hours),
+            )
+            db.add(mw)
+
     # Update step number to the next step (but don't mark complete yet)
     tenant.onboarding_step = step_number
     
