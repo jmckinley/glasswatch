@@ -455,4 +455,12 @@ export const agentApi = {
     }>('/agent/chat', { method: 'POST', body: { message, context } }),
 };
 
+export const authApi = {
+  demoLogin: () => apiCall<any>('/auth/demo-login', { method: 'POST' }),
+  login: (email: string, password: string) =>
+    apiCall<any>('/auth/email-login', { method: 'POST', body: { email, password } }),
+  register: (data: { email: string; password: string; name: string; company_name: string }) =>
+    apiCall<any>('/auth/register', { method: 'POST', body: data }),
+};
+
 export { apiCall };

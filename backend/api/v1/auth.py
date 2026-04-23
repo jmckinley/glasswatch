@@ -67,6 +67,132 @@ class APIKeyResponse(BaseModel):
     message: str = "Store this key securely. It won't be shown again."
 
 
+class EmailRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    company_name: str
+
+
+class EmailLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@router.post("/register", response_model=CallbackResponse)
+async def register_with_email(
+    body: EmailRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Register a new user with email/password.
+    Creates a new Tenant and admin User.
+    """
+    from passlib.context import CryptContext
+    from backend.models.tenant import Tenant
+    from sqlalchemy import select
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    # Check if email already exists
+    result = await db.execute(select(User).where(User.email == body.email))
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Create tenant
+    import uuid
+    tenant = Tenant(
+        name=body.company_name,
+        email=body.email,
+        region="us-east-1",
+        tier="trial",
+        is_active=True,
+        encryption_key_id=f"key-{uuid.uuid4().hex[:8]}",
+        settings={},
+    )
+    db.add(tenant)
+    await db.flush()  # Get tenant.id
+
+    # Create user
+    user = User(
+        tenant_id=tenant.id,
+        email=body.email,
+        name=body.name,
+        is_active=True,
+        role=UserRole.ADMIN,
+        password_hash=pwd_context.hash(body.password),
+        permissions={},
+        preferences={},
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    access_token = await create_access_token(
+        user_id=str(user.id),
+        tenant_id=str(tenant.id),
+    )
+
+    return CallbackResponse(
+        access_token=access_token,
+        user={
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "avatar_url": user.avatar_url,
+        },
+        redirect_to="/onboarding",
+    )
+
+
+@router.post("/email-login", response_model=CallbackResponse)
+async def login_with_email(
+    body: EmailLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Login with email/password credentials.
+    """
+    from passlib.context import CryptContext
+    from sqlalchemy import select
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    if not user or not user.password_hash:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not pwd_context.verify(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
+
+    access_token = await create_access_token(
+        user_id=str(user.id),
+        tenant_id=str(user.tenant_id),
+    )
+
+    return CallbackResponse(
+        access_token=access_token,
+        user={
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "avatar_url": user.avatar_url,
+        },
+        redirect_to="/dashboard",
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
 async def initiate_login(
     organization: Optional[str] = Query(None, description="Organization domain or ID"),
@@ -134,6 +260,7 @@ async def handle_callback(
 
 
 @router.get("/demo-login", response_model=CallbackResponse)
+@router.post("/demo-login", response_model=CallbackResponse)
 async def demo_login(
     db: AsyncSession = Depends(get_db),
 ):

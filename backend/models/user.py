@@ -58,6 +58,9 @@ class User(Base):
     role = Column(Enum(UserRole), nullable=False, default=UserRole.VIEWER)
     permissions = Column(JSON, default=dict, nullable=False)  # Additional granular permissions
     
+    # Email/password authentication
+    password_hash = Column(String(255), nullable=True)  # bcrypt hash for email/password auth
+
     # API access
     api_key_hash = Column(String(255), nullable=True)  # For programmatic access
     api_key_last_used = Column(DateTime(timezone=True), nullable=True)
