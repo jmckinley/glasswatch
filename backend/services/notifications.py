@@ -91,24 +91,36 @@ class NotificationService:
         tenant: Tenant,
         notification_type: NotificationType
     ) -> List[NotificationChannel]:
-        """Get configured channels for a notification type."""
-        # Get from tenant settings
-        notification_config = tenant.settings.get("notifications", {})
-        type_config = notification_config.get(notification_type.value, {})
+        """Get configured channels for a notification type, respecting enabled flags."""
+        notification_config = (tenant.settings or {}).get("notifications", {})
         
-        # Default channels if not configured
+        # Check which channels are actually enabled
+        slack_enabled = notification_config.get("slack_enabled", False)
+        slack_webhook = notification_config.get("slack_webhook_url")
+        teams_enabled = notification_config.get("teams_enabled", False)
+        teams_webhook = notification_config.get("teams_webhook_url")
+        
+        # Build available channels based on config
+        available = [NotificationChannel.IN_APP]  # always available
+        if slack_enabled and slack_webhook:
+            available.append(NotificationChannel.SLACK)
+        if teams_enabled and teams_webhook:
+            available.append(NotificationChannel.TEAMS)
+        
+        # Type-specific defaults (filtered to what's actually configured)
         default_channels = {
-            NotificationType.CRITICAL_VULN: [NotificationChannel.SLACK, NotificationChannel.EMAIL],
-            NotificationType.KEV_ADDED: [NotificationChannel.SLACK],
-            NotificationType.BUNDLE_READY: [NotificationChannel.EMAIL],
-            NotificationType.APPROVAL_NEEDED: [NotificationChannel.SLACK, NotificationChannel.EMAIL],
-            NotificationType.PATCH_FAILED: [NotificationChannel.SLACK, NotificationChannel.EMAIL],
-            NotificationType.SLA_BREACH: [NotificationChannel.SLACK, NotificationChannel.EMAIL],
-            NotificationType.WEEKLY_DIGEST: [NotificationChannel.EMAIL],
+            NotificationType.CRITICAL_VULN: [NotificationChannel.SLACK, NotificationChannel.IN_APP],
+            NotificationType.KEV_ADDED: [NotificationChannel.SLACK, NotificationChannel.IN_APP],
+            NotificationType.BUNDLE_READY: [NotificationChannel.IN_APP],
+            NotificationType.APPROVAL_NEEDED: [NotificationChannel.SLACK, NotificationChannel.IN_APP],
+            NotificationType.PATCH_FAILED: [NotificationChannel.SLACK, NotificationChannel.IN_APP],
+            NotificationType.SLA_BREACH: [NotificationChannel.SLACK, NotificationChannel.IN_APP],
+            NotificationType.WEEKLY_DIGEST: [NotificationChannel.IN_APP],
         }
         
-        channel_names = type_config.get("channels", default_channels.get(notification_type, []))
-        return [NotificationChannel(name) for name in channel_names]
+        desired = default_channels.get(notification_type, [NotificationChannel.IN_APP])
+        # Only return channels that are actually available
+        return [ch for ch in desired if ch in available]
     
     async def _send_slack(
         self,
@@ -119,11 +131,17 @@ class NotificationService:
         priority: str = "normal",
     ) -> Dict[str, Any]:
         """Send Slack notification using webhook or API."""
-        slack_config = tenant.settings.get("integrations", {}).get("slack", {})
-        webhook_url = slack_config.get("webhook_url")
+        # Webhook URL lives under notifications section (set via settings UI)
+        notif_config = tenant.settings.get("notifications", {})
+        webhook_url = notif_config.get("slack_webhook_url")
+        
+        # Fallback: check legacy integrations.slack path
+        if not webhook_url:
+            slack_config = tenant.settings.get("integrations", {}).get("slack", {})
+            webhook_url = slack_config.get("webhook_url")
         
         if not webhook_url:
-            raise ValueError("Slack webhook URL not configured")
+            raise ValueError("Slack webhook URL not configured. Add it in Settings → Notifications.")
         
         # Build Slack message with blocks for rich formatting
         color = {
@@ -139,8 +157,8 @@ class NotificationService:
                 "title": title,
                 "text": message,
                 "fallback": f"{title}: {message}",
-                "footer": "PatchGuide",
-                "footer_icon": "https://patchguide.ai/icon.png",
+                "footer": "Glasswatch",
+                "footer_icon": "https://glasswatch-production.up.railway.app/icon.png",
                 "ts": int(datetime.now(timezone.utc).timestamp()),
             }]
         }
@@ -168,11 +186,17 @@ class NotificationService:
         priority: str = "normal",
     ) -> Dict[str, Any]:
         """Send Microsoft Teams notification using webhook."""
-        teams_config = tenant.settings.get("integrations", {}).get("teams", {})
-        webhook_url = teams_config.get("webhook_url")
+        # Webhook URL lives under notifications section (set via settings UI)
+        notif_config = tenant.settings.get("notifications", {})
+        webhook_url = notif_config.get("teams_webhook_url")
+        
+        # Fallback: check legacy integrations.teams path
+        if not webhook_url:
+            teams_config = tenant.settings.get("integrations", {}).get("teams", {})
+            webhook_url = teams_config.get("webhook_url")
         
         if not webhook_url:
-            raise ValueError("Teams webhook URL not configured")
+            raise ValueError("Teams webhook URL not configured. Add it in Settings → Notifications.")
         
         # Build Teams adaptive card
         theme_color = {
@@ -189,7 +213,7 @@ class NotificationService:
             "summary": title,
             "sections": [{
                 "activityTitle": title,
-                "activitySubtitle": "PatchGuide Notification",
+                "activitySubtitle": "Glasswatch Notification",
                 "text": message,
                 "markdown": True,
             }],
