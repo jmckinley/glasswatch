@@ -230,6 +230,16 @@ export const bundlesApi = {
       method: "PATCH",
       body: { maintenance_window_id: windowId },
     }),
+
+  execute: (id: string) => apiCall<any>(`/bundles/${id}/execute`, { method: 'POST' }),
+  approve: (id: string) => apiCall<any>(`/bundles/${id}/approve`, { method: 'POST' }),
+  rollback: (id: string) => apiCall<any>(`/bundles/${id}/rollback`, { method: 'POST' }),
+  getItems: (id: string) => apiCall<any>(`/bundles/${id}/items`),
+  getExecutionLog: (id: string) => apiCall<any>(`/bundles/${id}/execution-log`),
+  update: (id: string, data: any) => apiCall<any>(`/bundles/${id}`, { method: 'PATCH', body: data }),
+  addItem: (id: string, item: any) => apiCall<any>(`/bundles/${id}/items`, { method: 'POST', body: item }),
+  removeItem: (bundleId: string, itemId: string) => apiCall<any>(`/bundles/${bundleId}/items/${itemId}`, { method: 'DELETE' }),
+  updateItem: (bundleId: string, itemId: string, data: any) => apiCall<any>(`/bundles/${bundleId}/items/${itemId}`, { method: 'PATCH', body: data }),
 };
 
 

@@ -92,8 +92,6 @@ async def list_bundles(
 
 
 
-@router.get("/stats")
-
 @router.get("/{bundle_id}")
 async def get_bundle(
     bundle_id: UUID,
@@ -470,6 +468,388 @@ async def assign_bundle_to_window(
     }
     
     return response
+
+# ---------------------------------------------------------------------------
+# Bundle item endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/{bundle_id}/items")
+async def list_bundle_items(
+    bundle_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    List all items in a bundle with full vulnerability + asset details.
+    """
+    result = await db.execute(
+        select(Bundle)
+        .where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+        .options(
+            selectinload(Bundle.items).selectinload(BundleItem.vulnerability),
+            selectinload(Bundle.items).selectinload(BundleItem.asset),
+        )
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+
+    items = []
+    for item in bundle.items:
+        item_dict = item.to_dict()
+        if item.vulnerability:
+            item_dict["vulnerability"] = {
+                "id": str(item.vulnerability.id),
+                "identifier": item.vulnerability.identifier,
+                "severity": item.vulnerability.severity,
+                "description": item.vulnerability.description,
+                "title": getattr(item.vulnerability, "title", item.vulnerability.description),
+            }
+        if item.asset:
+            item_dict["asset"] = {
+                "id": str(item.asset.id),
+                "name": item.asset.name,
+                "identifier": item.asset.identifier,
+                "type": item.asset.type,
+                "criticality": item.asset.criticality,
+            }
+        items.append(item_dict)
+
+    # Sort: failed first, in_progress, pending, success
+    STATUS_ORDER = {"failed": 0, "in_progress": 1, "pending": 2, "success": 3, "rolled_back": 4, "skipped": 5}
+    items.sort(key=lambda x: (STATUS_ORDER.get(x.get("status", ""), 99), x.get("priority") or 9999))
+
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/{bundle_id}/items")
+async def add_bundle_item(
+    bundle_id: UUID,
+    item_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Add a vulnerability-asset pair to a bundle.
+    """
+    result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+    if bundle.status not in ("draft", "scheduled", "approved"):
+        raise HTTPException(400, f"Cannot modify bundle in '{bundle.status}' status")
+
+    vuln_id = item_data.get("vulnerability_id")
+    asset_id = item_data.get("asset_id")
+    if not vuln_id or not asset_id:
+        raise HTTPException(400, "vulnerability_id and asset_id are required")
+
+    # Check for duplicate
+    existing = await db.execute(
+        select(BundleItem).where(
+            and_(
+                BundleItem.bundle_id == bundle_id,
+                BundleItem.vulnerability_id == UUID(vuln_id),
+                BundleItem.asset_id == UUID(asset_id),
+            )
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "This vulnerability-asset pair is already in the bundle")
+
+    # Get current max priority
+    max_priority_result = await db.execute(
+        select(func.max(BundleItem.priority)).where(BundleItem.bundle_id == bundle_id)
+    )
+    max_priority = max_priority_result.scalar() or 0
+
+    new_item = BundleItem(
+        bundle_id=bundle_id,
+        vulnerability_id=UUID(vuln_id),
+        asset_id=UUID(asset_id),
+        risk_score=float(item_data.get("risk_score", 0.0)),
+        priority=max_priority + 1,
+        status="pending",
+    )
+    db.add(new_item)
+
+    # Recalculate bundle risk score
+    bundle.assets_affected_count = (bundle.assets_affected_count or 0) + 1
+    bundle.updated_at = datetime.now(timezone.utc)
+    # If bundle was approved, reset to draft since content changed
+    if bundle.status == "approved":
+        bundle.status = "draft"
+        bundle.approved_by = None
+        bundle.approved_at = None
+
+    await db.commit()
+    await db.refresh(new_item)
+
+    item_dict = new_item.to_dict()
+
+    # Load vuln/asset details
+    vuln_result = await db.execute(select(Vulnerability).where(Vulnerability.id == new_item.vulnerability_id))
+    vuln = vuln_result.scalar_one_or_none()
+    asset_result_q = await db.execute(select(Asset).where(Asset.id == new_item.asset_id))
+    asset = asset_result_q.scalar_one_or_none()
+
+    if vuln:
+        item_dict["vulnerability"] = {
+            "id": str(vuln.id),
+            "identifier": vuln.identifier,
+            "severity": vuln.severity,
+            "description": vuln.description,
+            "title": getattr(vuln, "title", vuln.description),
+        }
+    if asset:
+        item_dict["asset"] = {
+            "id": str(asset.id),
+            "name": asset.name,
+            "identifier": asset.identifier,
+            "type": asset.type,
+            "criticality": asset.criticality,
+        }
+    return item_dict
+
+
+@router.patch("/{bundle_id}/items/{item_id}")
+async def update_bundle_item(
+    bundle_id: UUID,
+    item_id: UUID,
+    update_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Update priority or notes on a bundle item.
+    """
+    # Verify bundle ownership
+    bundle_result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = bundle_result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+
+    item_result = await db.execute(
+        select(BundleItem).where(and_(BundleItem.id == item_id, BundleItem.bundle_id == bundle_id))
+    )
+    item = item_result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(404, "Bundle item not found")
+
+    if "priority" in update_data:
+        item.priority = int(update_data["priority"])
+    if "notes" in update_data:
+        item.notes = update_data["notes"]
+
+    item.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(item)
+    return item.to_dict()
+
+
+@router.delete("/{bundle_id}/items/{item_id}")
+async def remove_bundle_item(
+    bundle_id: UUID,
+    item_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Remove an item from a bundle.
+    """
+    bundle_result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = bundle_result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+    if bundle.status not in ("draft", "scheduled", "approved"):
+        raise HTTPException(400, f"Cannot modify bundle in '{bundle.status}' status")
+
+    item_result = await db.execute(
+        select(BundleItem).where(and_(BundleItem.id == item_id, BundleItem.bundle_id == bundle_id))
+    )
+    item = item_result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(404, "Bundle item not found")
+
+    await db.delete(item)
+
+    # If bundle was approved, reset to draft
+    if bundle.status == "approved":
+        bundle.status = "draft"
+        bundle.approved_by = None
+        bundle.approved_at = None
+    bundle.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    return {"success": True, "deleted_item_id": str(item_id)}
+
+
+# ---------------------------------------------------------------------------
+# Bundle workflow endpoints
+# ---------------------------------------------------------------------------
+
+@router.patch("/{bundle_id}")
+async def update_bundle(
+    bundle_id: UUID,
+    update_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Update bundle metadata: name, description, scheduled_for, maintenance_window_id, risk_level.
+    If bundle is approved and content changes, resets to draft.
+    """
+    result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+    if bundle.status not in ("draft", "scheduled", "approved"):
+        raise HTTPException(400, f"Cannot edit bundle in '{bundle.status}' status")
+
+    changed = False
+    if "name" in update_data and update_data["name"] is not None:
+        bundle.name = update_data["name"]
+        changed = True
+    if "description" in update_data:
+        bundle.description = update_data["description"]
+        changed = True
+    if "scheduled_for" in update_data:
+        val = update_data["scheduled_for"]
+        bundle.scheduled_for = datetime.fromisoformat(val) if val else None
+        changed = True
+    if "maintenance_window_id" in update_data:
+        val = update_data["maintenance_window_id"]
+        bundle.maintenance_window_id = UUID(val) if val else None
+        changed = True
+    if "risk_level" in update_data:
+        bundle.risk_level = update_data["risk_level"]
+        changed = True
+
+    if changed:
+        # Editing an approved bundle resets to draft
+        if bundle.status == "approved":
+            bundle.status = "draft"
+            bundle.approved_by = None
+            bundle.approved_at = None
+        bundle.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(bundle)
+
+    return bundle.to_dict()
+
+
+@router.post("/{bundle_id}/approve")
+async def approve_bundle(
+    bundle_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Approve a bundle for execution.
+    Sets status to 'approved', records approved_by/approved_at.
+    """
+    result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+    if bundle.status not in ("draft", "scheduled"):
+        raise HTTPException(400, f"Bundle is already '{bundle.status}' — cannot approve")
+
+    bundle.status = "approved"
+    bundle.approved_by = "current_user"  # TODO: replace with actual user from auth
+    bundle.approved_at = datetime.now(timezone.utc)
+    bundle.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(bundle)
+    return bundle.to_dict()
+
+
+@router.post("/{bundle_id}/rollback")
+async def rollback_bundle(
+    bundle_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Rollback a bundle.
+    Sets bundle status to 'failed', rolls back all in_progress/success items.
+    """
+    result = await db.execute(
+        select(Bundle)
+        .where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+        .options(selectinload(Bundle.items))
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+
+    rolled_back_count = 0
+    for item in bundle.items:
+        if item.status in ("in_progress", "success"):
+            item.status = "rolled_back"
+            item.rollback_performed = True
+            item.rollback_at = datetime.now(timezone.utc)
+            item.updated_at = datetime.now(timezone.utc)
+            rolled_back_count += 1
+
+    bundle.status = "failed"
+    bundle.completed_at = datetime.now(timezone.utc)
+    bundle.rollback_count = rolled_back_count
+    bundle.updated_at = datetime.now(timezone.utc)
+
+    # Append to execution log
+    log_entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": "warn",
+        "message": f"Bundle rolled back — {rolled_back_count} items reverted",
+    }
+    current_log = bundle.execution_log or []
+    if not isinstance(current_log, list):
+        current_log = []
+    bundle.execution_log = current_log + [log_entry]
+
+    await db.commit()
+    await db.refresh(bundle)
+    return {**bundle.to_dict(), "rolled_back_items": rolled_back_count}
+
+
+@router.get("/{bundle_id}/execution-log")
+async def get_execution_log(
+    bundle_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Return the structured execution log for a bundle.
+    """
+    result = await db.execute(
+        select(Bundle).where(and_(Bundle.id == bundle_id, Bundle.tenant_id == tenant.id))
+    )
+    bundle = result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(404, "Bundle not found")
+
+    log = bundle.execution_log
+    if not isinstance(log, list):
+        log = []
+
+    return {"bundle_id": str(bundle_id), "entries": log, "total": len(log)}
+
+
+# ---------------------------------------------------------------------------
+# Bundle statistics
+# ---------------------------------------------------------------------------
 
 @router.get("/stats")
 async def get_bundle_stats(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -198,7 +199,11 @@ export default function ApprovalsPage() {
                     >
                       {RISK_ICONS[approval.risk_level]} {approval.risk_level.toUpperCase()}
                     </span>
-                    <h3 className="text-xl font-semibold text-white">{approval.title}</h3>
+                    {approval.bundle_id ? (
+                      <Link href={`/bundles/${approval.bundle_id}`} className="text-xl font-semibold text-white hover:text-blue-400 transition-colors">{approval.title}</Link>
+                    ) : (
+                      <h3 className="text-xl font-semibold text-white">{approval.title}</h3>
+                    )}
                   </div>
 
                   <p className="text-gray-400 mb-4">{approval.description}</p>

@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/assets", label: "Assets" },
   { href: "/vulnerabilities", label: "Vulnerabilities" },
   { href: "/goals", label: "Goals" },
+  { href: "/bundles", label: "Bundles" },
   { href: "/schedule", label: "Schedule" },
   { href: "/approvals", label: "Approvals" },
   { href: "/rules", label: "Rules" },

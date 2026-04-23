@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { maintenanceWindowsApi, goalsApi, bundlesApi, rulesApi } from "@/lib/api";
 import MaintenanceWindowDialog from "@/components/MaintenanceWindowDialog";
 import ScheduleCalendar from "@/components/ScheduleCalendar";
@@ -857,7 +858,7 @@ function WindowCard({
 
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h5 className="font-medium">{bundle.name}</h5>
+                    <h5 className="font-medium"><Link href={`/bundles/${bundle.id}`} className="hover:text-blue-400 transition-colors">{bundle.name}</Link></h5>
                     <div className="flex items-center gap-4 mt-1 text-sm text-neutral-400">
                       {bundle.assets_affected_count && (
                         <>
