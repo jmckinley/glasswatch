@@ -13,6 +13,7 @@ const navLinks = [
   { href: "/approvals", label: "Approvals" },
   { href: "/rules", label: "Rules" },
   { href: "/settings", label: "Settings" },
+  { href: "/help", label: "Help" },
 ];
 
 export default function Navigation() {
