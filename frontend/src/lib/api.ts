@@ -445,4 +445,14 @@ export const settingsApi = {
     apiCall<any>("/settings/test-connection", { method: "POST", body: { integration, config } }),
 };
 
+// Agent API
+export const agentApi = {
+  chat: (message: string, context?: any) =>
+    apiCall<{
+      response: string;
+      actions_taken: string[];
+      suggested_actions: string[];
+    }>('/agent/chat', { method: 'POST', body: { message, context } }),
+};
+
 export { apiCall };

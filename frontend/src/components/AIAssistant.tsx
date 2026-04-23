@@ -1,38 +1,46 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronUp, X, Sparkles } from "lucide-react";
+import { ChevronUp, X, Sparkles, CheckCircle } from "lucide-react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  actions_taken?: string[];
+  suggested_actions?: string[];
 }
 
 interface AIAssistantProps {
   onSendMessage?: (message: string) => Promise<string>;
-  apiEndpoint?: string; // Optional API endpoint for real AI integration
+  apiEndpoint?: string;
 }
 
-const suggestedQuestions = [
-  "What should I patch this week?",
-  "Show me all critical vulnerabilities",
-  "Create a goal for SOC 2 compliance",
-  "Which assets are most at risk?",
-  "Explain my current risk score",
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const REAL_API_ENDPOINT = `${API_BASE_URL}/api/v1/agent/chat`;
+
+const starterPrompts = [
+  "What needs my attention right now?",
+  "Show me critical KEV vulnerabilities",
+  "Create a rule blocking Friday deployments",
+  "What maintenance windows do we have?",
+  "How are we doing on our goals?",
 ];
 
 export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
-  const isDemoMode = !apiEndpoint && !onSendMessage;
+  // Always use real endpoint by default; fall back only if neither is provided
+  const effectiveEndpoint = apiEndpoint || REAL_API_ENDPOINT;
+  const isDemoMode = !effectiveEndpoint && !onSendMessage;
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
       content: isDemoMode
-        ? "Hi! I'm your AI patch assistant (Demo Mode). I can help you understand your vulnerabilities, create patching goals, and optimize your schedule.\n\nNote: This is a demo with mock responses. To enable full AI capabilities, contact your administrator to configure the AI integration."
-        : "Hi! I'm your AI patch assistant. I can help you understand your vulnerabilities, create patching goals, and optimize your schedule. What would you like to know?",
+        ? "Hi! I'm your AI patch assistant (Demo Mode). I can help you understand your vulnerabilities, create patching goals, and optimize your schedule.\n\nNote: This is demo mode with mock responses. Configure ANTHROPIC_API_KEY to enable full AI capabilities."
+        : "Hi! I'm your Glasswatch AI assistant. Ask me anything — I work with your live data.\n\nTry one of the prompts below, or ask me something.",
       timestamp: new Date(),
     },
   ]);
@@ -48,13 +56,13 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: text,
       timestamp: new Date(),
     };
 
@@ -64,29 +72,43 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
 
     try {
       let response: string;
-      
-      if (apiEndpoint) {
-        // Make real API call
-        const apiResponse = await fetch(apiEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message: input }),
-        });
-        
-        if (!apiResponse.ok) {
-          throw new Error(`API error: ${apiResponse.statusText}`);
+      let actions_taken: string[] = [];
+      let suggested_actions: string[] = [];
+
+      if (effectiveEndpoint) {
+        const token =
+          typeof window !== "undefined"
+            ? localStorage.getItem("glasswatch_token") ||
+              localStorage.getItem("glasswatch-token")
+            : null;
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
-        
+        // Include demo tenant header so requests work without login
+        headers["X-Tenant-ID"] = "550e8400-e29b-41d4-a716-446655440000";
+
+        const apiResponse = await fetch(effectiveEndpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ message: text }),
+        });
+
+        if (!apiResponse.ok) {
+          throw new Error(`API error: ${apiResponse.status} ${apiResponse.statusText}`);
+        }
+
         const data = await apiResponse.json();
-        response = data.response || data.message || "No response from AI";
+        response = data.response || data.message || "No response from agent";
+        actions_taken = data.actions_taken || [];
+        suggested_actions = data.suggested_actions || [];
       } else if (onSendMessage) {
-        // Use provided handler
-        response = await onSendMessage(input);
+        response = await onSendMessage(text);
       } else {
-        // Demo mode - use mock responses
-        response = getMockResponse(input);
+        response = getMockResponse(text);
       }
 
       const assistantMessage: Message = {
@@ -94,6 +116,8 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
         role: "assistant",
         content: response,
         timestamp: new Date(),
+        actions_taken,
+        suggested_actions,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -101,7 +125,8 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm having trouble processing that request. Please try again.",
+        content:
+          "I'm having trouble processing that request. Please check your connection and try again.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -110,12 +135,16 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
     }
   };
 
+  const handleSend = () => sendMessage(input);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
+
+  const isFirstMessage = messages.length === 1;
 
   return (
     <>
@@ -135,7 +164,7 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
+        <div className="fixed bottom-6 right-6 w-96 h-[620px] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
@@ -167,23 +196,56 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
                   message.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    message.role === "user"
-                      ? "bg-primary text-background"
-                      : "bg-neutral-800 text-foreground"
-                  }`}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs mt-1 opacity-60">
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                <div className="max-w-[85%]">
+                  <div
+                    className={`rounded-lg p-3 ${
+                      message.role === "user"
+                        ? "bg-primary text-background"
+                        : "bg-neutral-800 text-foreground"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs mt-1 opacity-60">
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Actions taken chips */}
+                  {message.actions_taken && message.actions_taken.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {message.actions_taken.map((action, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 text-xs bg-green-900/50 text-green-400 border border-green-800 px-2 py-0.5 rounded-full"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          {action}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Suggested actions */}
+                  {message.suggested_actions && message.suggested_actions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {message.suggested_actions.map((action, i) => (
+                        <button
+                          key={i}
+                          onClick={() => sendMessage(action)}
+                          className="text-xs bg-neutral-700 hover:bg-neutral-600 text-neutral-200 px-2 py-1 rounded-full transition-colors"
+                        >
+                          {action} →
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-neutral-800 rounded-lg p-3 max-w-[80%]">
@@ -198,18 +260,18 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestions */}
-          {messages.length === 1 && (
+          {/* Starter prompts (shown until first user message) */}
+          {isFirstMessage && (
             <div className="px-4 pb-2">
-              <p className="text-xs text-neutral-400 mb-2">Suggested questions:</p>
-              <div className="flex flex-wrap gap-2">
-                {suggestedQuestions.map((question, index) => (
+              <p className="text-xs text-neutral-400 mb-2">Try asking:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {starterPrompts.map((prompt, index) => (
                   <button
                     key={index}
-                    onClick={() => setInput(question)}
-                    className="text-xs bg-neutral-800 hover:bg-neutral-700 px-2 py-1 rounded transition-colors"
+                    onClick={() => sendMessage(prompt)}
+                    className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-200 px-2 py-1.5 rounded-lg transition-colors text-left"
                   >
-                    {question}
+                    {prompt}
                   </button>
                 ))}
               </div>
@@ -244,7 +306,7 @@ export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {
   );
 }
 
-// Mock responses for demo
+// Kept for demo fallback
 function getMockResponse(input: string): string {
   const lowerInput = input.toLowerCase();
 
@@ -255,9 +317,7 @@ function getMockResponse(input: string): string {
 2. **CVE-2024-5678** (KEV Listed) - Active exploitation detected
 3. **CVE-2024-9012** (High) - Database servers at risk
 
-Total risk reduction if patched: 2,340 points (28% improvement).
-
-You can create a patch bundle for these from the Schedule page.`;
+Total risk reduction if patched: 2,340 points (28% improvement).`;
   }
 
   if (lowerInput.includes("critical")) {
@@ -267,33 +327,7 @@ You can create a patch bundle for these from the Schedule page.`;
 • 8 on internal production servers
 • 3 on development systems
 
-The highest risk is CVE-2024-1234 with a CVSS score of 9.8 and active exploitation in the wild.
-
-View the full list on the Vulnerabilities page, or create a goal to eliminate these from the Goals page.`;
-  }
-
-  if (lowerInput.includes("soc") || lowerInput.includes("compliance")) {
-    return `I can help you create a SOC 2 compliance goal. Based on your current vulnerabilities:
-
-• **Timeline needed**: 45-60 days to patch all high/critical
-• **Maintenance windows required**: 8-10
-• **Risk tolerance**: Conservative recommended
-
-You can create a compliance goal targeting July 1st from the Goals page.`;
-  }
-
-  if (lowerInput.includes("risk score")) {
-    return `Your current total risk score is **84,720**.
-
-**Breakdown:**
-• Critical vulnerabilities: 45,200 (53%)
-• High vulnerabilities: 28,100 (33%)
-• Medium vulnerabilities: 9,420 (11%)
-• Low vulnerabilities: 2,000 (3%)
-
-**Trend**: Down 12.4% over the last 7 days
-
-The score is calculated using 8 factors including CVSS, EPSS, KEV listing, asset criticality, and runtime analysis from Snapper.`;
+The highest risk is CVE-2024-1234 with a CVSS score of 9.8 and active exploitation in the wild.`;
   }
 
   return `I understand you're asking about "${input}". I can help you with:
