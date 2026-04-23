@@ -119,7 +119,7 @@ class SnapshotService:
             tenant_id=tenant_id,
             snapshot_type=snapshot_type,
             system_state=system_state,
-            metadata=metadata,
+            snapshot_metadata=metadata,
             checksum=checksum,
             size_bytes=size_bytes
         )

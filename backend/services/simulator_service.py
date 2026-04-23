@@ -83,7 +83,7 @@ class SimulatorService:
             total_criticality += asset.criticality
             
             # Count internet-facing
-            if asset.is_internet_facing:
+            if asset.exposure == "INTERNET":
                 internet_facing_count += 1
         
         # Estimate downtime based on asset types and patch count

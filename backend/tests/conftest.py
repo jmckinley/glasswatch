@@ -154,12 +154,15 @@ async def create_test_tenant(test_session: AsyncSession):
 async def create_test_user(test_session: AsyncSession):
     """Factory fixture to create test users."""
     async def _create_user(
-        tenant_id: str,
+        tenant_id,
         email: str = "user@example.com",
         name: str = "Test User",
         role: UserRole = UserRole.ENGINEER,
         is_active: bool = True,
     ) -> User:
+        from uuid import UUID as _UUID
+        if isinstance(tenant_id, str):
+            tenant_id = _UUID(tenant_id)
         user = User(
             id=uuid4(),
             tenant_id=tenant_id,
@@ -182,31 +185,39 @@ async def create_test_user(test_session: AsyncSession):
 async def create_test_vulnerability(test_session: AsyncSession):
     """Factory fixture to create test vulnerabilities."""
     async def _create_vulnerability(
-        tenant_id: str,
-        cve_id: str = "CVE-2024-0001",
+        identifier: str = "CVE-2024-0001",
         severity: str = "HIGH",
         epss_score: float = 0.5,
+        kev_listed: bool = False,
+        # Legacy aliases kept for backwards compat
+        tenant_id: str = None,
+        cve_id: str = None,
         in_kev: bool = False,
     ) -> Vulnerability:
+        # Support legacy cve_id / in_kev param names
+        if cve_id:
+            identifier = cve_id
+        if in_kev:
+            kev_listed = True
         vuln = Vulnerability(
             id=uuid4(),
-            tenant_id=tenant_id,
-            cve_id=cve_id,
-            title=f"Test Vulnerability {cve_id}",
+            identifier=identifier,
+            source="nvd",
+            title=f"Test Vulnerability {identifier}",
             description="Test vulnerability description",
             severity=severity,
             cvss_score=7.5,
             epss_score=epss_score,
-            in_kev=in_kev,
-            published_date=datetime.now(timezone.utc),
+            kev_listed=kev_listed,
+            patch_available=True,
+            published_at=datetime.now(timezone.utc),
             affected_products=["test-product"],
-            references=["https://example.com/vuln"]
         )
         test_session.add(vuln)
         await test_session.flush()
         await test_session.refresh(vuln)
         return vuln
-    
+
     return _create_vulnerability
 
 
@@ -215,33 +226,39 @@ async def create_test_asset(test_session: AsyncSession):
     """Factory fixture to create test assets."""
     async def _create_asset(
         tenant_id: str,
-        hostname: str = "test-server",
+        hostname: str = "test-server",  # maps to identifier
         ip_address: str = "10.0.0.1",
         criticality: int = 3,
         is_internet_facing: bool = False,
         runtime_loaded: bool = False,
         runtime_executed: bool = False,
     ) -> Asset:
+        from uuid import UUID as _UUID
+        # Normalize tenant_id to UUID object for SQLAlchemy
+        if isinstance(tenant_id, str):
+            tenant_id = _UUID(tenant_id)
+        # Map legacy is_internet_facing to exposure field
+        exposure = "INTERNET" if is_internet_facing else "ISOLATED"
         asset = Asset(
             id=uuid4(),
             tenant_id=tenant_id,
-            hostname=hostname,
-            ip_address=ip_address,
+            identifier=hostname,
+            name=hostname,
+            type="server",
             criticality=criticality,
-            is_internet_facing=is_internet_facing,
-            os_type="Ubuntu",
+            exposure=exposure,
+            os_family="linux",
             os_version="22.04",
             environment="production",
-            runtime_loaded=runtime_loaded,
-            runtime_executed=runtime_executed,
+            ip_addresses=[ip_address],
             running_services=["nginx", "postgresql"],
-            tags={"env": "test"}
+            tags=["env:test"],
         )
         test_session.add(asset)
         await test_session.flush()
         await test_session.refresh(asset)
         return asset
-    
+
     return _create_asset
 
 
@@ -249,22 +266,31 @@ async def create_test_asset(test_session: AsyncSession):
 async def create_test_bundle(test_session: AsyncSession):
     """Factory fixture to create test bundles."""
     async def _create_bundle(
-        tenant_id: str,
+        tenant_id,
         name: str = "Test Bundle",
         description: str = "Test bundle description",
         status: str = "draft",
         priority: int = 3,
+        # Extra kwargs passed through to Bundle model
+        **kwargs,
     ) -> Bundle:
+        from uuid import UUID as _UUID
+        if isinstance(tenant_id, str):
+            tenant_id = _UUID(tenant_id)
+        # Map legacy kwarg names to actual model fields
+        if 'affected_asset_count' in kwargs:
+            kwargs['assets_affected_count'] = kwargs.pop('affected_asset_count')
+        if 'estimated_downtime' in kwargs:
+            kwargs['estimated_duration_minutes'] = kwargs.pop('estimated_downtime')
         bundle = Bundle(
             id=uuid4(),
             tenant_id=tenant_id,
             name=name,
             description=description,
             status=status,
-            priority=priority,
-            affected_asset_count=0,
-            estimated_downtime=30,
-            tags=["test"]
+            risk_score=kwargs.pop('risk_score', priority * 10.0),
+            assets_affected_count=kwargs.pop('assets_affected_count', 0),
+            **kwargs,
         )
         test_session.add(bundle)
         await test_session.flush()

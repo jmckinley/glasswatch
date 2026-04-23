@@ -452,6 +452,46 @@ class ApprovalService:
         # Default: only ADMIN and APPROVER can approve
         return False
 
+    async def approve(
+        self,
+        db: AsyncSession,
+        approval_id: UUID,
+        approver_id: UUID,
+        comment: Optional[str] = None,
+    ):
+        """Alias for approve_request that returns the updated ApprovalRequest."""
+        from backend.models.approval import ApprovalRequest
+        await self.approve_request(
+            db=db,
+            approval_request_id=approval_id,
+            user_id=approver_id,
+            comment=comment,
+        )
+        result = await db.execute(
+            select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+        )
+        return result.scalar_one()
+
+    async def reject(
+        self,
+        db: AsyncSession,
+        approval_id: UUID,
+        approver_id: UUID,
+        reason: Optional[str] = None,
+    ):
+        """Alias for reject_request that returns the updated ApprovalRequest."""
+        from backend.models.approval import ApprovalRequest
+        await self.reject_request(
+            db=db,
+            approval_request_id=approval_id,
+            user_id=approver_id,
+            comment=reason,  # reject_request uses 'comment' param
+        )
+        result = await db.execute(
+            select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
+        )
+        return result.scalar_one()
+
 
 # Global instance
 approval_service = ApprovalService()

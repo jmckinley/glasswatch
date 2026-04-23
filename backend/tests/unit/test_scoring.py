@@ -23,9 +23,15 @@ from backend.models.asset_vulnerability import AssetVulnerability
 
 pytestmark = pytest.mark.asyncio
 
+# Neutral runtime data: library loaded but not executed → 0 points modifier
+NEUTRAL_RUNTIME = {"code_executed": False, "library_loaded": True}
+
 
 def make_vuln(identifier="CVE-2024-0001", severity="HIGH", **kwargs):
-    """Helper to create a Vulnerability with required fields."""
+    """Helper to create a Vulnerability with required fields.
+    patch_available=True by default to avoid -5 no-patch penalty in basic tests.
+    """
+    kwargs.setdefault("patch_available", True)
     return Vulnerability(
         id=uuid4(),
         identifier=identifier,
@@ -52,7 +58,10 @@ def make_asset(tenant_id=None, criticality=3, exposure="ISOLATED", **kwargs):
 
 
 def make_av(asset, vuln, **kwargs):
-    """Helper to create an AssetVulnerability."""
+    """Helper to create an AssetVulnerability.
+    library_loaded=True by default to avoid -10 not-loaded penalty in basic tests.
+    """
+    kwargs.setdefault("library_loaded", True)
     return AssetVulnerability(
         asset_id=asset.id,
         vulnerability_id=vuln.id,
@@ -93,6 +102,7 @@ class TestScoringService:
 
         score = ScoringService.calculate_score(vuln, asset, asset_vuln)
 
+        # MEDIUM(10) + criticality(3) + LOADED(0) + patch_available(0) = 13
         assert score >= 10
 
     async def test_severity_low(self):
@@ -103,6 +113,7 @@ class TestScoringService:
 
         score = ScoringService.calculate_score(vuln, asset, asset_vuln)
 
+        # LOW(5) + criticality(3) + LOADED(0) = 8, clamped >=0
         assert score >= 5
 
     async def test_epss_max_contribution(self):
@@ -144,7 +155,7 @@ class TestScoringService:
         asset = make_asset(criticality=1)
         asset_vuln = make_av(asset, vuln)
 
-        # Pass code_executed=True in runtime_data (scoring service reads these keys)
+        # code_executed=True → +15 points bonus
         runtime_data = {
             "code_executed": True,
             "library_loaded": True,
@@ -171,7 +182,7 @@ class TestScoringService:
 
         score = ScoringService.calculate_score(vuln, asset, asset_vuln, runtime_data)
 
-        # HIGH (20) - not_loaded (10) + criticality (9) = 19+
+        # HIGH (20) - not_loaded (10) + criticality (9) = 19 (no patch penalty since patch_available=True)
         assert score >= 15
         assert score < 40  # Penalty applied
 
@@ -187,7 +198,7 @@ class TestScoringService:
 
         score = ScoringService.calculate_score(vuln, asset, asset_vuln)
 
-        # HIGH (20) + criticality (9) - controls (10) = 19+
+        # HIGH (20) + criticality (9) + LOADED(0) - controls (10) = 19
         assert score >= 15
         assert score < 40  # Reduction applied
 
@@ -229,5 +240,5 @@ class TestScoringService:
 
         score = ScoringService.calculate_score(vuln, asset, asset_vuln)
 
-        # Should have exposure boost
+        # MEDIUM(10) + criticality(9) + exposure(10) + LOADED(0) = 29+
         assert score >= 20  # MEDIUM + criticality + exposure
