@@ -15,6 +15,17 @@ interface Goal {
   target_risk_score: number | null;
 }
 
+interface MaintenanceWindow {
+  id: string;
+  name: string;
+  start_time: string;
+  duration_hours: number;
+  environment: string;
+  type: string;
+  max_assets: number;
+  scheduled_bundles?: any[];
+}
+
 interface RiskPair {
   vulnerability_id: string;
   vulnerability_identifier: string;
@@ -32,17 +43,6 @@ interface RiskPair {
     asset_exposure: string;
     asset_criticality: number;
   };
-}
-
-interface MaintenanceWindow {
-  id: string;
-  name: string;
-  start_time: string;
-  duration_hours: number;
-  environment: string;
-  type: string;
-  max_assets: number;
-  scheduled_bundles?: any[];
 }
 
 interface DashboardStats {
@@ -73,10 +73,23 @@ interface DashboardStats {
   windows: MaintenanceWindow[];
 }
 
+type DashboardMode = "focus" | "full";
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [riskPairs, setRiskPairs] = useState<RiskPair[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<DashboardMode>("focus");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("glasswatch-dashboard-mode") as DashboardMode | null;
+    if (saved === "full" || saved === "focus") setMode(saved);
+  }, []);
+
+  const setModeAndSave = (m: DashboardMode) => {
+    setMode(m);
+    localStorage.setItem("glasswatch-dashboard-mode", m);
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -97,381 +110,525 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
-
-  if (!stats) {
-    return <div className="text-center text-neutral-400 p-8">Error loading dashboard</div>;
-  }
-
-  // Calculate KEV + internet-facing critical path
-  const kevInternetFacing = Math.min(stats.vulnerabilities.kev_listed, stats.assets.internet_exposed);
-  const bod2201Deadline = new Date("2026-05-15"); // Example BOD 22-01 deadline
-  const daysToDeadline = Math.ceil((bod2201Deadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  if (loading) return <DashboardSkeleton />;
+  if (!stats) return <div className="text-center text-neutral-400 p-8">Error loading dashboard</div>;
 
   return (
     <>
-      {/* Risk Posture Overview */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Risk Posture Overview</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Risk Score with Trend */}
-          <div className="card p-6">
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Total Risk Score</h3>
-            <div className="flex items-baseline gap-3">
-              <div className="metric-value">{stats.risk_score.total.toLocaleString()}</div>
-              <div
-                className={`flex items-center text-sm ${
-                  stats.risk_score.trend === "down"
-                    ? "text-success"
-                    : stats.risk_score.trend === "up"
-                    ? "text-destructive"
-                    : "text-neutral-400"
-                }`}
-              >
-                {stats.risk_score.trend === "down" ? "↓" : "↑"}
-                {stats.risk_score.reduction_7d}% (7d)
-              </div>
-            </div>
-            <div className="mt-4 text-sm text-neutral-400">
-              {stats.vulnerabilities.total} total vulnerabilities across {stats.assets.total} assets
-            </div>
-          </div>
-
-          {/* Critical Path Alert */}
-          <div className="card p-6 border-l-4 border-destructive">
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Critical Path Alert</h3>
-            <div className="mb-2">
-              <span className="text-2xl font-bold text-destructive">{kevInternetFacing}</span>
-              <span className="text-neutral-400 ml-2">KEV vulns on internet-facing assets</span>
-            </div>
-            <div className="text-sm text-warning mt-3">
-              ⚠ BOD 22-01 deadline in <strong>{daysToDeadline} days</strong>
-            </div>
-            <Link href="/vulnerabilities?kev=true&exposure=internet" className="text-sm text-primary hover:underline mt-2 inline-block">
-              View KEV vulnerabilities →
-            </Link>
-          </div>
-
-          {/* Next Maintenance */}
-          <div className="card p-6 bg-primary/5 border-primary/20">
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Next Patch Window</h3>
-            {stats.bundles.next_window ? (
-              <>
-                <div className="text-lg font-medium">
-                  {new Date(stats.bundles.next_window).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-                <div className="text-sm text-neutral-400 mt-1">
-                  {stats.bundles.scheduled} bundles scheduled
-                </div>
-                <Link href="/schedule" className="text-sm text-primary hover:underline mt-2 inline-block">
-                  View schedule →
-                </Link>
-              </>
-            ) : (
-              <div className="text-neutral-400">No windows scheduled</div>
-            )}
-          </div>
+      {/* Header with mode toggle */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white">
+            {mode === "focus" ? "Focus" : "Overview"}
+          </h2>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {mode === "focus" ? "What needs your attention right now" : "Full platform snapshot"}
+          </p>
         </div>
-      </div>
-
-      {/* Goal Health */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Goal Health</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {stats.goals.length === 0 ? (
-            <div className="col-span-3 card p-8 text-center text-neutral-400">
-              No active goals. <Link href="/goals" className="text-primary hover:underline">Create your first goal</Link>
-            </div>
-          ) : (
-            stats.goals.map((goal) => <GoalHealthCard key={goal.id} goal={goal} />)
-          )}
-        </div>
-      </div>
-
-      {/* What Needs Attention */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Top Riskiest Pairs */}
-        <div className="card p-6">
-          <h3 className="text-lg font-medium mb-4">Top 5 Riskiest Asset-Vulnerability Pairs</h3>
-          {riskPairs.length === 0 ? (
-            <div className="text-center text-neutral-400 py-8">No vulnerability data available</div>
-          ) : (
-            <div className="space-y-3">
-              {riskPairs.map((pair, idx) => (
-                <div key={idx} className="bg-neutral-800 rounded-lg p-4 hover:bg-neutral-750 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <Link
-                        href={`/vulnerabilities/${pair.vulnerability_id}`}
-                        className="font-medium hover:text-primary transition-colors"
-                      >
-                        {pair.vulnerability_identifier}
-                      </Link>
-                      <div className="text-sm text-neutral-400 mt-1">
-                        {pair.asset_name} <span className="text-neutral-500">({pair.asset_environment})</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold text-destructive">{pair.risk_score.toFixed(1)}</div>
-                      <div className="text-xs text-neutral-500">risk score</div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <RiskBadge label={pair.risk_factors.severity} type="severity" />
-                    {pair.risk_factors.kev_listed && <RiskBadge label="KEV" type="critical" />}
-                    {pair.risk_factors.epss_score > 0.5 && (
-                      <RiskBadge label={`EPSS ${(pair.risk_factors.epss_score * 100).toFixed(0)}%`} type="warning" />
-                    )}
-                    {pair.risk_factors.asset_exposure === "internet-facing" && (
-                      <RiskBadge label="Internet" type="warning" />
-                    )}
-                    {pair.risk_factors.asset_criticality >= 8 && (
-                      <RiskBadge label={`Crit ${pair.risk_factors.asset_criticality}`} type="info" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming Windows */}
-        <div className="card p-6">
-          <h3 className="text-lg font-medium mb-4">Upcoming Maintenance Windows</h3>
-          {stats.windows.length === 0 ? (
-            <div className="text-center text-neutral-400 py-8">No upcoming windows scheduled</div>
-          ) : (
-            <div className="space-y-3">
-              {stats.windows.map((window) => {
-                const startDate = new Date(window.start_time);
-                const bundleCount = window.scheduled_bundles?.length || 0;
-                const capacityUsed = window.scheduled_bundles
-                  ?.reduce((sum, b) => sum + (b.assets_affected_count || 0), 0) || 0;
-                const capacityPct = window.max_assets ? (capacityUsed / window.max_assets) * 100 : 0;
-
-                return (
-                  <div key={window.id} className="bg-neutral-800 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="font-medium">{window.name}</div>
-                        <div className="text-sm text-neutral-400 mt-1">
-                          {startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} •{" "}
-                          {startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} •{" "}
-                          {window.duration_hours}h • {window.environment}
-                        </div>
-                      </div>
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          window.type === "emergency"
-                            ? "bg-destructive/20 text-destructive"
-                            : "bg-primary/20 text-primary"
-                        }`}
-                      >
-                        {window.type.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-neutral-400 mb-1">
-                        <span>
-                          {bundleCount} bundles • {capacityUsed}/{window.max_assets} assets
-                        </span>
-                        <span>{capacityPct.toFixed(0)}% capacity</span>
-                      </div>
-                      <div className="h-1.5 bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all ${
-                            capacityPct > 80 ? "bg-warning" : "bg-primary"
-                          }`}
-                          style={{ width: `${Math.min(capacityPct, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <Link href="/schedule" className="block mt-4 text-center text-sm text-primary hover:underline">
-            View full schedule →
-          </Link>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="card p-6">
-        <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Link
-            href="/goals"
-            className="block p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors group"
+        <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1 border border-gray-700">
+          <button
+            onClick={() => setModeAndSave("focus")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
+              mode === "focus"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-400 hover:text-white"
+            }`}
           >
-            <div className="font-medium">Create New Goal</div>
-            <div className="text-sm text-neutral-400 mt-1">
-              Define compliance or risk reduction objective
-            </div>
-          </Link>
-          <Link
-            href="/approvals"
-            className="block p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors group"
+            ⚡ Focus
+          </button>
+          <button
+            onClick={() => setModeAndSave("full")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
+              mode === "full"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-400 hover:text-white"
+            }`}
           >
-            <div className="font-medium">Review Pending Approvals</div>
-            <div className="text-sm text-neutral-400 mt-1">
-              {stats.bundles.pending_approval} bundles awaiting approval
-            </div>
-          </Link>
-          <Link
-            href="/vulnerabilities"
-            className="block p-4 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors group"
-          >
-            <div className="font-medium">Import New Assets</div>
-            <div className="text-sm text-neutral-400 mt-1">
-              Bulk import from CSV or integrate with CMDB
-            </div>
-          </Link>
+            📊 Full
+          </button>
         </div>
       </div>
+
+      {mode === "focus" ? (
+        <FocusDashboard stats={stats} />
+      ) : (
+        <FullDashboard stats={stats} riskPairs={riskPairs} />
+      )}
     </>
   );
 }
 
-function GoalHealthCard({ goal }: { goal: Goal }) {
-  const totalPatches = goal.vulnerabilities_total;
-  const patches_remaining = goal.vulnerabilities_total - goal.vulnerabilities_addressed;
-  const progressPct = totalPatches > 0 ? (goal.vulnerabilities_addressed / totalPatches) * 100 : 0;
-  
-  // Calculate velocity and projection
-  const daysRemaining = goal.target_completion_date
-    ? Math.ceil((new Date(goal.target_completion_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-    : null;
-  
-  // Assume patches were completed over the last 30 days (rough estimate)
-  const patchesPerWeek = goal.vulnerabilities_addressed > 0 ? (goal.vulnerabilities_addressed / 30) * 7 : 0;
-  const weeksNeeded = patchesPerWeek > 0 ? patches_remaining / patchesPerWeek : Infinity;
-  const weeksAvailable = daysRemaining ? daysRemaining / 7 : null;
-  
-  // Determine status
-  let status: "on-track" | "at-risk" | "behind";
-  if (weeksAvailable === null || weeksNeeded === Infinity) {
-    status = progressPct >= 50 ? "on-track" : "at-risk";
-  } else if (weeksNeeded <= weeksAvailable * 0.9) {
-    status = "on-track";
-  } else if (weeksNeeded <= weeksAvailable) {
-    status = "at-risk";
-  } else {
-    status = "behind";
-  }
+// ─── Focus Mode ──────────────────────────────────────────────────────────────
 
-  const statusColors = {
-    "on-track": "border-success bg-success/5",
-    "at-risk": "border-warning bg-warning/5",
-    "behind": "border-destructive bg-destructive/5",
-  };
-
-  const statusLabels = {
-    "on-track": "✓ On Track",
-    "at-risk": "⚠ At Risk",
-    "behind": "✗ Behind",
-  };
+function FocusDashboard({ stats }: { stats: DashboardStats }) {
+  const kevInternetFacing = Math.min(stats.vulnerabilities.kev_listed, stats.assets.internet_exposed);
+  const nextWindow = stats.windows[0];
 
   return (
-    <div className={`card p-6 border-l-4 ${statusColors[status]}`}>
-      <div className="flex justify-between items-start mb-3">
-        <h4 className="font-medium">{goal.name}</h4>
-        <span
-          className={`text-xs px-2 py-1 rounded ${
-            status === "on-track"
-              ? "bg-success/20 text-success"
-              : status === "at-risk"
-              ? "bg-warning/20 text-warning"
-              : "bg-destructive/20 text-destructive"
-          }`}
-        >
-          {statusLabels[status]}
-        </span>
-      </div>
+    <div className="space-y-6 max-w-3xl">
+      {/* Panel 1: Right Now */}
+      <RightNowPanel stats={stats} kevInternetFacing={kevInternetFacing} />
 
-      <div className="mb-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-neutral-400">Progress</span>
-          <span>{progressPct.toFixed(0)}% complete</span>
-        </div>
-        <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all ${
-              status === "on-track" ? "bg-success" : status === "at-risk" ? "bg-warning" : "bg-destructive"
-            }`}
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1 text-sm">
-        <div className="flex justify-between">
-          <span className="text-neutral-400">Patches remaining:</span>
-          <span className="font-medium">{patches_remaining}</span>
-        </div>
-        {daysRemaining !== null && (
-          <div className="flex justify-between">
-            <span className="text-neutral-400">Days remaining:</span>
-            <span className="font-medium">{daysRemaining}</span>
+      {/* Panel 2: Active Goals */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Active Goals</h3>
+        {stats.goals.length === 0 ? (
+          <div className="text-gray-400 text-sm">
+            No active goals.{" "}
+            <Link href="/goals" className="text-blue-400 hover:underline">
+              Create one →
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {stats.goals.slice(0, 4).map((goal) => {
+              const pct =
+                goal.vulnerabilities_total > 0
+                  ? Math.round((goal.vulnerabilities_addressed / goal.vulnerabilities_total) * 100)
+                  : 0;
+              return (
+                <div key={goal.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <Link
+                      href={`/goals/${goal.id}`}
+                      className="text-sm font-medium text-white hover:text-blue-300 transition-colors"
+                    >
+                      {goal.name}
+                    </Link>
+                    <span className="text-sm text-gray-400">
+                      {goal.vulnerabilities_addressed}/{goal.vulnerabilities_total} vulns · {pct}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        pct >= 80
+                          ? "bg-green-500"
+                          : pct >= 40
+                          ? "bg-blue-500"
+                          : "bg-yellow-500"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {goal.target_completion_date && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Target:{" "}
+                      {new Date(goal.target_completion_date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
-        {patchesPerWeek > 0 && (
-          <div className="flex justify-between">
-            <span className="text-neutral-400">Velocity:</span>
-            <span className="font-medium">{patchesPerWeek.toFixed(1)} patches/week</span>
-          </div>
+        {stats.goals.length > 4 && (
+          <Link href="/goals" className="mt-4 block text-sm text-blue-400 hover:underline">
+            View all {stats.goals.length} goals →
+          </Link>
         )}
       </div>
 
-      {weeksNeeded !== Infinity && weeksAvailable !== null && (
-        <div className="mt-3 pt-3 border-t border-neutral-700 text-xs text-neutral-400">
-          {status === "on-track" && (
-            <>Need {weeksNeeded.toFixed(1)} weeks, have {weeksAvailable.toFixed(1)} weeks</>
-          )}
-          {status === "at-risk" && (
-            <>Tight timeline: {weeksNeeded.toFixed(1)} weeks needed, {weeksAvailable.toFixed(1)} available</>
-          )}
-          {status === "behind" && (
-            <>Need {weeksNeeded.toFixed(1)} weeks, only {weeksAvailable.toFixed(1)} available — increase velocity</>
-          )}
-        </div>
-      )}
-
-      <Link href={`/goals/${goal.id}`} className="block mt-3 text-sm text-primary hover:underline">
-        View details →
-      </Link>
+      {/* Panel 3: Next Window */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Next Maintenance Window</h3>
+        {nextWindow ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white font-medium">{nextWindow.name}</p>
+              <p className="text-gray-400 text-sm mt-1">
+                {new Date(nextWindow.start_time).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}{" "}
+                ·{" "}
+                {new Date(nextWindow.start_time).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                · {nextWindow.duration_hours}h window
+              </p>
+              <p className="text-gray-500 text-xs mt-1 capitalize">{nextWindow.environment} environment</p>
+            </div>
+            <Link
+              href="/schedule"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+            >
+              View Schedule →
+            </Link>
+          </div>
+        ) : (
+          <div className="text-gray-400 text-sm">
+            No upcoming maintenance windows.{" "}
+            <Link href="/schedule" className="text-blue-400 hover:underline">
+              Schedule one →
+            </Link>
+          </div>
+        )}
+        {stats.bundles.pending_approval > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-700 flex items-center justify-between">
+            <p className="text-sm text-yellow-300">
+              ⏳ {stats.bundles.pending_approval} bundle{stats.bundles.pending_approval !== 1 ? "s" : ""} pending approval
+            </p>
+            <Link href="/approvals" className="text-sm text-blue-400 hover:underline">
+              Review →
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function RiskBadge({ label, type }: { label: string; type: "severity" | "critical" | "warning" | "info" }) {
-  const colors = {
-    severity: "bg-neutral-700 text-neutral-300",
-    critical: "bg-destructive/20 text-destructive border border-destructive/30",
-    warning: "bg-warning/20 text-warning",
-    info: "bg-primary/20 text-primary",
-  };
+function RightNowPanel({
+  stats,
+  kevInternetFacing,
+}: {
+  stats: DashboardStats;
+  kevInternetFacing: number;
+}) {
+  if (kevInternetFacing > 0) {
+    return (
+      <div className="bg-red-950/60 border border-red-700/60 rounded-xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="text-3xl">🚨</div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-red-300 mb-1">Critical Action Required</h3>
+            <p className="text-white text-base">
+              <span className="font-bold text-red-200 text-2xl">{kevInternetFacing}</span>{" "}
+              KEV {kevInternetFacing === 1 ? "vulnerability" : "vulnerabilities"} on internet-facing assets
+            </p>
+            <p className="text-red-300/80 text-sm mt-1">
+              These are actively exploited in the wild. CISA BOD 22-01 mandates remediation.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <Link
+                href="/vulnerabilities?filter=kev"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Patch These Now →
+              </Link>
+              <Link
+                href="/goals/new"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+              >
+                Create Goal
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  return <span className={`text-xs px-2 py-0.5 rounded ${colors[type]}`}>{label}</span>;
+  if (stats.vulnerabilities.critical > 0) {
+    return (
+      <div className="bg-orange-950/60 border border-orange-700/60 rounded-xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="text-3xl">⚠️</div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-orange-300 mb-1">Critical Vulnerabilities</h3>
+            <p className="text-white text-base">
+              <span className="font-bold text-orange-200 text-2xl">{stats.vulnerabilities.critical}</span>{" "}
+              critical{" "}
+              {stats.vulnerabilities.critical === 1 ? "vulnerability" : "vulnerabilities"} unpatched
+            </p>
+            <p className="text-orange-300/80 text-sm mt-1">
+              {stats.assets.internet_exposed > 0
+                ? `${stats.assets.internet_exposed} of your assets are internet-exposed.`
+                : "Review your asset exposure."}
+            </p>
+            <div className="mt-4">
+              <Link
+                href="/vulnerabilities?severity=CRITICAL"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Review Criticals →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-green-950/50 border border-green-700/40 rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="text-3xl">✅</div>
+        <div className="flex-1">
+          <h3 className="text-lg font-bold text-green-300 mb-1">Good Standing</h3>
+          <p className="text-white text-base">No critical actions required right now.</p>
+          <p className="text-green-300/70 text-sm mt-1">
+            {stats.vulnerabilities.high > 0
+              ? `${stats.vulnerabilities.high} high-severity vulnerabilities remain — keep them moving.`
+              : `${stats.vulnerabilities.total} vulnerabilities tracked. Stay proactive.`}
+          </p>
+          <div className="mt-4">
+            <Link
+              href="/vulnerabilities"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+            >
+              View All Vulnerabilities →
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Full Mode ────────────────────────────────────────────────────────────────
+
+function FullDashboard({ stats, riskPairs }: { stats: DashboardStats; riskPairs: RiskPair[] }) {
+  const kevInternetFacing = Math.min(stats.vulnerabilities.kev_listed, stats.assets.internet_exposed);
+  const bod2201Deadline = new Date("2026-05-15");
+  const daysToDeadline = Math.ceil((bod2201Deadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+  return (
+    <>
+      {/* Top stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label="Total Vulnerabilities"
+          value={stats.vulnerabilities.total.toLocaleString()}
+          sub={`${stats.vulnerabilities.critical} critical · ${stats.vulnerabilities.high} high`}
+          href="/vulnerabilities"
+        />
+        <StatCard
+          label="Total Assets"
+          value={stats.assets.total.toLocaleString()}
+          sub={`${stats.assets.internet_exposed} internet-exposed`}
+          href="/assets"
+        />
+        <StatCard
+          label="Risk Score"
+          value={stats.risk_score.total.toLocaleString()}
+          sub={
+            stats.risk_score.trend === "down"
+              ? `↓ ${stats.risk_score.reduction_7d}% (7d)`
+              : stats.risk_score.trend === "up"
+              ? `↑ ${stats.risk_score.reduction_7d}% (7d)`
+              : "Stable (7d)"
+          }
+          subColor={
+            stats.risk_score.trend === "down"
+              ? "text-green-400"
+              : stats.risk_score.trend === "up"
+              ? "text-red-400"
+              : "text-gray-400"
+          }
+        />
+        <StatCard
+          label="Bundles Scheduled"
+          value={stats.bundles.scheduled.toString()}
+          sub={
+            stats.bundles.pending_approval > 0
+              ? `${stats.bundles.pending_approval} pending approval`
+              : "All approved"
+          }
+          href="/approvals"
+        />
+      </div>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Critical Path */}
+        <div className="card p-6">
+          <h3 className="text-sm font-medium text-neutral-400 mb-3">Critical Path</h3>
+          <div className="mb-2">
+            <span className="text-3xl font-bold text-destructive">{kevInternetFacing}</span>
+            <span className="text-neutral-400 ml-2 text-sm">KEV vulns on internet-facing assets</span>
+          </div>
+          <div className="text-sm text-warning mt-2">
+            ⚠ BOD 22-01 deadline in <strong>{daysToDeadline} days</strong>
+          </div>
+          <Link
+            href="/vulnerabilities?filter=kev"
+            className="mt-4 block text-sm text-blue-400 hover:underline"
+          >
+            View KEV vulnerabilities →
+          </Link>
+        </div>
+
+        {/* KEV breakdown */}
+        <div className="card p-6">
+          <h3 className="text-sm font-medium text-neutral-400 mb-3">Vulnerability Breakdown</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Critical", count: stats.vulnerabilities.critical, color: "text-red-400" },
+              { label: "High", count: stats.vulnerabilities.high, color: "text-orange-400" },
+              { label: "Medium", count: stats.vulnerabilities.medium, color: "text-yellow-400" },
+              { label: "Low", count: stats.vulnerabilities.low, color: "text-green-400" },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="text-center">
+                <div className={`text-2xl font-bold ${color}`}>{count}</div>
+                <div className="text-xs text-gray-400">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Goals */}
+      {stats.goals.length > 0 && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-neutral-400">Active Goals</h3>
+            <Link href="/goals" className="text-xs text-blue-400 hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {stats.goals.slice(0, 3).map((goal) => {
+              const pct =
+                goal.vulnerabilities_total > 0
+                  ? Math.round((goal.vulnerabilities_addressed / goal.vulnerabilities_total) * 100)
+                  : 0;
+              return (
+                <div key={goal.id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <Link href={`/goals/${goal.id}`} className="text-white hover:text-blue-300">
+                      {goal.name}
+                    </Link>
+                    <span className="text-gray-400">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-700 rounded-full">
+                    <div
+                      className={`h-full rounded-full ${pct >= 80 ? "bg-green-500" : "bg-blue-500"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Top risks table */}
+      {riskPairs.length > 0 && (
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-neutral-400">Top Risk Pairs</h3>
+            <Link href="/vulnerabilities" className="text-xs text-blue-400 hover:underline">
+              View all →
+            </Link>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-700">
+                <th className="text-left pb-2 font-medium">Vulnerability</th>
+                <th className="text-left pb-2 font-medium">Asset</th>
+                <th className="text-right pb-2 font-medium">Risk</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {riskPairs.slice(0, 5).map((pair) => (
+                <tr key={`${pair.vulnerability_id}-${pair.asset_id}`} className="hover:bg-gray-800/50">
+                  <td className="py-2 pr-4">
+                    <div className="text-white font-medium truncate max-w-[200px]">
+                      {pair.vulnerability_identifier}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate max-w-[200px]">
+                      {pair.vulnerability_title}
+                    </div>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="text-gray-300 truncate max-w-[150px]">{pair.asset_name}</div>
+                    <div className="text-xs text-gray-500">{pair.asset_environment}</div>
+                  </td>
+                  <td className="py-2 text-right">
+                    <span
+                      className={`font-bold text-base ${
+                        pair.risk_score >= 80
+                          ? "text-red-400"
+                          : pair.risk_score >= 60
+                          ? "text-orange-400"
+                          : "text-yellow-400"
+                      }`}
+                    >
+                      {pair.risk_score}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Maintenance windows */}
+      {stats.windows.length > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-neutral-400">Upcoming Maintenance Windows</h3>
+            <Link href="/schedule" className="text-xs text-blue-400 hover:underline">
+              Schedule →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {stats.windows.map((w) => (
+              <div key={w.id} className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+                <div className="font-medium text-white text-sm">{w.name}</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {new Date(w.start_time).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}{" "}
+                  · {w.duration_hours}h · {w.environment}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  subColor = "text-gray-400",
+  href,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  subColor?: string;
+  href?: string;
+}) {
+  const content = (
+    <div className="card p-5 h-full">
+      <p className="text-xs font-medium text-neutral-400 mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
+      {sub && <p className={`text-xs mt-1 ${subColor}`}>{sub}</p>}
+    </div>
+  );
+  return href ? (
+    <Link href={href} className="block hover:opacity-90 transition-opacity">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
 }
 
 function DashboardSkeleton() {
   return (
-    <>
-      <div className="skeleton h-32 mb-8 rounded-lg" />
-      <div className="skeleton h-48 mb-8 rounded-lg" />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="skeleton h-96 rounded-lg" />
-        <div className="skeleton h-96 rounded-lg" />
-      </div>
-    </>
+    <div className="space-y-6 animate-pulse">
+      <div className="h-8 bg-gray-700 rounded w-1/4" />
+      <div className="h-40 bg-gray-800 rounded-xl" />
+      <div className="h-48 bg-gray-800 rounded-xl" />
+      <div className="h-32 bg-gray-800 rounded-xl" />
+    </div>
   );
 }

@@ -423,6 +423,16 @@ export const rulesApi = {
     bundle_id?: string;
   }) =>
     apiCall<any>("/rules/evaluate", { method: "POST", body: request }),
+
+  parseNlp: (text: string) =>
+    apiCall<any>("/rules/parse-nlp", { method: "POST", body: { text } }),
+};
+
+export const settingsApi = {
+  get: () => apiCall<any>("/settings"),
+  update: (settings: any) => apiCall<any>("/settings", { method: "PATCH", body: { settings } }),
+  testConnection: (integration: string, config: Record<string, string>) =>
+    apiCall<any>("/settings/test-connection", { method: "POST", body: { integration, config } }),
 };
 
 export { apiCall };

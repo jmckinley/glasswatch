@@ -2,7 +2,7 @@
 Tenant model - Multi-tenant isolation
 """
 
-from sqlalchemy import Column, String, DateTime, JSON, Boolean
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship

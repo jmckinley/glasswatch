@@ -20,6 +20,25 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+# Patch SQLite compiler to handle PostgreSQL-specific types
+# (JSONB, ARRAY, UUID) by substituting SQLite-compatible equivalents.
+# This is required because the models were written for PostgreSQL but
+# tests use in-memory SQLite for speed.
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler as _SQLiteTypeCompiler
+
+def _visit_JSONB(self, type_, **kw):
+    return "TEXT"
+
+def _visit_ARRAY(self, type_, **kw):
+    return "TEXT"
+
+def _visit_UUID(self, type_, **kw):
+    return "TEXT"
+
+_SQLiteTypeCompiler.visit_JSONB = _visit_JSONB
+_SQLiteTypeCompiler.visit_ARRAY = _visit_ARRAY
+_SQLiteTypeCompiler.visit_UUID = _visit_UUID
+
 from backend.db.base import Base
 from backend.db.session import get_db
 from backend.main import app
@@ -32,8 +51,14 @@ from backend.models.asset_vulnerability import AssetVulnerability
 from backend.core.auth_workos import create_access_token
 
 
-# Test database URL - use in-memory SQLite for speed
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Test database URL
+# Use PostgreSQL test database if available, else fall back to SQLite.
+# Note: SQLite doesn't support JSONB, so some models need to use JSON for tests.
+import os as _os
+TEST_DATABASE_URL = _os.environ.get(
+    "TEST_DATABASE_URL",
+    "sqlite+aiosqlite:///:memory:"
+)
 
 
 @pytest.fixture(scope="session")

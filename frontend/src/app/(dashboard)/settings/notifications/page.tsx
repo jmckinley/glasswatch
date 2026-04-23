@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { apiCall } from "@/lib/api";
+import { apiCall, settingsApi } from "@/lib/api";
 
 const DIGEST_FREQUENCIES = [
   { value: "realtime", label: "Real-time" },
@@ -18,12 +18,19 @@ export default function NotificationsSettingsPage() {
     notifications: {
       email_enabled: true,
       slack_enabled: false,
+      slack_webhook_url: "",
       slack_channel: "",
+      teams_enabled: false,
+      teams_webhook_url: "",
       digest_frequency: "daily",
       critical_alerts: true,
     },
   });
   const [saveMessage, setSaveMessage] = useState("");
+  const [slackTestResult, setSlackTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [teamsTestResult, setTeamsTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingSlack, setTestingSlack] = useState(false);
+  const [testingTeams, setTestingTeams] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -158,46 +165,100 @@ export default function NotificationsSettingsPage() {
 
         {/* Slack Notifications */}
         <div className="pb-6 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Slack Integration
-          </h3>
-          
+          <h3 className="text-lg font-semibold text-white mb-4">Slack Integration</h3>
           <div className="space-y-4">
             <label className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-white">Enable Slack Notifications</div>
-                <div className="text-sm text-gray-400">
-                  Send alerts to Slack channel
-                </div>
+                <div className="text-sm text-gray-400">Send alerts to Slack channel</div>
               </div>
-              <input
-                type="checkbox"
-                checked={settings.notifications.slack_enabled}
-                onChange={(e) =>
-                  updateNotifications("slack_enabled", e.target.checked)
-                }
-                className="w-5 h-5 rounded text-blue-500"
-              />
+              <input type="checkbox" checked={settings.notifications.slack_enabled}
+                onChange={(e) => updateNotifications("slack_enabled", e.target.checked)}
+                className="w-5 h-5 rounded text-blue-500" />
             </label>
-
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Slack Channel
-              </label>
-              <input
-                type="text"
-                value={settings.notifications.slack_channel || ""}
-                onChange={(e) =>
-                  updateNotifications("slack_channel", e.target.value)
-                }
+              <label className="block text-sm font-medium text-gray-300 mb-2">Webhook URL</label>
+              <input type="url" value={(settings.notifications as any).slack_webhook_url || ""}
+                onChange={(e) => updateNotifications("slack_webhook_url", e.target.value)}
+                disabled={!settings.notifications.slack_enabled}
+                placeholder="https://hooks.slack.com/services/..."
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Channel Name</label>
+              <input type="text" value={settings.notifications.slack_channel || ""}
+                onChange={(e) => updateNotifications("slack_channel", e.target.value)}
                 disabled={!settings.notifications.slack_enabled}
                 placeholder="#security-alerts"
-                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
-              <p className="text-sm text-gray-400 mt-1">
-                Channel name (e.g., #security-alerts)
-              </p>
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
             </div>
+            {settings.notifications.slack_enabled && (settings.notifications as any).slack_webhook_url && (
+              <div>
+                <button disabled={testingSlack}
+                  onClick={async () => {
+                    setTestingSlack(true);
+                    try {
+                      const r = await settingsApi.testConnection("slack", { webhook_url: (settings.notifications as any).slack_webhook_url });
+                      setSlackTestResult(r);
+                    } catch { setSlackTestResult({ success: false, message: "Request failed" }); }
+                    finally { setTestingSlack(false); }
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg disabled:opacity-50">
+                  {testingSlack ? "Testing..." : "Send Test Message"}
+                </button>
+                {slackTestResult && (
+                  <div className={`mt-2 p-2 rounded text-xs ${slackTestResult.success ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
+                    {slackTestResult.success ? "✓" : "✗"} {slackTestResult.message}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Microsoft Teams */}
+        <div className="pb-6 border-b border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Microsoft Teams</h3>
+          <div className="space-y-4">
+            <label className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-white">Enable Teams Notifications</div>
+                <div className="text-sm text-gray-400">Send alerts to a Teams channel</div>
+              </div>
+              <input type="checkbox" checked={(settings.notifications as any).teams_enabled || false}
+                onChange={(e) => updateNotifications("teams_enabled", e.target.checked)}
+                className="w-5 h-5 rounded text-blue-500" />
+            </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Incoming Webhook URL</label>
+              <input type="url" value={(settings.notifications as any).teams_webhook_url || ""}
+                onChange={(e) => updateNotifications("teams_webhook_url", e.target.value)}
+                disabled={!(settings.notifications as any).teams_enabled}
+                placeholder="https://yourcompany.webhook.office.com/..."
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+              <p className="text-xs text-gray-500 mt-1">Create via Teams channel → Connectors → Incoming Webhook</p>
+            </div>
+            {(settings.notifications as any).teams_enabled && (settings.notifications as any).teams_webhook_url && (
+              <div>
+                <button disabled={testingTeams}
+                  onClick={async () => {
+                    setTestingTeams(true);
+                    try {
+                      const r = await settingsApi.testConnection("teams", { webhook_url: (settings.notifications as any).teams_webhook_url });
+                      setTeamsTestResult(r);
+                    } catch { setTeamsTestResult({ success: false, message: "Request failed" }); }
+                    finally { setTestingTeams(false); }
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg disabled:opacity-50">
+                  {testingTeams ? "Testing..." : "Send Test Message"}
+                </button>
+                {teamsTestResult && (
+                  <div className={`mt-2 p-2 rounded text-xs ${teamsTestResult.success ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
+                    {teamsTestResult.success ? "✓" : "✗"} {teamsTestResult.message}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
