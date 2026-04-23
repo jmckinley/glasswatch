@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { vulnerabilitiesApi } from "@/lib/api";
 
@@ -49,14 +50,17 @@ const SEVERITY_BG: Record<string, string> = {
 };
 
 export default function VulnerabilitiesPage() {
+  const searchParams = useSearchParams();
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
   const [stats, setStats] = useState<VulnStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    severity: "",
-    kev_listed: false,
-    search: "",
-  });
+
+  // Pre-populate filters from URL query params (?filter=kev, ?severity=CRITICAL)
+  const [filters, setFilters] = useState(() => ({
+    severity: searchParams.get("severity") || "",
+    kev_listed: searchParams.get("filter") === "kev",
+    search: searchParams.get("search") || "",
+  }));
   const [pagination, setPagination] = useState({
     skip: 0,
     limit: 20,
@@ -128,6 +132,25 @@ export default function VulnerabilitiesPage() {
             <div className="text-2xl font-bold text-success">{stats.patches_available}</div>
             <div className="text-sm text-neutral-400">Patches Available</div>
           </div>
+        </div>
+      )}
+
+      {/* Active filter banner */}
+      {(filters.kev_listed || filters.severity) && (
+        <div className="flex items-center gap-3 px-4 py-2.5 mb-4 bg-blue-950/60 border border-blue-700/50 rounded-lg text-sm">
+          <span className="text-blue-300 font-medium">🔍 Filtered:</span>
+          {filters.kev_listed && (
+            <span className="px-2 py-0.5 bg-red-900/60 border border-red-700/50 text-red-300 rounded text-xs font-semibold">KEV Listed Only</span>
+          )}
+          {filters.severity && (
+            <span className="px-2 py-0.5 bg-orange-900/60 border border-orange-700/50 text-orange-300 rounded text-xs font-semibold">{filters.severity}</span>
+          )}
+          <button
+            onClick={() => setFilters({ severity: "", kev_listed: false, search: "" })}
+            className="ml-auto text-xs text-neutral-400 hover:text-white transition-colors"
+          >
+            Clear filters ✕
+          </button>
         </div>
       )}
 
