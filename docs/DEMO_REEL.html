@@ -52,14 +52,9 @@
     pointer-events: all;
   }
 
-  /* ── PROGRESS BAR ───────────────────────────────────────── */
+  /* ── PROGRESS BAR (hidden) ─────────────────────────────── */
   #progress-bar {
-    position: fixed; bottom: 76px; left: 0;
-    height: 3px; width: 0%;
-    background: var(--accent);
-    z-index: 1000;
-    transition: width linear;
-    box-shadow: 0 0 8px var(--accent);
+    display: none;
   }
 
   /* ── NARRATION BAR ──────────────────────────────────────── */
@@ -96,9 +91,9 @@
     line-height: 1.3;
   }
   #narration-text {
-    font-size: 14px;
-    color: #94a3b8;
-    line-height: 1.55;
+    font-size: 16px;
+    color: #cbd5e1;
+    line-height: 1.6;
     flex: 1;
   }
 
