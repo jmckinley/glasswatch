@@ -122,19 +122,44 @@ Click **Try Demo** on the login page — you should land on a dashboard with sam
 
 ---
 
-## Connecting Your Scanners
+## Supported Integrations
 
-Once the app is running, point your scanner to send webhooks:
-
-| Scanner | Webhook URL |
+### Vulnerability Scanners
+| Scanner | How to connect |
 |---|---|
-| Tenable | `https://your-domain/api/v1/webhooks/tenable` |
-| Qualys | `https://your-domain/api/v1/webhooks/qualys` |
-| Rapid7 | `https://your-domain/api/v1/webhooks/rapid7` |
+| **Tenable** (Nessus / Tenable.io) | Add API keys in Settings → Integrations. Webhook: `POST /api/v1/webhooks/tenable` |
+| **Qualys** | Add credentials + platform URL in Settings → Integrations. Webhook: `POST /api/v1/webhooks/qualys` |
+| **Rapid7 InsightVM** | Add host URL + API key in Settings → Integrations. Webhook: `POST /api/v1/webhooks/rapid7` |
+| **CSV Import** | Upload any scanner's CSV export at `/import` — no scanner account needed |
 
-Add your `X-Webhook-Secret` from **Settings → Integrations** to the scanner webhook config.
+For scanner webhooks, set `X-Webhook-Secret` (from Settings → Integrations) as the secret header in your scanner's webhook config.
 
-No scanner? Import vulnerability and asset data via CSV at `/import`.
+### Ticketing & ITSM
+| System | How to connect |
+|---|---|
+| **Jira** | Add Jira URL + API token in Settings → Integrations. Bidirectional — bundles create issues, closing the issue marks the patch done. |
+| **ServiceNow** | Add instance URL + credentials. Webhook: `POST /api/v1/webhooks/servicenow` |
+
+### Notifications
+| System | How to connect |
+|---|---|
+| **Slack** | Create an Incoming Webhook in Slack, paste URL in Settings → Notifications → Slack Webhook |
+| **Microsoft Teams** | Create a connector in Teams, paste the webhook URL in Settings → Notifications → Teams Webhook |
+| **Email (Resend)** | Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` env vars. Configure alert rules in Settings → Alert Rules |
+
+### Authentication
+| System | How to connect |
+|---|---|
+| **Google OAuth** | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`. Callback: `/auth/callback?provider=google` |
+| **GitHub OAuth** | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`. Callback: `/auth/callback?provider=github` |
+| **WorkOS SSO** | `WORKOS_API_KEY` + `WORKOS_CLIENT_ID`. Enterprise SAML/OIDC (Okta, Azure AD, Google Workspace) |
+| **Email/Password** | Built-in — no config required |
+
+### AI & Intelligence
+| System | How to connect |
+|---|---|
+| **Anthropic Claude** | Set `ANTHROPIC_API_KEY`. Powers AI assistant and NLP rule creation |
+| **NVD / CISA KEV / EPSS** | Automatic — no config needed. CVE enrichment pulled from public APIs |
 
 ---
 

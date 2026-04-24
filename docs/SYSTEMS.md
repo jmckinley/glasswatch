@@ -4,6 +4,57 @@ Technical reference for integrators, security engineers, and platform teams.
 
 ---
 
+## Supported Integrations
+
+Glasswatch integrates with the following external systems. Each category below links to the detailed configuration section.
+
+### Vulnerability Scanners
+| System | Protocol | Auth method | Section |
+|---|---|---|---|
+| **Tenable** (Nessus / Tenable.io) | Inbound webhook | X-Webhook-Secret | [Tenable](#tenable) |
+| **Qualys** | Inbound webhook | X-Webhook-Secret | [Qualys](#qualys) |
+| **Rapid7 InsightVM** | Inbound webhook | X-Webhook-Secret | [Rapid7](#rapid7) |
+| **CSV Import** | File upload | Bearer JWT | `/api/v1/import/vulnerabilities/csv` |
+
+### Ticketing & Change Management
+| System | Protocol | Auth method |
+|---|---|---|
+| **Jira** | Bidirectional webhook | API token + basic auth |
+| **ServiceNow** | Outbound webhook | Username + password |
+
+### Notifications & Messaging
+| System | Protocol | Config location |
+|---|---|---|
+| **Slack** | Outbound webhook | Settings → Notifications → Slack Webhook |
+| **Microsoft Teams** | Outbound webhook | Settings → Notifications → Teams Webhook |
+| **Email (Resend)** | HTTPS API | `RESEND_API_KEY` env var |
+| **SMTP (fallback)** | SMTP | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` env vars |
+
+### Authentication & Identity
+| System | Protocol | Env vars |
+|---|---|---|
+| **Google OAuth** | OAuth 2.0 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| **GitHub OAuth** | OAuth 2.0 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
+| **WorkOS SSO** | SAML/OIDC | `WORKOS_API_KEY`, `WORKOS_CLIENT_ID` |
+| **Email/Password** | JWT + bcrypt | Built-in, no config |
+
+### AI & Intelligence
+| System | Protocol | Env vars |
+|---|---|---|
+| **Anthropic Claude** | HTTPS API | `ANTHROPIC_API_KEY` |
+| **NVD (NIST)** | HTTPS API | Auto (no key required) |
+| **CISA KEV** | HTTPS API | Auto (no key required) |
+| **EPSS** | HTTPS API | Auto (no key required) |
+
+### Data & Infrastructure
+| System | Protocol | Env vars |
+|---|---|---|
+| **PostgreSQL** | asyncpg | `DATABASE_URL` |
+| **Redis** | redis-py | `REDIS_URL` |
+| **Sentry** | HTTPS SDK | `SENTRY_DSN` |
+
+---
+
 ## Base URLs
 
 | Environment | URL |

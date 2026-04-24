@@ -53,9 +53,58 @@ Glasswatch converts vulnerability chaos into organized, evidence-backed patch op
 |---|---|
 | Frontend | Next.js 15, TypeScript, Tailwind CSS |
 | Backend | FastAPI (Python 3.11), async SQLAlchemy |
-| Database | PostgreSQL (Railway managed) |
+| Database | PostgreSQL + Redis |
 | Auth | JWT + Google/GitHub OAuth + WorkOS SSO |
-| Hosting | Railway (backend + frontend + DB) |
+| Hosting | Railway (backend + frontend + DB) or self-hosted Docker |
+
+---
+
+## Integrations
+
+### Vulnerability Scanners
+| Scanner | Integration type |
+|---|---|
+| **Tenable** (Nessus / Tenable.io) | Inbound webhook + API key auth |
+| **Qualys** | Inbound webhook + credential auth |
+| **Rapid7 InsightVM** | Inbound webhook + API key auth |
+| **CSV Import** | Manual upload at `/import` (any scanner export) |
+
+### Ticketing & ITSM
+| System | Integration type |
+|---|---|
+| **Jira** | Bidirectional webhook — bundle → issue, issue closed → bundle patched |
+| **ServiceNow** | Webhook integration for change management |
+
+### Notifications & Messaging
+| System | Integration type |
+|---|---|
+| **Slack** | Incoming webhook for patch alerts, SLA warnings, bundle events |
+| **Microsoft Teams** | Incoming webhook connector |
+| **Email (Resend)** | Transactional email — invite links, weekly digest, alert notifications |
+| **SMTP** | Fallback email delivery |
+
+### Authentication & Identity
+| System | Integration type |
+|---|---|
+| **Google OAuth** | Login with Google (OAuth 2.0) |
+| **GitHub OAuth** | Login with GitHub |
+| **WorkOS SSO** | Enterprise SAML/OIDC (Okta, Azure AD, Google Workspace) |
+| **Email/Password** | Native auth with bcrypt hashing |
+
+### AI & Intelligence
+| System | Integration type |
+|---|---|
+| **Anthropic Claude** | AI assistant, NLP rule creation, risk analysis |
+| **NVD (NIST)** | CVE enrichment — CVSS scores, description, references |
+| **CISA KEV** | Known Exploited Vulnerabilities feed |
+| **EPSS** | Exploit Prediction Scoring System for prioritization |
+
+### Operations
+| System | Integration type |
+|---|---|
+| **Sentry** | Error tracking and alerting |
+| **PostgreSQL** | Primary data store |
+| **Redis** | Caching, rate limiting, session management |
 
 ---
 
