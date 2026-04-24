@@ -21,6 +21,19 @@ from backend.db.base import Base
 import backend.db.models  # noqa: F401 — register all models on Base.metadata
 from backend.services.cache_service import cache_service
 
+import os
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=0.1,
+        environment=os.getenv("ENV", "development"),
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

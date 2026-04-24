@@ -45,6 +45,13 @@ const SETTINGS_SECTIONS = [
     name: "Alert Rules",
     description: "Configure which events trigger Slack, email, and in-app alerts",
   },
+  {
+    id: "team",
+    href: "/settings/team",
+    icon: "👥",
+    name: "Team",
+    description: "Manage team members, roles, and send invitations",
+  },
 ];
 
 export default function SettingsPage() {
