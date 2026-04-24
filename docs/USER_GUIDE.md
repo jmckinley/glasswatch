@@ -1,828 +1,549 @@
 # Glasswatch User Guide
 
-**Transform vulnerability chaos into organized patch operations.**
+**Version:** Alpha · **Last updated:** April 2026
 
-Welcome to Glasswatch, the AI-powered patch decision platform that converts business objectives into optimized patch schedules.
+---
+
+Glasswatch is a patch decision platform for security and IT operations teams. It takes vulnerability data from your scanners and converts it into a prioritized, scheduled patching plan — one grounded in business objectives rather than raw CVE counts.
+
+This guide covers every major feature. It assumes you have access to Glasswatch and are comfortable with basic security concepts (CVEs, CVSS scores, patch management). It does not assume any developer knowledge.
 
 ---
 
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
-2. [Dashboard Overview](#dashboard-overview)
-3. [Managing Vulnerabilities](#managing-vulnerabilities)
-4. [Asset Management](#asset-management)
-5. [Creating Goals](#creating-goals)
+2. [Dashboard](#dashboard)
+3. [Vulnerabilities](#vulnerabilities)
+4. [Assets](#assets)
+5. [Goals](#goals)
 6. [Patch Bundles](#patch-bundles)
-7. [Approval Workflows](#approval-workflows)
-8. [Patch Simulator](#patch-simulator)
-9. [Team Collaboration](#team-collaboration)
-10. [Activity Feed & Notifications](#activity-feed--notifications)
-11. [Best Practices](#best-practices)
+7. [Maintenance Windows](#maintenance-windows)
+8. [Rules](#rules)
+9. [AI Assistant](#ai-assistant)
+10. [Notifications](#notifications)
+11. [Compliance & Reporting](#compliance--reporting)
+12. [Settings](#settings)
+13. [Importing Data](#importing-data)
 
 ---
 
 ## Getting Started
 
-### First Login
+### Trying the Demo
 
-#### Production (SSO)
-1. Navigate to your organization's Glasswatch URL
-2. Click "Login with SSO"
-3. Enter your organization domain or ID
-4. Authenticate through your identity provider (WorkOS SSO)
-5. Grant necessary permissions
-6. You'll be redirected to the Glasswatch dashboard
+If you're evaluating Glasswatch or just getting oriented, the fastest way in is the demo.
 
-#### Demo Mode (Development/Testing)
-1. Navigate to the Glasswatch instance
-2. Click "Demo Login" (appears when WorkOS is not configured)
-3. Automatically logged in as demo user with full access
-4. Explore all features with sample data
+Go to [https://frontend-production-ef3e.up.railway.app](https://frontend-production-ef3e.up.railway.app) and click **Try Demo**. No sign-up required. You'll land in a fully functional environment loaded with synthetic assets, vulnerabilities, goals, and bundles. Every feature works — create goals, approve bundles, write rules, ask the AI assistant questions. Demo data resets periodically.
 
-### User Roles
+### Logging In to a Real Deployment
 
-| Role | Permissions |
-|------|-------------|
-| **Viewer** | Read-only access to dashboards and reports |
-| **Analyst** | View + Comment + Create goals/bundles (no execution) |
-| **Operator** | Analyst + Execute bundles + Manage assets |
-| **Admin** | Full access including user management and configuration |
+If your organization has deployed Glasswatch, navigate to your instance URL. You'll see options for:
 
-### Initial Setup Checklist
+- **Email and password** — works out of the box, no additional configuration needed
+- **Google or GitHub OAuth** — available if your admin has configured those integrations
+- **SSO (WorkOS)** — for enterprise deployments with a configured identity provider; click "Login with SSO" and enter your organization domain
 
-- [ ] Complete your user profile
-- [ ] Set notification preferences
-- [ ] Review existing assets (or import your infrastructure)
-- [ ] Familiarize yourself with the dashboard
-- [ ] Explore sample vulnerabilities and their risk scores
-- [ ] Try creating a simple goal
+### Key Concepts
+
+Before diving into the interface, a few terms worth knowing:
+
+**Vulnerability** — A specific CVE (or similar identifier) that affects one or more of your assets. Glasswatch ingests these from scanner webhooks or CSV imports and scores each one using 8 factors.
+
+**Asset** — A system in your infrastructure: a server, container, database, cloud instance, or application. Assets have metadata like environment (production vs. staging), criticality, and exposure level (internet-facing vs. internal).
+
+**Goal** — A business-level objective that drives patching. "Patch all CISA KEV vulnerabilities on production systems by June 30" is a goal. Glasswatch uses goals to automatically generate a patching plan.
+
+**Bundle** — A group of patches scheduled for deployment in a single maintenance window. Bundles are the output of the goal optimizer. They move through a lifecycle: Draft → Pending Approval → Approved → In Progress → Completed.
+
+**Rule** — A governance policy that controls when and how patches can be deployed. "No deployments in production on Fridays after 3pm" is a rule. You write these in plain English.
+
+**Maintenance Window** — An approved time slot for running patches. Bundles are scheduled to run within windows.
 
 ---
 
-## Dashboard Overview
+## Dashboard
 
-The dashboard provides a real-time view of your patch management status.
+The dashboard is your starting point. It surfaces the information that matters most — where your biggest risks are, what's in flight, and what needs your attention today.
 
-### Key Widgets
+### Focus Mode and Full Mode
 
-#### Vulnerability Overview
-- **Total Vulnerabilities**: All known vulnerabilities across your assets
-- **Severity Distribution**: Breakdown by CRITICAL, HIGH, MEDIUM, LOW
-- **KEV Listed**: CISA Known Exploited Vulnerabilities
-- **Exploits Available**: Vulnerabilities with public exploits
-- **Recent (7 days)**: Newly published vulnerabilities
+The dashboard has two display modes. **Focus Mode** strips away lower-priority information and shows only what requires action: critical unpatched vulnerabilities, bundles awaiting approval, and overdue SLA items. It's useful for a quick morning check.
 
-#### Asset Health
-- **Total Assets**: All infrastructure assets under management
-- **By Environment**: Production, Staging, Development breakdown
-- **Risk Score Distribution**: Assets by risk level
-- **Internet-Facing**: Public-facing assets requiring priority
+**Full Mode** shows the complete picture: all vulnerability counts by severity, asset health across environments, goal progress, and recent bundle activity. Toggle between modes using the view selector at the top right.
 
-#### Patch Bundles
-- **Pending Approval**: Bundles awaiting approval
-- **Scheduled**: Approved bundles with future execution dates
-- **In Progress**: Currently executing bundles
-- **Completed (30 days)**: Recently completed patches
+### Reading the Panels
 
-#### Active Goals
-- **Goal Progress**: Percentage completion for each active goal
-- **Target Dates**: Upcoming compliance deadlines
-- **Risk Reduction**: Total risk points reduced
+**Vulnerability Overview** shows your total vulnerability count broken down by severity (Critical, High, Medium, Low). It also calls out how many are in the CISA Known Exploited Vulnerabilities (KEV) catalog — these are confirmed exploits in the wild and should be treated as the highest priority regardless of CVSS score.
 
-### Quick Actions
-- Create new goal
-- Import assets
-- Trigger discovery scan
-- Review pending approvals
-- Generate compliance report
+**Asset Health** shows your asset inventory by environment. The risk score distribution tells you how many assets have elevated risk — not just because of the number of vulnerabilities they carry, but weighted by severity and business criticality.
+
+**Patch Bundles** summarizes what's in motion: bundles pending approval, scheduled for upcoming windows, currently in progress, and completed in the last 30 days.
+
+**Active Goals** shows progress toward your current goals — percentage complete, days until the target date, and projected risk reduction.
+
+### The Risk Score
+
+The tenant-wide risk score is the number at the top of the dashboard. It's a 0–100 aggregate that reflects the severity and breadth of your unpatched vulnerability exposure. As you complete bundles, the score goes down. Tracking it over time tells you whether your patching program is making real progress.
+
+### "Patch These Now"
+
+This button appears on the dashboard when Glasswatch has identified a short list of vulnerabilities that combine high risk scores with available patches and no active bundle assignment. Clicking it creates a draft bundle with those items pre-populated, ready for your review.
 
 ---
 
-## Managing Vulnerabilities
+## Vulnerabilities
 
-Glasswatch aggregates vulnerability data from multiple sources (NVD, GHSA, vendor advisories) and enriches it with runtime context from Snapper.
+### Viewing the Vulnerability List
 
-### Viewing Vulnerabilities
+Navigate to **Vulnerabilities** in the sidebar. By default you'll see all open vulnerabilities sorted by risk score, highest first. The list shows the CVE ID, a short description, the number of affected assets, severity, whether it's KEV-listed, and the risk score.
 
-1. Navigate to **Vulnerabilities** in the main menu
-2. Use filters to narrow results:
-   - **Severity**: CRITICAL, HIGH, MEDIUM, LOW
-   - **KEV Status**: Show only CISA KEV-listed
-   - **Exploit Availability**: Filter by exploit status
-   - **Source**: NVD, GHSA, vendor-specific
-   - **Search**: Find by CVE ID, title, or description
+Use the filters at the top to narrow the list:
 
-### Understanding Risk Scores
+- **KEV only** — shows only CISA Known Exploited Vulnerabilities. These have confirmed active exploitation and should be your first priority in almost every case.
+- **Critical** — shows only Critical severity (CVSS 9.0+).
+- **By asset** — filter to vulnerabilities affecting a specific asset or asset group.
+- **Patch available** — useful when you're building a bundle; you can filter to only vulnerabilities where a vendor patch exists.
 
-Glasswatch uses an **8-factor scoring algorithm** that goes beyond CVSS:
+Search the list by CVE ID or keyword to find a specific vulnerability quickly.
 
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| **CVSS Score** | 40% | Base severity (0-10) |
-| **EPSS Score** | 20% | Exploit prediction probability |
-| **KEV Listed** | +15 pts | CISA Known Exploited Vulnerabilities |
-| **Exploit Available** | +10 pts | Public exploit code exists |
-| **Asset Criticality** | 15% | Importance of affected assets (1-5) |
-| **Asset Exposure** | 10% | Internet-facing, internal, or isolated |
-| **Snapper Runtime** | ±25 pts | **Actual code execution detected** |
-| **Patch Availability** | 5% | Vendor patch released |
+### Understanding the Risk Score
 
-**Total Risk Score**: 0-100 (higher = more urgent)
+Glasswatch scores every vulnerability on a 0–100 scale using 8 factors. This goes well beyond CVSS, which only captures the severity of the vulnerability in isolation. The 8 factors are:
 
-### Snapper Runtime Integration
+**CVSS Score (40%)** — The base severity rating from the National Vulnerability Database. High CVSS still matters.
 
-**What is Snapper?**
-Snapper is a runtime monitoring system that tracks actual code execution in your applications.
+**EPSS Score (20%)** — The Exploit Prediction Scoring System, published by FIRST.org. This is a probability (0–100%) that the vulnerability will be exploited in the next 30 days based on actual threat intelligence. A high EPSS score means the attacker community has noticed this one.
 
-**Why it matters:**
-- Traditional scoring assumes all vulnerabilities are equally exploitable
-- Snapper shows which vulnerable code paths **actually run**
-- **+25 points** if vulnerability code is executed regularly
-- **-25 points** if vulnerable code is never executed
-- This makes prioritization dramatically more accurate
+**KEV Listing (+15 points)** — If CISA has added the vulnerability to its Known Exploited Vulnerabilities catalog, it's confirmed active exploitation. This adds a flat 15 points regardless of other factors.
 
-**Example:**
-```
-CVE-2024-1234 in Apache Commons
-- CVSS: 9.8 (Critical)
-- Base Score: 78
-- Snapper detects: Code NEVER executed
-- Final Score: 53 (Medium priority)
-→ Deprioritized for patching
-```
+**Exploit Available (+10 points)** — Public proof-of-concept or working exploit code exists in the wild. Not as severe as confirmed exploitation, but meaningfully more dangerous than a theoretical vulnerability.
 
-### Vulnerability Detail Page
+**Asset Criticality (15%)** — How important is the affected asset to your business? Criticality is set per asset (1–5 scale). A CVSS 7.0 vulnerability on your payment API (criticality 5) is more urgent than the same vulnerability on a dev server (criticality 2).
 
-Click any vulnerability to view:
-- **Full Description**: Technical details and impact
-- **CVSS Vector**: Breakdown of attack complexity, privileges, etc.
-- **Affected Assets**: List of your assets with this vulnerability
-- **Patch Information**: Vendor advisory, patch release date, download links
-- **Exploit Details**: Maturity level, POC availability
-- **Patch Weather**: Community success rate for this patch
-- **Snapper Data**: Runtime execution status per asset
-- **Comments**: Team discussion and notes
+**Asset Exposure (10%)** — Internet-facing assets score higher than internal systems, which score higher than isolated ones. An internet-facing asset is one click away from an attacker.
 
-### Adding Vulnerabilities Manually
+**Patch Availability (5%)** — Whether a vendor patch exists. Unpatched CVEs score slightly lower because there's nothing you can do yet — but only slightly.
 
-While Glasswatch automatically discovers vulnerabilities through scanning, you can also add them manually:
+**Snapper Runtime Data (±25 points)** — If your deployment includes Snapper, runtime reachability data is factored in. If the vulnerable code path is actively executing, the score increases by 25 points. If it's never called, it decreases by 25. This is the most powerful differentiator: a CVSS 9.8 vulnerability in a library you use but never invoke is genuinely lower priority than a CVSS 7.0 in code that runs thousands of times per hour.
 
-1. Click **Add Vulnerability**
-2. Enter CVE/GHSA identifier or fill form manually:
-   - Identifier (e.g., CVE-2024-1234)
-   - Title and description
-   - Severity and CVSS score
-   - Affected products
-3. Select affected assets
-4. Click **Save**
+Example: CVE-2024-1234 in Apache Commons, CVSS 9.8. Without Snapper, it scores 78. With Snapper confirming the code never runs, it drops to 53 — still medium priority, but no longer a fire drill.
 
-The system will automatically enrich the data with:
-- NVD information (if available)
-- EPSS score
-- KEV status
-- Patch availability
+### CVE Detail Page
+
+Click any vulnerability to open its detail view. This shows:
+
+- Full technical description and impact analysis
+- CVSS vector breakdown (attack complexity, privileges required, etc.)
+- EPSS score and historical trend
+- KEV status with the CISA advisory link
+- All assets affected, with per-asset risk scores
+- Patch information: vendor advisory, patch release date, fix version
+- Exploit details: maturity level, proof-of-concept availability
+- Snapper runtime data per asset (if configured)
+- SLA deadline: based on your organization's SLA settings, when this should be resolved
+
+### SLA Deadlines
+
+Glasswatch tracks SLA compliance for every open vulnerability. The default SLAs follow industry-standard timelines (Critical: 15 days, High: 30 days, Medium: 60 days) but your admin can configure custom targets in Settings. Vulnerabilities approaching or past their SLA deadline are flagged in the list and on the compliance dashboard.
 
 ---
 
-## Asset Management
+## Assets
 
-Assets are your infrastructure components: servers, containers, cloud instances, databases, etc.
+### Asset List Overview
 
-### Viewing Assets
+Navigate to **Assets** to see your full inventory. Each asset shows its name, type, environment, criticality, exposure level, and current risk score. The risk score for an asset is derived from the vulnerabilities affecting it.
 
-1. Navigate to **Assets**
-2. Filter by:
-   - **Type**: Server, Container, Cloud Instance, Database, Application
-   - **Platform**: Linux, Windows, Kubernetes, AWS, Azure, GCP
-   - **Environment**: Production, Staging, Development
-   - **Criticality**: 1 (Low) to 5 (Critical)
-   - **Exposure**: Internet-facing, Internal, Isolated
-   - **Search**: Name, identifier, FQDN, IP address
+Filter by environment (Production, Staging, Development), criticality level, exposure, asset type, or owner team. Use search to find a specific host by name or IP.
 
-### Understanding Asset Criticality
+### Asset Detail Page
 
-| Level | Description | Example |
-|-------|-------------|---------|
-| **5 - Critical** | Revenue-generating, customer-facing | Payment API, E-commerce frontend |
-| **4 - High** | Core business operations | Internal CRM, Email server |
-| **3 - Medium** | Supporting systems | CI/CD, Monitoring |
-| **2 - Low** | Development/testing | Dev servers, QA environments |
-| **1 - Minimal** | Non-operational | Decommissioned, archived |
+Click an asset to see everything about it:
 
-### Adding Assets Manually
+**Risk Breakdown** — A visual breakdown of the asset's overall risk, showing which vulnerabilities are driving it. The top-contributing vulnerabilities are listed with their individual scores.
 
-1. Click **Add Asset**
-2. Fill in required fields:
-   - **Identifier**: Unique ID (hostname, instance ID, etc.)
-   - **Name**: Human-readable name
-   - **Type**: Asset type
-   - **Platform**: Operating system or platform
-   - **Environment**: Deployment environment
-3. Fill optional fields:
-   - Criticality (1-5)
-   - Exposure level
-   - Location/region
-   - Owner team and email
-   - IP addresses, FQDN
-   - Cloud metadata (account ID, tags, etc.)
-   - Compliance frameworks
-   - Maintenance window
-4. Click **Save**
+**Vulnerability List** — All open vulnerabilities affecting this asset, sorted by risk score. You can filter this list by severity, KEV status, or patch availability. Each row shows the CVE, risk score, SLA status, and whether it's already assigned to a bundle.
 
-### Bulk Import
+**Patch History** — A log of every patch that has been applied to this asset through Glasswatch, including when it ran, who approved it, and whether it succeeded.
 
-For large-scale asset management:
+**"Patch This Asset"** — Creates a new draft bundle containing all unpatched vulnerabilities for this asset. Good for targeted remediation when an asset is high-risk and you want to address it immediately outside the normal goal cycle.
 
-1. Click **Import Assets**
-2. Choose format: **JSON** or **CSV**
-3. Download template
-4. Fill in asset data
-5. Upload file
-6. Review import results:
-   - Created: New assets added
-   - Updated: Existing assets modified
-   - Errors: Validation failures
+### Asset Groups
 
-**CSV Template:**
-```csv
-identifier,name,type,platform,environment,criticality,exposure,owner_team
-prod-web-01,Production Web 01,server,linux,production,5,internet,platform
-prod-db-01,Production DB 01,database,postgresql,production,5,internal,database
-```
+Asset groups let you organize assets by environment, team, or criticality tier. Groups are useful for scoping goals ("patch all internet-facing production assets") and for reporting ("show compliance posture for the payments team").
 
-**JSON Template:**
-```json
-[
-  {
-    "identifier": "prod-web-01",
-    "name": "Production Web 01",
-    "type": "server",
-    "platform": "linux",
-    "environment": "production",
-    "criticality": 5,
-    "exposure": "internet",
-    "owner_team": "platform"
-  }
-]
-```
+To create a group, go to Assets → Groups → New Group. Define the name and add assets individually or use a filter rule (e.g., "all assets with environment=production and criticality ≥ 4").
 
-### Asset Vulnerabilities
+### Patch Coverage View
 
-View all vulnerabilities affecting an asset:
+The patch coverage view shows a matrix of CVEs versus assets, letting you see at a glance which vulnerabilities affect which systems and where coverage gaps exist. This is particularly useful for compliance work — for example, verifying that a specific KEV CVE has been patched across all internet-facing hosts.
 
-1. Click on an asset
-2. **Vulnerabilities Tab** shows:
-   - Active vulnerabilities
-   - Risk score for each
-   - Snapper runtime data (code executed, library loaded)
-   - Recommended action
-   - Patch status
-3. Filter by:
-   - Risk score threshold
-   - Patch availability
-   - Status (Active, Patched, Accepted Risk)
+### Stale Asset Detection
 
-### Discovery Scanning
-
-Automate asset and vulnerability discovery:
-
-1. Navigate to **Discovery** > **Scans**
-2. Click **New Scan**
-3. Configure scan:
-   - **Name**: Descriptive name
-   - **Type**: Network scan, Cloud account scan, Container registry scan
-   - **Targets**: IP ranges, cloud accounts, registries
-   - **Options**: Port scan, service detection, vulnerability detection
-4. Click **Run Scan**
-5. Monitor progress in the scan list
-6. Review discovered assets and vulnerabilities
-7. Approve or merge new findings
-
-**Scheduled Scans:**
-- Set up recurring scans (daily, weekly, monthly)
-- Automatically import new assets
-- Alert on new critical vulnerabilities
+If an asset has not received new scan data in more than 30 days, Glasswatch flags it as stale. A stale asset might mean your scanner isn't reaching it, it's been decommissioned without being removed, or there's a gap in your coverage. Stale assets appear with a warning indicator in the asset list.
 
 ---
 
-## Creating Goals
+## Goals
 
-**Goals are the heart of Glasswatch** - they convert business objectives into optimized patch schedules.
+### What Goals Are
 
-### Goal Types
+Goals are the reason Glasswatch exists. Instead of working through a CVE queue manually, you define an outcome — what you want to achieve and by when — and Glasswatch builds the patching plan to get there.
 
-| Type | Description | Example |
-|------|-------------|---------|
-| **Compliance Deadline** | Meet audit requirements by date | "SOC 2 ready by June 30" |
-| **Risk Reduction** | Reduce overall risk by X% | "Cut risk score by 50%" |
-| **Zero Critical** | Eliminate all critical vulnerabilities | "Zero critical on production" |
-| **KEV Elimination** | Patch all CISA KEV vulnerabilities | "KEV-free by Q2" |
-| **Custom** | Custom metrics and targets | Advanced use cases |
+A goal might be: "Eliminate all KEV vulnerabilities on internet-facing production systems by June 15." Or: "Reduce our overall risk score by 40% before the SOC 2 audit." Or simply: "Zero critical vulnerabilities on the payments infrastructure by end of quarter."
+
+Goals are not just tracking tools. When you create a goal and run the optimizer, Glasswatch generates the actual patch bundles, scheduled across your maintenance windows, that will achieve the goal. The plan is concrete and executable, not aspirational.
 
 ### Creating a Goal
 
-1. Navigate to **Goals**
-2. Click **Create Goal**
-3. Fill in basic information:
-   - **Name**: Clear, descriptive name
-   - **Type**: Select goal type
-   - **Description**: What you're trying to achieve
-   - **Target Date**: Deadline for completion
-4. Set target metrics (varies by type):
-   - Compliance Deadline: Frameworks to satisfy
-   - Risk Reduction: % or point reduction
-   - Zero Critical: Target count (usually 0)
-   - KEV Elimination: Specific KEV list
-5. Configure constraints:
-   - **Risk Tolerance**: Conservative, Balanced, Aggressive
-   - **Max Vulnerabilities per Window**: Limit patches per maintenance window
-   - **Max Downtime**: Maximum acceptable downtime per window (hours)
-   - **Require Vendor Approval**: Wait for official vendor patches only
-   - **Min Patch Weather Score**: Minimum community success rate (0-100)
-6. Scope the goal:
-   - **Asset Filters**: Which assets to include
-     - Environment (production, staging, etc.)
-     - Exposure (internet-facing, internal)
-     - Criticality level
-     - Owner team
-   - **Vulnerability Filters**: Which vulnerabilities to address
-     - Severity levels
-     - KEV-listed only
-     - Exploit availability
-     - Published date range
-7. Click **Create & Optimize**
+Navigate to **Goals** and click **New Goal**. Fill in:
 
-### Understanding Risk Tolerance
+**Name** — Something descriptive that will make sense to your team. "Q2 KEV Elimination" or "Glasswing Compliance Sprint" are better than "Goal 1."
 
-| Setting | Approach | Best For |
-|---------|----------|----------|
-| **Conservative** | Slow, cautious patching | Critical production systems |
-| **Balanced** | Moderate pace, best trade-off | Most environments |
-| **Aggressive** | Fast patching, accepts some risk | Development, non-critical systems |
+**Target Date** — The deadline. Be realistic — the optimizer will tell you if the goal can't be achieved in time given your maintenance window capacity.
 
-**What it affects:**
-- Patches per maintenance window
-- Acceptable downtime
-- Testing requirements
-- Rollback planning
+**Risk Threshold** — The minimum acceptable risk score for vulnerabilities in scope. For example, setting this to 50 means the goal will only include vulnerabilities scoring 50 or above. Lower thresholds create more work but achieve more complete remediation.
 
-### Running Optimization
+**CVE Filter** — Optionally restrict the goal to specific CVE types: KEV-listed only, critical severity only, a specific asset group, or vulnerabilities matching a custom filter.
 
-After creating a goal, Glasswatch's constraint solver generates optimal patch bundles:
+**Risk Tolerance** — Conservative, Balanced, or Aggressive. This controls how many patches get scheduled per maintenance window and how much downtime is acceptable. Use Conservative for production systems, Aggressive for dev and staging.
 
-1. Click **Optimize** on your goal
-2. Configure optimization:
-   - **Maintenance Windows**: Number of windows to schedule
-   - **Start Date**: When to begin patching
-   - **Force Re-optimize**: Regenerate even if bundles exist
-3. Click **Run Optimization**
-4. Wait 10-30 seconds (shows progress)
-5. Review generated bundles:
-   - Bundle count
-   - Vulnerabilities addressed
-   - Estimated risk reduction
-   - Total downtime required
-
-**Optimization Algorithm:**
-- Uses Google OR-Tools constraint solver
-- Balances risk reduction vs. operational impact
-- Respects maintenance windows
-- Groups related patches for efficiency
-- Minimizes downtime
-- Considers dependencies
+Click **Create and Optimize** to generate the bundle schedule immediately, or **Create** to save the goal and optimize later.
 
 ### Goal Progress Tracking
 
-Monitor goal progress in real-time:
-- **Progress Bar**: % of vulnerabilities resolved
-- **Bundles Created**: Patch bundles generated
-- **Bundles Completed**: Successfully executed bundles
-- **Risk Reduction**: Total risk points reduced
-- **Timeline**: Execution schedule vs. target date
+The goal detail page shows:
 
-### Previewing Before Creating Bundles
+- Overall progress as a percentage of vulnerabilities resolved
+- A timeline comparing projected completion vs. your target date
+- Bundles generated: how many are complete, in progress, pending, or draft
+- Risk reduction achieved so far
 
-Want to see the plan before committing?
+If the goal is falling behind — bundles are delayed, windows are missed — the optimizer can be re-run to rebalance the remaining work across available windows.
 
-1. Navigate to your goal
-2. Click **Preview Optimization**
-3. Adjust parameters
-4. See projected bundles without creating them
-5. Iterate until satisfied
-6. Click **Create Bundles** when ready
+### How Goals Generate Bundles
+
+When you run the optimizer, Glasswatch:
+
+1. Identifies all vulnerabilities and assets in scope based on your goal's filters
+2. Ranks them by risk score, highest first
+3. Distributes them across your available maintenance windows, respecting window capacity constraints (max patches per window, max downtime)
+4. Evaluates all active rules to ensure no governance policies are violated
+5. Groups related patches where possible to reduce total deployment events
+6. Outputs a set of bundles, each scheduled to a specific maintenance window
+
+The optimizer uses Google OR-Tools, a constraint solver. If OR-Tools can't find an optimal solution within the time limit (which can happen with very large datasets), it falls back to a fast heuristic. You'll see a note in the optimization results if this happens — the plan is still good, just not provably optimal. This is expected behavior.
 
 ---
 
 ## Patch Bundles
 
-Bundles are optimized groups of patches created by the goal engine.
+### What Bundles Are
+
+A bundle is a scheduled unit of patch deployment. It contains a list of vulnerability-asset pairs (e.g., "patch CVE-2024-1234 on prod-web-01") assigned to a specific maintenance window. Think of it as a change ticket with a concrete scope, schedule, and approval chain.
+
+Bundles are typically generated by the goal optimizer, but you can also create them manually for urgent or one-off situations.
 
 ### Bundle Lifecycle
 
-```
-Draft → Scheduled → Approved → In Progress → Completed
-  ↓         ↓           ↓            ↓
-Cancelled ←─────────────┘            ↓
-                                   Failed
-```
+A bundle moves through these states:
 
-### Viewing Bundles
+**Draft** — Created but not yet submitted for approval. You can freely edit the scope, add or remove items, and adjust the scheduled window.
 
-1. Navigate to **Bundles**
-2. Filter by:
-   - **Status**: Draft, Scheduled, Approved, In Progress, Completed, Failed
-   - **Goal**: Parent goal
-   - **Schedule**: Upcoming, past
-3. Sort by:
-   - Scheduled date
-   - Risk score
-   - Creation date
+**Pending Approval** — Submitted to approvers. The bundle is locked for editing until it's approved or rejected.
 
-### Bundle Details
+**Approved** — Cleared for execution. The bundle will run during its scheduled maintenance window.
 
-Click a bundle to view:
-- **Overview**: Name, status, schedule, downtime estimate
-- **Items**: Individual vulnerability + asset pairs
-  - Vulnerability details
-  - Asset details
-  - Risk score
-  - Patch time estimate
-  - Snapper runtime data
-- **Impact Summary**: Affected services, dependencies
-- **Approval Status**: Who approved, when
-- **Execution Log**: Real-time progress (if in progress)
-- **Comments**: Team discussion
+**In Progress** — Execution is underway. Patch items are being applied to assets in sequence.
 
-### Requesting Approval
+**Completed** — All patch items ran successfully. The bundle is closed and its items are marked resolved.
 
-If a bundle requires approval:
+**Failed** — One or more patch items failed during execution, or the bundle was rolled back. The detail page will show which items failed and why.
 
-1. Open the bundle
-2. Click **Request Approval**
-3. Fill in request:
-   - **Title**: Summary for approvers
-   - **Description**: Details and justification
-   - **Risk Level**: Your assessment
-   - **Impact Summary**: Services affected, downtime estimate
-4. Click **Submit**
-5. Approvers will be notified
-6. Track approval status in bundle details
+If a bundle is rejected or needs to be abandoned, it can be cancelled from Draft or Pending Approval states.
+
+### Bundle Detail Page
+
+Click a bundle to see its full view. The detail page has several sections:
+
+**Timeline Stepper** — A visual progress indicator showing where the bundle is in its lifecycle. Each stage shows who performed the action and when.
+
+**Pre-Flight Checklist** — Automatically populated before execution. Checks include: maintenance window is open, no change freeze is active, required packages are available, disk space is sufficient, and all bundle items are still valid (the vulnerabilities haven't already been patched).
+
+**Patch Items** — The list of specific patches to apply: CVE, affected asset, estimated downtime, and current status. Each item shows the patch command or procedure that will be run.
+
+**Execution Log** — Available once the bundle is in progress or completed. Shows the real-time (or historical) output of each patch operation, with timestamps and success/failure status for each item.
+
+### Approving a Bundle
+
+If you have approver permissions, bundles in Pending Approval state will appear in your queue. Open the bundle, review the scope and impact, and click **Approve** or **Reject**.
+
+When approving, you're confirming that:
+- The scope is correct
+- The scheduled window is appropriate
+- Rollback procedures are in place
+- No business events conflict with the timing
+
+When rejecting, you must provide a reason. The requester will be notified with your feedback.
 
 ### Executing a Bundle
 
-Once approved:
+Once a bundle is Approved, it will execute automatically when its scheduled maintenance window opens — provided automated execution is configured. If manual execution is required, you'll see an **Execute** button in the bundle detail page. Click it to start the run.
 
-1. Open the approved bundle
-2. Verify:
-   - Maintenance window is open
-   - No change freezes active
-   - Required resources available
-3. Click **Execute**
-4. Monitor real-time progress
-5. Review completion status
-6. Verify patches applied successfully
+During execution, the execution log updates in real time. You can monitor progress without refreshing.
 
-**Note**: Execution integrates with your patch deployment tools (Ansible, SCCM, AWS Systems Manager, etc.). Contact your admin for integration setup.
+### Rolling Back
 
-### Rollback
+If something goes wrong during or after execution, navigate to the bundle and click **Roll Back**. Glasswatch will attempt to revert the changes applied by this bundle. The bundle status will change to Failed, and a rollback entry will be added to the execution log. The affected vulnerabilities will be re-opened and re-queued for future scheduling.
 
-If something goes wrong:
+### Edit/Tweak Mode
 
-1. Navigate to the bundle
-2. Click **Rollback**
-3. Confirm rollback action
-4. System reverts changes
-5. Bundle status changes to "Failed" with rollback note
+Approved bundles are normally locked to prevent scope changes after sign-off. However, if you need to make minor adjustments (removing a single asset that just went into a freeze, for example), you can enter **Edit/Tweak Mode** from the bundle detail page.
+
+Important: entering Edit/Tweak Mode resets the bundle to Draft status and clears the approval. You will need to go through the approval process again. This is by design — changes to an approved bundle must be re-reviewed.
 
 ---
 
-## Approval Workflows
+## Maintenance Windows
 
-Glasswatch supports multi-level approval workflows for patch bundles.
+### What Maintenance Windows Do
 
-### Approval Policies
+Maintenance windows tell Glasswatch when it's acceptable to apply patches to your systems. The optimizer will only schedule bundles inside valid windows. Windows prevent patches from being scheduled at inappropriate times — during business hours, major product launches, or regulatory blackout periods.
 
-Admins configure policies that determine when approval is required:
+### Creating a Window
 
-**Example Policy:**
+Navigate to **Settings → Maintenance Windows** and click **New Window**. Configure:
+
+- **Name** — e.g., "Production Saturday nights" or "Dev weekday evenings"
+- **Day and Time** — Day of week and start time
+- **Duration** — How many hours the window lasts
+- **Environment** — Which environments this window applies to (Production, Staging, Development, or All)
+- **Recurrence** — One-time or recurring (weekly, biweekly, monthly)
+
+Once created, the window will appear in the optimizer's scheduling constraints. Bundles scoped to matching environments will be assigned to available windows.
+
+You can also blackout specific dates — useful for holidays, company events, or audit periods when you don't want any changes running.
+
+---
+
+## Rules
+
+### What Rules Are
+
+Rules are governance policies that Glasswatch evaluates at deployment time. They can block a bundle from running, require additional approvals, send notifications, or constrain scheduling.
+
+Rules are how your change management policy gets encoded into Glasswatch. Instead of relying on people to remember "we don't deploy on Fridays," you write the rule once and it's enforced automatically.
+
+### Creating Rules via NLP
+
+Navigate to **Rules** and click **New Rule**. Type your rule in plain English in the text box. Glasswatch (using Claude if an API key is configured, or pattern matching otherwise) parses it and generates a structured rule. You'll see a preview of what was understood before saving.
+
+Examples of rules you can write:
+
+- "Block all deployments in production on Fridays after 3pm"
+- "Require two approvals for any bundle affecting internet-facing assets"
+- "Notify the security team when a bundle is scheduled that includes KEV vulnerabilities"
+- "Block deployments in the last three days of any quarter"
+- "Warn if a single bundle contains more than 50 patch items"
+
+After the rule is created, review the parsed version and click **Save** to activate it.
+
+### Rule Types
+
+**Block** — Prevents bundle execution. The bundle cannot proceed until the condition is resolved (e.g., change the scheduled time to a permitted window).
+
+**Require** — Adds a mandatory gate. For example, "require CISO approval for critical production bundles" adds a specific approver requirement to matching bundles.
+
+**Notify** — Sends an alert when the rule condition is met, but does not block. Useful for visibility without friction.
+
+**Schedule** — Automatically constrains when bundles matching the rule can be scheduled. Similar to maintenance windows but expressed as a policy.
+
+---
+
+## AI Assistant
+
+### Opening the Assistant
+
+The AI assistant is available from any page in Glasswatch. Click the sparkle icon (✨) in the bottom-right corner to open it. It's a floating chat interface connected to your live data.
+
+### What It Can Do
+
+The assistant is most useful for things that would otherwise require navigating to several different pages. Some examples of what you can ask:
+
+**Situation awareness:**
+- "What needs my attention right now?" — Returns your highest-priority items: critical KEV vulnerabilities without a bundle, bundles awaiting your approval, and goals at risk of missing their deadline.
+- "How many KEV vulnerabilities do we have open?" — Queries live data and returns the count with a breakdown.
+
+**Looking things up:**
+- "What is the risk score for CVE-2021-44228?" — Fetches the scoring details and explains why it scored that way.
+- "Which assets are affected by critical vulnerabilities with no patch available?" — Runs a live query and lists results.
+
+**Taking action:**
+- "Create a rule blocking deployments on the last Friday of every month in production" — Creates the rule directly, then shows you a preview to confirm.
+- "Approve bundle #42" — Triggers the approval action if you have the required permissions.
+- "Show me all bundles pending approval" — Lists them with links.
+
+### Prompts to Try
+
+If you're not sure where to start, these tend to be useful:
+
+- "What's the status of our Q2 compliance goal?"
+- "Which goal is furthest behind schedule?"
+- "What are the top 5 vulnerabilities I should address today?"
+- "Create a new goal: patch all KEV vulnerabilities on internet-facing assets by June 30"
+- "Show me the riskiest assets in production"
+
+The assistant uses your actual data, not synthetic examples. If the answer depends on something Glasswatch doesn't have (like scanner data that hasn't been ingested), it will say so.
+
+---
+
+## Notifications
+
+### The Notification Bell
+
+The bell icon in the top navigation shows real-time alerts. Glasswatch polls for new events every 30 seconds and updates the count badge automatically. Click the bell to see the full notification list.
+
+### Alert Types
+
+**KEV Alerts** — Triggered when CISA adds a new CVE to the Known Exploited Vulnerabilities catalog that affects one or more of your assets. These are high-signal, high-urgency — a KEV addition means active exploitation has been confirmed.
+
+**Bundle Events** — Status changes on your bundles: approval requested, approved, rejected, execution started, execution completed, execution failed.
+
+**SLA Warnings** — When a vulnerability's SLA deadline is approaching (configurable: 7 days, 3 days, day-of) or has been breached, you'll receive an alert.
+
+**Goal Milestones** — When a goal reaches 25%, 50%, 75%, or 100% completion, or when a goal is at risk of missing its target date.
+
+### Configuring Alert Rules
+
+Navigate to **Settings → Alert Rules** to configure which events trigger notifications and where they're delivered.
+
+Each rule has:
+- **Trigger** — The event type (KEV alert, bundle status change, SLA warning, etc.)
+- **Filter** — Conditions that must be true for the alert to fire (e.g., only for production assets, only for Critical severity)
+- **Channels** — Where to send the alert: In-App, Slack, Microsoft Teams, or Email
+
+You can create multiple rules with different filters and channels. For example: send all KEV alerts to Slack immediately, send weekly SLA summaries by email, and send bundle approvals in-app only.
+
+### Delivery Channels
+
+**In-App** — The notification bell. Always available, no configuration needed.
+
+**Slack** — Requires a Slack webhook URL configured in Settings → Integrations. Notifications are sent as formatted messages to the configured channel.
+
+**Microsoft Teams** — Requires a Teams incoming webhook URL. Format and setup are similar to Slack.
+
+**Email** — Requires Resend API configuration (Settings → Integrations). Alerts are sent from your configured sender address.
+
+---
+
+## Compliance & Reporting
+
+### Compliance Dashboard
+
+Navigate to **Compliance** to see your posture against common frameworks. The dashboard shows cards for:
+
+- **BOD 22-01** — CISA's Binding Operational Directive requiring federal agencies to patch KEV vulnerabilities within defined timelines. Even if you're not a federal agency, this is a useful benchmark: KEV with patch = patch it fast.
+- **SOC 2** — Tracks your patch SLA adherence, which is a supporting control for SOC 2 CC7.1 (vulnerability and patch management).
+- **PCI DSS** — Tracks patching of systems in scope for PCI, with attention to the required monthly scanning and timely critical patch requirements.
+
+Each card shows current pass/fail status, the number of items in or out of compliance, and a trend line.
+
+### MTTP Metrics
+
+Mean Time to Patch (MTTP) is the core metric for patch program effectiveness. The reporting view shows MTTP:
+
+- By severity (Critical, High, Medium, Low)
+- By environment (Production, Staging, Dev)
+- By team (based on asset owner_team)
+- Trend over time
+
+Drilling into any metric shows the individual vulnerability-asset pairs contributing to it.
+
+### SLA Tracking Table
+
+The SLA table lists all open vulnerabilities with their SLA deadlines, current status (on track, at risk, breached), and the assigned bundle (if any). Filter by status to quickly find breached items.
+
+### Exporting a PDF Report
+
+From the Compliance page, click **Export Report**. Choose a date range and which sections to include (executive summary, compliance posture, MTTP metrics, SLA status, detailed vulnerability list). The report generates in your browser and downloads as a PDF. Reports are formatted for presentation to leadership or auditors.
+
+### SIEM and CMDB Integration
+
+Glasswatch exposes export endpoints for feeding data into your SIEM or CMDB:
+
 ```
-Name: Production Critical Patches
-Required Approvals: 2
-Auto-Approve Threshold: null
-Timeout: 48 hours
-Conditions:
-  - Environment: production
-  - Risk Level: high OR critical
-Approver Roles: admin, security_lead
+GET /api/v1/export/vulnerabilities
+GET /api/v1/export/assets
 ```
 
-### Requesting Approval (Detailed)
+Both endpoints support `?format=json` (default) and `?format=csv`. Add filters via query parameters: `?severity=critical`, `?environment=production`, `?kev_only=true`.
 
-1. Navigate to **Approvals** > **Requests**
-2. Click **New Request**
-3. Select the bundle
-4. Fill in request details:
-   - Title (concise summary)
-   - Description (full context)
-   - Risk level assessment
-   - Impact summary:
-     - Assets affected
-     - Services impacted
-     - Estimated downtime
-     - Rollback plan
-5. Click **Submit**
-6. Request is routed to appropriate approvers
-
-### Approving a Request
-
-If you're an approver:
-
-1. Navigate to **Approvals** > **Pending**
-2. Review request:
-   - Bundle details
-   - Affected assets and vulnerabilities
-   - Risk assessment
-   - Impact summary
-   - Simulation results (if available)
-3. Click **Approve** or **Reject**
-4. Add comment explaining your decision
-5. Click **Confirm**
-
-**Approval Tips:**
-- Review simulation results before approving
-- Check for maintenance window availability
-- Verify no change freezes are active
-- Ensure rollback plan is documented
-- Consider business impact timing
-
-### Rejecting a Request
-
-1. Open the approval request
-2. Click **Reject**
-3. **Required**: Add comment explaining why:
-   - Insufficient testing
-   - Missing rollback plan
-   - Timing concerns
-   - Risk too high
-   - Better alternatives exist
-4. Click **Confirm**
-5. Requester is notified with your feedback
-
-### Auto-Approval
-
-Some policies support auto-approval for low-risk bundles:
-- Risk score below threshold
-- Only affects non-production environments
-- All patches have high Patch Weather scores
-- No critical services impacted
+Authenticate with an API key (generate one in Settings → API Keys). These endpoints are designed to be called by scheduled scripts or your SIEM's connector.
 
 ---
 
-## Patch Simulator
+## Settings
 
-The simulator predicts patch impact before execution.
+### Integrations
 
-### Running Impact Prediction
+**Settings → Integrations** is where you connect Glasswatch to your scanner infrastructure and notification services.
 
-1. Open a bundle
-2. Click **Simulate Impact**
-3. Wait 10-15 seconds for analysis
-4. Review results:
-   - **Risk Score**: Overall execution risk (0-100)
-   - **Risk Level**: Low, Medium, High, Critical
-   - **Assets Affected**: Count and list
-   - **Services Impacted**: Which services will be affected
-   - **Estimated Downtime**: Total downtime in minutes
-   - **Dependencies**: Related services and systems
-   - **Rollback Plan**: Automated or manual
-5. **Is Safe to Proceed?**: Green/yellow/red indicator
+For each scanner (Tenable, Qualys, Rapid7), you'll configure a webhook secret. Glasswatch then provides you with a webhook URL to paste into your scanner's notification settings. Once configured, the scanner will POST new findings to Glasswatch in real time as scans complete.
 
-### Running Dry-Run Simulation
+For Slack and Teams, paste in the incoming webhook URL from your messaging platform. Glasswatch will use it to deliver alerts.
 
-Full pre-flight validation:
+For email, enter your Resend API key. Glasswatch uses Resend for reliable transactional delivery.
 
-1. Open a bundle
-2. Click **Dry-Run**
-3. System performs:
-   - ✓ Package availability check
-   - ✓ Disk space validation
-   - ✓ Network connectivity test
-   - ✓ Maintenance window verification
-   - ✓ Change freeze check
-   - ✓ Dependency analysis
-   - ✓ Rollback plan validation
-4. Review detailed results:
-   - All checks passed?
-   - Any warnings or blockers?
-   - Recommended actions
-5. Make go/no-go decision
+### Alert Rules
 
-### Interpreting Results
+Described in the [Notifications](#notifications) section above. This is where you configure which events trigger alerts and where they go.
 
-**Risk Levels:**
-- **Low (0-30)**: Safe to proceed, minimal risk
-- **Medium (31-60)**: Acceptable with proper planning
-- **High (61-80)**: Requires careful consideration and rollback plan
-- **Critical (81-100)**: High risk, consider alternatives
+### Connections
 
-**Common Warnings:**
-- "Maintenance window conflict detected"
-- "Insufficient disk space on target"
-- "Package not available in repository"
-- "Change freeze active"
-- "Low Patch Weather score"
+**Settings → Connections** shows the health status of each configured integration. A green indicator means the last test was successful. A red indicator means something needs attention — click it to see the error details and troubleshooting suggestions.
+
+Use the **Test** button on each connection to send a test payload and confirm the integration is working end-to-end.
 
 ---
 
-## Team Collaboration
+## Importing Data
 
-### Comments
+### CSV Import
 
-Add comments to any resource (vulnerability, asset, bundle, goal):
+If you don't have a scanner configured yet, or if you're migrating from another tool, you can import vulnerability and asset data via CSV.
 
-1. Navigate to the resource
-2. Scroll to **Comments** section
-3. Type your comment
-4. **@mention** teammates for notifications:
-   - Type `@` and select from list
-   - They'll receive notification
-5. Click **Post**
+Navigate to **Import** in the sidebar. Select the data type (Vulnerabilities or Assets) and download the template CSV to see the expected format.
 
-**Formatting:**
-- Basic markdown supported
-- Code blocks with triple backticks
-- Links auto-detected
+**Vulnerability CSV columns:**
 
-### Mentions & Notifications
+| Column | Required | Description |
+|--------|----------|-------------|
+| `asset_name` | Yes | Name of the affected asset (must match an existing asset) |
+| `cve_id` | Yes | CVE identifier, e.g. `CVE-2024-1234` |
+| `severity` | Yes | `critical`, `high`, `medium`, or `low` |
+| `cvss_score` | Yes | CVSS base score (0.0–10.0) |
+| `discovered_date` | Yes | ISO 8601 date, e.g. `2024-03-15` |
+| `description` | No | Short description of the vulnerability |
+| `patch_available` | No | `true` or `false` |
 
-**Getting notified:**
-- In-app notification bell
-- Email digest (configure in preferences)
-- Real-time browser notifications (if enabled)
+**Asset CSV columns:**
 
-**Notification types:**
-- @mentions in comments
-- Approval requests
-- Bundle execution status changes
-- Goal milestones reached
-- Critical vulnerability discovered
-- Scheduled bundle reminders
+| Column | Required | Description |
+|--------|----------|-------------|
+| `name` | Yes | Asset name |
+| `type` | Yes | `server`, `container`, `database`, `cloud_instance`, or `application` |
+| `environment` | Yes | `production`, `staging`, or `development` |
+| `ip_address` | No | Primary IP address |
+| `owner_team` | No | Team responsible for this asset |
+| `criticality` | No | Integer 1–5 (default: 3) |
 
-### Configuring Notifications
+### What Happens After Import
 
-1. Click your avatar → **Preferences**
-2. Navigate to **Notifications**
-3. Choose preferences:
-   - Email digest: Realtime, Hourly, Daily, Weekly, Off
-   - Browser notifications: On/Off
-   - Notification types to receive
-4. Click **Save**
+After you upload a CSV, Glasswatch shows a summary: rows created, rows updated (if the identifier already exists), and any validation errors. Errors are listed with row numbers and descriptions so you can fix and re-upload.
+
+Imported vulnerabilities are immediately scored using the same 8-factor algorithm as scanner-ingested data. They'll appear in the vulnerability list and contribute to asset risk scores within a few seconds of import completing.
 
 ---
 
-## Activity Feed & Notifications
-
-### Activity Feed
-
-Real-time timeline of all tenant actions:
-
-1. Navigate to **Activity**
-2. View chronological feed:
-   - User actions
-   - System events
-   - Status changes
-   - Approvals
-   - Executions
-3. Filter by:
-   - User
-   - Action type
-   - Resource type
-   - Date range
-4. Search activities
-
-**Example Activities:**
-- "Alice approved Bundle #42"
-- "System discovered 12 new vulnerabilities"
-- "Bob created goal 'Q2 Compliance'"
-- "Bundle #40 execution completed successfully"
-
-### Real-Time Updates
-
-Enable live updates:
-
-1. Activity feed auto-refreshes
-2. WebSocket connection for instant updates
-3. Toast notifications for important events
-4. Update badge counts on navigation items
-
----
-
-## Best Practices
-
-### Vulnerability Prioritization
-
-**DO:**
-- ✓ Trust Glasswatch's risk scores (they're smarter than CVSS alone)
-- ✓ Pay attention to Snapper runtime data
-- ✓ Prioritize KEV-listed vulnerabilities
-- ✓ Consider asset criticality and exposure
-- ✓ Use Patch Weather scores to avoid problematic patches
-
-**DON'T:**
-- ✗ Ignore CVSS scores entirely (they're part of the picture)
-- ✗ Patch everything at once (increases risk)
-- ✗ Skip testing because a patch looks "safe"
-- ✗ Ignore vulnerabilities on internal assets
-
-### Goal Creation
-
-**DO:**
-- ✓ Start with clear business objectives
-- ✓ Set realistic target dates
-- ✓ Use appropriate risk tolerance for each environment
-- ✓ Scope goals narrowly at first (iterate and expand)
-- ✓ Run preview before creating bundles
-
-**DON'T:**
-- ✗ Create overlapping goals (confuses optimization)
-- ✗ Set impossible deadlines
-- ✗ Use aggressive risk tolerance for production
-- ✗ Ignore maintenance window constraints
-
-### Patch Execution
-
-**DO:**
-- ✓ Always run simulation before approval
-- ✓ Verify maintenance windows are clear
-- ✓ Have rollback plans documented
-- ✓ Monitor execution in real-time
-- ✓ Verify success after completion
-- ✓ Update runbooks based on experience
-
-**DON'T:**
-- ✗ Skip dry-run for production bundles
-- ✗ Execute during business hours (unless emergency)
-- ✗ Ignore warnings from simulator
-- ✗ Assume success without verification
-- ✗ Execute during change freezes
-
-### Team Collaboration
-
-**DO:**
-- ✓ Use comments to document decisions
-- ✓ @mention relevant team members
-- ✓ Provide context in approval requests
-- ✓ Share lessons learned
-- ✓ Document exceptions and workarounds
-
-**DON'T:**
-- ✗ Approve without reviewing details
-- ✗ Make unilateral decisions for shared assets
-- ✗ Ignore approval rejection feedback
-- ✗ Skip communication during incidents
-
-### Asset Management
-
-**DO:**
-- ✓ Keep asset metadata up-to-date
-- ✓ Set accurate criticality levels
-- ✓ Document owner teams and contacts
-- ✓ Use discovery scans regularly
-- ✓ Tag assets consistently
-
-**DON'T:**
-- ✗ Leave assets without owners
-- ✗ Overstate criticality (dilutes meaning)
-- ✗ Ignore discovered assets
-- ✗ Skip decommissioned asset cleanup
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `g d` | Go to Dashboard |
-| `g v` | Go to Vulnerabilities |
-| `g a` | Go to Assets |
-| `g b` | Go to Bundles |
-| `g o` | Go to Goals |
-| `/` | Focus search |
-| `c` | Create (context-sensitive) |
-| `?` | Show keyboard shortcuts |
-| `Esc` | Close modal |
-
----
-
-## Getting Help
-
-- **In-App Help**: Click `?` icon in top navigation
-- **Documentation**: [docs.glasswatch.ai](https://docs.glasswatch.ai)
-- **Support Email**: support@glasswatch.ai
-- **Status Page**: [status.glasswatch.ai](https://status.glasswatch.ai)
-- **Community Forum**: [community.glasswatch.ai](https://community.glasswatch.ai)
-
----
-
-**Happy patching! 🎯**
+*For deployment and integration setup, see the [Implementation Guide](IMPLEMENTATION_GUIDE.md). For API reference, see the [interactive API docs](https://glasswatch-production.up.railway.app/docs).*

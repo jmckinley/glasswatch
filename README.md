@@ -5,6 +5,8 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://glasswatch-production.up.railway.app)
 [![Deployed on Railway](https://img.shields.io/badge/deployed-Railway-blueviolet)](https://glasswatch-production.up.railway.app)
 
+**[Live Demo](https://frontend-production-ef3e.up.railway.app)** · **[API Docs](https://glasswatch-production.up.railway.app/docs)** · **[User Guide](docs/USER_GUIDE.md)** · **[Implementation Guide](docs/IMPLEMENTATION_GUIDE.md)**
+
 ---
 
 ## What It Is
@@ -24,6 +26,11 @@ Glasswatch converts vulnerability chaos into organized, evidence-backed patch op
 - **NLP Rules** — Write deployment rules in plain English: "Block deployments on Fridays after 3pm in production"
 - **AI Agent** — Ask questions and take actions in plain language from the in-app assistant
 - **Scanner Webhooks** — Ingest findings from Tenable, Qualys, and Rapid7 in real time
+- **Asset Intelligence** — Asset groups, patch coverage matrix, stale asset detection, per-asset risk breakdown
+- **Compliance Dashboard** — BOD 22-01, SOC 2, and PCI DSS posture cards with MTTP metrics and SLA tracking
+- **Notifications** — Real-time alerts via Slack, Teams, and email; configurable alert rules by event type
+- **CSV Import** — Bulk import vulnerabilities and assets from any scanner via CSV
+- **SIEM/CMDB API** — Export vulnerabilities and assets in JSON or CSV for downstream integration
 - **SSO & RBAC** — WorkOS-backed SSO, multi-tenant, role-based access
 
 ---
@@ -68,10 +75,27 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown.
 
 ---
 
+## For Alpha Customers
+
+Glasswatch is in active alpha development. All sprints through Sprint 23 are complete. The live demo at [https://frontend-production-ef3e.up.railway.app](https://frontend-production-ef3e.up.railway.app) reflects the current state — click **Try Demo** to explore without signing up.
+
+**What to expect during alpha:**
+- Core functionality (scoring, goals, bundles, rules, compliance, notifications) is fully operational
+- Some UI rough edges and in-progress features — we ship iteratively
+- Demo data resets periodically
+- Performance on large datasets (10k+ vulnerabilities) is functional but not yet optimized
+
+**How to give feedback:**
+Email [support@glasswatch.io](mailto:support@glasswatch.io) with what you found, what you expected, and what environment you're on. Screenshots are helpful. Bug reports and feature requests both welcome.
+
+---
+
 ## Links
 
 - **Live demo:** https://frontend-production-ef3e.up.railway.app
 - **API docs (Swagger):** https://glasswatch-production.up.railway.app/docs
+- **User Guide:** [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- **Implementation Guide:** [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md)
 - **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Systems & integrations:** [docs/SYSTEMS.md](docs/SYSTEMS.md)
 - **FAQ:** [docs/FAQ.md](docs/FAQ.md)
