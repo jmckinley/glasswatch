@@ -49,6 +49,45 @@ check_command curl "https://curl.se/"
 SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
 POSTGRES_PASSWORD=$(openssl rand -hex 16 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(16))")
 
+# Collect API keys
+echo -e "\n${BOLD}API Key Setup${NC}"
+echo -e "${YELLOW}Glasswatch uses a few external services. Enter your keys now or press Enter to skip (you can add them later in .env).${NC}\n"
+
+echo -e "${BOLD}1. Anthropic API Key${NC} (required for AI assistant and NLP rule creation)"
+echo -e "   Get yours at: ${BLUE}https://console.anthropic.com/settings/keys${NC}"
+read -p "   ANTHROPIC_API_KEY (or press Enter to skip): " ANTHROPIC_API_KEY
+
+echo -e "\n${BOLD}2. Resend API Key${NC} (required for invite emails, weekly digest, alerts)"
+echo -e "   Get yours at: ${BLUE}https://resend.com/api-keys${NC}"
+echo -e "   ${YELLOW}Note: also verify your sender domain in Resend dashboard${NC}"
+read -p "   RESEND_API_KEY (or press Enter to skip): " RESEND_API_KEY
+if [ -n "$RESEND_API_KEY" ]; then
+  read -p "   RESEND_FROM_EMAIL (e.g. alerts@yourdomain.com): " RESEND_FROM_EMAIL
+  RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-"noreply@glasswatch.io"}
+fi
+
+echo -e "\n${BOLD}3. Sentry DSN${NC} (optional — error tracking, highly recommended for production)"
+echo -e "   Get yours at: ${BLUE}https://sentry.io/settings/ → Projects → DSN${NC}"
+read -p "   SENTRY_DSN (or press Enter to skip): " SENTRY_DSN
+
+echo -e "\n${BOLD}4. Scanner API Keys${NC} (add whichever scanners you use — can be added later)"
+echo -e "   ${YELLOW}Tenable:${NC} Settings → My Account → API Keys at ${BLUE}https://cloud.tenable.com${NC}"
+read -p "   TENABLE_ACCESS_KEY (or press Enter to skip): " TENABLE_ACCESS_KEY
+if [ -n "$TENABLE_ACCESS_KEY" ]; then
+  read -p "   TENABLE_SECRET_KEY: " TENABLE_SECRET_KEY
+fi
+echo -e "   ${YELLOW}Qualys:${NC} API URL + credentials from your Qualys subscription"
+read -p "   QUALYS_USERNAME (or press Enter to skip): " QUALYS_USERNAME
+if [ -n "$QUALYS_USERNAME" ]; then
+  read -s -p "   QUALYS_PASSWORD: " QUALYS_PASSWORD; echo
+  read -p "   QUALYS_API_URL (e.g. https://qualysapi.qualys.com): " QUALYS_API_URL
+fi
+echo -e "   ${YELLOW}Rapid7:${NC} InsightVM → Administration → API Keys"
+read -p "   RAPID7_HOST (e.g. https://your-instance.insight.rapid7.com, or press Enter to skip): " RAPID7_HOST
+if [ -n "$RAPID7_HOST" ]; then
+  read -p "   RAPID7_API_KEY: " RAPID7_API_KEY
+fi
+
 # Create directory
 INSTALL_DIR="${GLASSWATCH_DIR:-./glasswatch}"
 mkdir -p "$INSTALL_DIR"
@@ -80,25 +119,38 @@ BACKEND_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
 # Auth tokens
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# Optional: Email via Resend (for invite emails, digest)
-# RESEND_API_KEY=re_xxxx
+# Email via Resend (invite emails, weekly digest, alerts)
+# Get your key: https://resend.com/api-keys
+RESEND_API_KEY=${RESEND_API_KEY:-}
+RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@glasswatch.io}
 
-# Optional: Scanner integrations
-# TENABLE_ACCESS_KEY=
-# TENABLE_SECRET_KEY=
-# QUALYS_USERNAME=
-# QUALYS_PASSWORD=
-# RAPID7_HOST=
-# RAPID7_API_KEY=
+# Anthropic AI (AI assistant, NLP rule creation)
+# Get your key: https://console.anthropic.com/settings/keys
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
-# Optional: OAuth
+# Scanner integrations (add keys for the scanners you use)
+# Tenable: https://cloud.tenable.com -> Settings -> API Keys
+TENABLE_ACCESS_KEY=${TENABLE_ACCESS_KEY:-}
+TENABLE_SECRET_KEY=${TENABLE_SECRET_KEY:-}
+# Qualys: your subscription credentials
+QUALYS_USERNAME=${QUALYS_USERNAME:-}
+QUALYS_PASSWORD=${QUALYS_PASSWORD:-}
+QUALYS_API_URL=${QUALYS_API_URL:-}
+# Rapid7: InsightVM -> Administration -> API Keys
+RAPID7_HOST=${RAPID7_HOST:-}
+RAPID7_API_KEY=${RAPID7_API_KEY:-}
+
+# OAuth (optional - Google/GitHub login)
+# Google: https://console.cloud.google.com -> APIs -> Credentials
+# GitHub: https://github.com/settings/developers
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
 # GITHUB_CLIENT_ID=
 # GITHUB_CLIENT_SECRET=
 
-# Optional: Error tracking
-# SENTRY_DSN=
+# Error tracking (highly recommended for production)
+# Get your DSN: https://sentry.io/settings/ -> Projects -> DSN
+SENTRY_DSN=${SENTRY_DSN:-}
 EOF
 
 echo -e "${GREEN}✓ .env generated${NC}"
@@ -124,7 +176,16 @@ services:
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - TENABLE_ACCESS_KEY=${TENABLE_ACCESS_KEY:-}
+      - TENABLE_SECRET_KEY=${TENABLE_SECRET_KEY:-}
+      - QUALYS_USERNAME=${QUALYS_USERNAME:-}
+      - QUALYS_PASSWORD=${QUALYS_PASSWORD:-}
+      - QUALYS_API_URL=${QUALYS_API_URL:-}
+      - RAPID7_HOST=${RAPID7_HOST:-}
+      - RAPID7_API_KEY=${RAPID7_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -234,4 +295,32 @@ echo -e "    Logs:    $COMPOSE_CMD logs -f"
 echo -e "    Update:  $COMPOSE_CMD pull && $COMPOSE_CMD up -d"
 echo ""
 echo -e "  ${BOLD}Config:${NC} Edit .env then restart: $COMPOSE_CMD up -d"
+echo ""
+
+# Show configuration status
+echo -e "${BOLD}Configuration Status:${NC}"
+if [ -n "${ANTHROPIC_API_KEY}" ]; then
+  echo -e "  ${GREEN}✓ AI assistant${NC} — enabled"
+else
+  echo -e "  ${YELLOW}○ AI assistant${NC} — disabled (add ANTHROPIC_API_KEY to .env)"
+  echo -e "    → https://console.anthropic.com/settings/keys"
+fi
+if [ -n "${RESEND_API_KEY}" ]; then
+  echo -e "  ${GREEN}✓ Email (Resend)${NC} — enabled (invite emails, weekly digest)"
+else
+  echo -e "  ${YELLOW}○ Email${NC} — disabled (add RESEND_API_KEY to .env)"
+  echo -e "    → https://resend.com/api-keys"
+fi
+if [ -n "${SENTRY_DSN}" ]; then
+  echo -e "  ${GREEN}✓ Error tracking${NC} — enabled (Sentry)"
+else
+  echo -e "  ${YELLOW}○ Error tracking${NC} — not configured (add SENTRY_DSN to .env)"
+  echo -e "    → https://sentry.io (free tier available)"
+fi
+if [ -n "${TENABLE_ACCESS_KEY}" ] || [ -n "${QUALYS_USERNAME}" ] || [ -n "${RAPID7_HOST}" ]; then
+  echo -e "  ${GREEN}✓ Scanner integration${NC} — configured"
+else
+  echo -e "  ${YELLOW}○ Scanner integration${NC} — not configured (add scanner keys to .env)"
+  echo -e "    → Or use CSV import at http://localhost:3000/import"
+fi
 echo ""

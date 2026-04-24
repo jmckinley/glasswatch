@@ -24,6 +24,56 @@ If you're a security analyst or manager trying to use Glasswatch after it's depl
 
 ---
 
+## API Keys You'll Need
+
+Before deploying, gather these keys. The installer will prompt for them interactively.
+
+### Required for full functionality
+
+**Anthropic API Key** — Powers the AI assistant and NLP rule creation. Without this, those features fall back to pattern matching (limited).
+- Go to: https://console.anthropic.com/settings/keys
+- Click "Create Key", give it a name like "Glasswatch Production"
+- Copy the key — it starts with `sk-ant-`
+- Add to `.env` as: `ANTHROPIC_API_KEY=sk-ant-...`
+
+**Resend API Key** — Sends invite emails, weekly digests, and alert notifications.
+- Go to: https://resend.com/api-keys
+- Click "Create API Key"
+- Also go to **Domains** and add + verify your sender domain (requires adding 3 DNS records)
+- Without a verified domain, emails will be blocked
+- Add to `.env` as: `RESEND_API_KEY=re_...` and `RESEND_FROM_EMAIL=alerts@yourdomain.com`
+
+### Strongly recommended
+
+**Sentry DSN** — Error tracking. Tells you when something breaks in production before a user complains.
+- Go to: https://sentry.io → Create Project → FastAPI (for backend) and Next.js (for frontend)
+- Copy the DSN from **Project Settings → Client Keys (DSN)**
+- Free tier is more than enough
+- Add to `.env` as: `SENTRY_DSN=https://...@sentry.io/...`
+
+### Required if using scanners
+
+**Tenable** — Settings → My Account → API Keys at https://cloud.tenable.com
+- You need both `TENABLE_ACCESS_KEY` and `TENABLE_SECRET_KEY`
+
+**Qualys** — Your platform credentials + API URL (e.g. `https://qualysapi.qualys.com`)
+- Set `QUALYS_USERNAME`, `QUALYS_PASSWORD`, `QUALYS_API_URL`
+
+**Rapid7 InsightVM** — Administration → API Keys in your InsightVM instance
+- Set `RAPID7_HOST` (your instance URL) and `RAPID7_API_KEY`
+
+### Optional (enables OAuth login)
+
+**Google OAuth** — https://console.cloud.google.com → APIs & Services → Credentials → Create OAuth Client
+- Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- Add authorized redirect URI: `https://yourdomain.com/auth/callback?provider=google`
+
+**GitHub OAuth** — https://github.com/settings/developers → New OAuth App
+- Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
+- Set Authorization callback URL: `https://yourdomain.com/auth/callback?provider=github`
+
+---
+
 ## Deployment Options
 
 ### Option A: Railway (Recommended for Alpha)
