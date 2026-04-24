@@ -256,7 +256,7 @@ function FocusDashboard({ stats }: { stats: DashboardStats }) {
             View all {stats.goals.length} goals →
           </Link>
         )}
-      </div>
+      </div>}
 
       {/* Panel 3: Next Window — shown when expanded */}
       {showMore && <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">

@@ -194,65 +194,48 @@ export default function VulnerabilitiesPage() {
         ) : null}
       </div>
 
-      {/* Active filter banner */}
-      {(filters.kev_listed || filters.severity) && (
-        <div className="flex items-center gap-3 px-4 py-2.5 mb-4 bg-blue-950/60 border border-blue-700/50 rounded-lg text-sm">
-          <span className="text-blue-300 font-medium">🔍 Filtered:</span>
-          {filters.kev_listed && (
-            <span className="px-2 py-0.5 bg-red-900/60 border border-red-700/50 text-red-300 rounded text-xs font-semibold">KEV Listed Only</span>
-          )}
-          {filters.severity && (
-            <span className="px-2 py-0.5 bg-orange-900/60 border border-orange-700/50 text-orange-300 rounded text-xs font-semibold">{filters.severity}</span>
-          )}
-          <button
-            onClick={() => setFilters({ severity: "", kev_listed: false, search: "" })}
-            className="ml-auto text-xs text-neutral-400 hover:text-white transition-colors"
-          >
-            Clear filters ✕
-          </button>
-        </div>
-      )}
+      {/* Search + Filter Pills */}
+      <div className="mb-6 space-y-3">
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search CVE, keyword, or description..."
+          className="w-full max-w-sm px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white placeholder-neutral-500"
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+        />
 
-      {/* Filters */}
-      <div className="card p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div>
-            <label className="block text-sm text-neutral-400 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="CVE, keyword, or description..."
-              className="px-3 py-2 bg-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-neutral-400 mb-1">Severity</label>
-            <select
-              className="px-3 py-2 bg-neutral-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              value={filters.severity}
-              onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
+        {/* Filter Pills */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {[
+            { label: "All", active: !filters.severity && !filters.kev_listed && !filters.patch_available, onClick: () => setFilters({ severity: "", kev_listed: false, patch_available: false, search: filters.search }) },
+            { label: `Critical${stats ? ` (${stats.by_severity.CRITICAL})` : ""}`, active: filters.severity === "CRITICAL", onClick: () => setFilters({ ...filters, severity: "CRITICAL", kev_listed: false, patch_available: false }) },
+            { label: `High${stats ? ` (${stats.by_severity.HIGH})` : ""}`, active: filters.severity === "HIGH", onClick: () => setFilters({ ...filters, severity: "HIGH", kev_listed: false, patch_available: false }) },
+            { label: `Medium${stats ? ` (${stats.by_severity.MEDIUM})` : ""}`, active: filters.severity === "MEDIUM", onClick: () => setFilters({ ...filters, severity: "MEDIUM", kev_listed: false, patch_available: false }) },
+            { label: `Low${stats ? ` (${stats.by_severity.LOW})` : ""}`, active: filters.severity === "LOW", onClick: () => setFilters({ ...filters, severity: "LOW", kev_listed: false, patch_available: false }) },
+            { label: `KEV Only${stats ? ` (${stats.kev_listed})` : ""}`, active: filters.kev_listed, onClick: () => setFilters({ ...filters, severity: "", kev_listed: true, patch_available: false }) },
+            { label: `Patch Available${stats ? ` (${stats.patches_available})` : ""}`, active: filters.patch_available, onClick: () => setFilters({ ...filters, severity: "", kev_listed: false, patch_available: true }) },
+          ].map(({ label, active, onClick }) => (
+            <button
+              key={label}
+              onClick={onClick}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                active
+                  ? "bg-indigo-600 text-white"
+                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white border border-neutral-700"
+              }`}
             >
-              <option value="">All Severities</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.kev_listed}
-                onChange={(e) => setFilters({ ...filters, kev_listed: e.target.checked })}
-                className="rounded"
-              />
-              <Tooltip content="CISA Known Exploited Vulnerability — actively exploited in the wild. CISA BOD 22-01 mandates federal agencies patch these immediately.">
-                <span className="text-sm">KEV Listed Only ⓘ</span>
-              </Tooltip>
-            </label>
-          </div>
+              {label}
+            </button>
+          ))}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => setFilters({ severity: "", kev_listed: false, patch_available: false, search: filters.search })}
+              className="ml-2 text-xs text-neutral-500 hover:text-white transition-colors"
+            >
+              Clear filters ×
+            </button>
+          )}
         </div>
       </div>
 
@@ -281,7 +264,7 @@ export default function VulnerabilitiesPage() {
                 Status
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
-                Published
+                Age
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
                 Actions
@@ -303,20 +286,32 @@ export default function VulnerabilitiesPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="text-center py-16">
-                    <div className="text-5xl mb-4">🔍</div>
-                    <h3 className="text-lg font-medium text-white mb-2">No vulnerabilities found</h3>
-                    <p className="text-neutral-400 mb-4">
-                      {(filters.severity || filters.kev_listed || filters.search)
-                        ? "Try clearing your filters to see all vulnerabilities."
-                        : "Connect a scanner or import a CSV to get started."}
-                    </p>
-                    {(filters.severity || filters.kev_listed || filters.search) && (
-                      <button
-                        onClick={() => setFilters({ severity: "", kev_listed: false, search: "" })}
-                        className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors"
-                      >
-                        Clear Filters
-                      </button>
+                    {(filters.severity || filters.kev_listed || filters.patch_available || filters.search) ? (
+                      <>
+                        <div className="text-5xl mb-4">🔍</div>
+                        <h3 className="text-lg font-medium text-white mb-2">No vulnerabilities match this filter</h3>
+                        <p className="text-neutral-400 mb-4">Try broadening your search.</p>
+                        <button
+                          onClick={() => setFilters({ severity: "", kev_listed: false, patch_available: false, search: "" })}
+                          className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors"
+                        >
+                          Clear Filters
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-5xl mb-4">🎉</div>
+                        <h3 className="text-lg font-medium text-white mb-2">No vulnerabilities found — your environment looks clean.</h3>
+                        <p className="text-neutral-400 mb-4">Connect a scanner or import a CSV to keep your data current.</p>
+                        <div className="flex justify-center gap-3">
+                          <Link href="/settings/connections" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
+                            Connect Scanner
+                          </Link>
+                          <Link href="/import" className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors">
+                            Import CSV
+                          </Link>
+                        </div>
+                      </>
                     )}
                   </div>
                 </td>
@@ -368,7 +363,8 @@ export default function VulnerabilitiesPage() {
 
 function VulnerabilityRow({ vulnerability }: { vulnerability: Vulnerability }) {
   const vuln = vulnerability;
-  const publishedDate = new Date(vuln.published_at).toLocaleDateString();
+  const ageInDays = Math.floor((Date.now() - new Date(vuln.published_at).getTime()) / (1000 * 60 * 60 * 24));
+  const ageLabel = ageInDays >= 365 ? `${Math.floor(ageInDays / 365)}y ${Math.floor((ageInDays % 365) / 30)}m` : `${ageInDays}d`;
 
   return (
     <tr className="border-b border-border hover:bg-card-hover transition-colors">
@@ -412,7 +408,7 @@ function VulnerabilityRow({ vulnerability }: { vulnerability: Vulnerability }) {
           )}
         </div>
       </td>
-      <td className="px-6 py-4 text-sm text-neutral-400">{publishedDate}</td>
+      <td className="px-6 py-4 text-sm text-neutral-400">{ageLabel}</td>
       <td className="px-6 py-4">
         <Link
           href={`/vulnerabilities/${vuln.id}`}

@@ -10,12 +10,12 @@ const navLinks = [
   { href: "/assets", label: "Assets" },
   { href: "/vulnerabilities", label: "Vulnerabilities" },
   { href: "/goals", label: "Goals" },
-  { href: "/bundles", label: "Bundles" },
+  { href: "/bundles", label: "Bundles", tooltip: "Patch Schedules" },
   { href: "/schedule", label: "Schedule" },
   { href: "/approvals", label: "Approvals" },
   { href: "/rules", label: "Rules" },
   { href: "/compliance", label: "Compliance" },
-  { href: "/agent", label: "AI Analyst" },
+  { href: "/agent", label: "AI Assistant" },
   { href: "/import", label: "Import" },
   { href: "/settings", label: "Settings" },
   { href: "/help", label: "Help" },
@@ -44,9 +44,10 @@ export default function Navigation() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  title={(link as { href: string; label: string; tooltip?: string }).tooltip}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive(link.href)
-                      ? "text-white bg-gray-900"
+                      ? "text-white bg-indigo-700 border-b-2 border-indigo-400"
                       : "text-gray-300 hover:text-white hover:bg-gray-700"
                   }`}
                 >
@@ -88,11 +89,12 @@ export default function Navigation() {
               <Link
                 key={link.href}
                 href={link.href}
+                title={(link as { href: string; label: string; tooltip?: string }).tooltip}
                 onClick={() => setMobileOpen(false)}
-                className={`px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-2.5 rounded-md text-sm font-medium transition-colors border-l-2 ${
                   isActive(link.href)
-                    ? "text-white bg-gray-900"
-                    : "text-gray-300 hover:text-white hover:bg-gray-700"
+                    ? "text-white bg-indigo-900/60 border-indigo-500"
+                    : "text-gray-300 hover:text-white hover:bg-gray-700 border-transparent"
                 }`}
               >
                 {link.label}
