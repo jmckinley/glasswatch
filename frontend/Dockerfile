@@ -1,32 +1,53 @@
-# Frontend Dockerfile for Glasswatch
+# Frontend Dockerfile for Glasswatch (self-hosted)
+# Next.js standalone output — minimal production image
 
-FROM node:20-alpine
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Set working directory
+# ============================================================================
+# Stage 1: Dependencies
+# ============================================================================
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package*.json ./
+RUN npm ci --ignore-scripts
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# ============================================================================
+# Stage 2: Build
+# ============================================================================
+FROM node:20-alpine AS builder
+WORKDIR /app
 
-# Copy application code
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the application
-RUN pnpm build
+# NEXT_PUBLIC_* vars must be present at build time for Next.js to inline them
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+RUN npm run build
+
+# ============================================================================
+# Stage 3: Runtime (minimal image using standalone output)
+# ============================================================================
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
 USER nextjs
 
-# Expose port
 EXPOSE 3000
 
-# Start the application
-CMD ["pnpm", "start"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -qO- http://localhost:3000/ || exit 1
+
+CMD ["node", "server.js"]

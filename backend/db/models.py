@@ -25,3 +25,4 @@ from backend.models.connection import Connection  # noqa: F401
 from backend.models.tag import Tag  # noqa: F401
 from backend.models.rule import DeploymentRule  # noqa: F401
 from backend.models.discovery_scan import DiscoveryScan  # noqa: F401
+from backend.models.invite import Invite  # noqa: F401

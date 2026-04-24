@@ -596,5 +596,10 @@ def main():
         conn.close()
 
 
+async def seed():
+    """Async wrapper for the seed function (for compatibility with asyncio.run())."""
+    main()
+
+
 if __name__ == "__main__":
     main()

@@ -9,6 +9,18 @@
 
 ---
 
+## Quick Install (Self-Hosted)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jmckinley/glasswatch/main/install.sh | bash
+```
+
+That's it. Requires [Docker](https://docs.docker.com/get-docker/). Up and running in under 5 minutes.
+
+**Manual setup:** See [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md)
+
+---
+
 ## What It Is
 
 Glasswatch converts vulnerability chaos into organized, evidence-backed patch operations. Instead of drowning in CVE queues, teams define business objectives — "be Glasswing-ready by July 1" — and Glasswatch builds the optimal patching plan to get there.
