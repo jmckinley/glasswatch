@@ -22,6 +22,7 @@ import {
   BarChart2,
   Database,
   AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 
 // FAQ data — sourced from docs/FAQ.md
@@ -80,6 +81,16 @@ const faqItems = [
     question: "What does SOC 2 readiness mean?",
     answer:
       "Glasswatch maintains immutable audit logs, role-based access, JWT auth with short-lived tokens, TLS-only communication, and full tenant isolation — all aligned with SOC 2 requirements. The Compliance dashboard tracks your patching SLA adherence, which directly supports SOC 2 CC7.1 controls during an audit.",
+  },
+  {
+    question: "How does the audit log work?",
+    answer:
+      "Every meaningful action in Glasswatch generates an audit event — bundle approvals, vulnerability imports, user logins (including failed attempts), invite sends, and maintenance window changes. Go to Audit Log in the sidebar to browse, filter by action type/resource/date, expand any row for full structured details, and export to CSV for auditors or compliance evidence packages.",
+  },
+  {
+    question: "Can I see failed login attempts?",
+    answer:
+      "Yes. Failed logins appear in the Audit Log with action 'user.login_failed', a red ✗ status, and the source IP address. Useful for detecting brute-force attempts or compromised credentials. Navigate to Audit Log and filter by action type 'user.login_failed'.",
   },
   {
     question: "How does the goal optimizer work?",
@@ -186,6 +197,11 @@ const keyConcepts = [
     title: "Compliance & Reporting",
     desc: "BOD 22-01, SOC 2, and PCI DSS posture cards. MTTP metrics by severity, environment, and team. Export PDF reports for leadership or auditors.",
   },
+  {
+    icon: ClipboardList,
+    title: "Audit Log",
+    desc: "Complete tamper-evident record of every action in your workspace. Bundle approvals, vulnerability imports, user logins, and system events — timestamped with user, IP, and full context. Searchable, filterable, exportable to CSV for auditors.",
+  },
 ];
 
 const commonWorkflows = [
@@ -200,6 +216,18 @@ const commonWorkflows = [
       "Click Create and Optimize — bundles are generated automatically",
       "Review bundles in the Bundles view, approve the first one",
       "Track progress on the Goals page; the optimizer rebalances as you complete bundles",
+    ],
+  },
+  {
+    title: "I want to prepare an evidence package for a security audit",
+    icon: Shield,
+    steps: [
+      "Go to Audit Log in the sidebar",
+      "Set Date From to the start of your audit period",
+      "Click Export CSV — this downloads all audit events in the selected range",
+      "Go to Compliance → Export Report for the patching posture PDF",
+      "Combine both exports as evidence: audit trail + SLA compliance data",
+      "The Compliance page shows your MTTP and SLA adherence per framework (SOC 2, PCI DSS, BOD 22-01)",
     ],
   },
   {
@@ -286,6 +314,7 @@ const integrations = [
   { name: "ServiceNow", type: "ITSM", direction: "Outbound" },
   { name: "VulnCheck", type: "Threat intel", direction: "Outbound (enrichment)" },
   { name: "Snapper", type: "Runtime analysis", direction: "Outbound (scoring)" },
+  { name: "Audit Log (built-in)", type: "Compliance", direction: "Internal — all events auto-recorded" },
 ];
 
 const docLinks = [
@@ -332,6 +361,7 @@ export default function HelpPage() {
     { id: "concepts", label: "Key Concepts", icon: BookOpen },
     { id: "workflows", label: "Common Workflows", icon: GitBranch },
     { id: "integrations", label: "Integrations", icon: Link2 },
+    { id: "audit", label: "Audit Log", icon: ClipboardList },
     { id: "docs", label: "Documentation", icon: ExternalLink },
     { id: "faq", label: "FAQ", icon: HelpCircle },
   ];
@@ -604,6 +634,61 @@ export default function HelpPage() {
             </div>
           )}
 
+          {/* Audit Log */}
+          {activeSection === "audit" && (
+            <div>
+              <h2 className="text-xl font-semibold text-white mb-4">Audit Log</h2>
+              <p className="text-gray-400 mb-6">
+                A complete record of every action taken in your workspace.{" "}
+                <Link href="/audit-log" className="text-blue-400 hover:underline">
+                  Open Audit Log →
+                </Link>
+              </p>
+
+              {/* What's recorded */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-5">
+                <h3 className="font-semibold text-white mb-3">What&apos;s recorded</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {[
+                    { badge: "📦", color: "bg-indigo-900/40 text-indigo-300 border-indigo-700", label: "Bundle events", examples: "created, approved, status changed, executed" },
+                    { badge: "🛡️", color: "bg-amber-900/40 text-amber-300 border-amber-700", label: "Vulnerability events", examples: "CSV imported, webhook ingestion" },
+                    { badge: "👤", color: "bg-emerald-900/40 text-emerald-300 border-emerald-700", label: "User events", examples: "login, failed login, invited, accepted" },
+                    { badge: "🗓️", color: "bg-blue-900/40 text-blue-300 border-blue-700", label: "Maintenance events", examples: "window created, deleted" },
+                    { badge: "🎯", color: "bg-purple-900/40 text-purple-300 border-purple-700", label: "Goal events", examples: "created, updated" },
+                    { badge: "⚙️", color: "bg-gray-900/40 text-gray-300 border-gray-700", label: "System events", examples: "config changes, integration events" },
+                  ].map((cat) => (
+                    <div key={cat.label} className={`border rounded-lg p-3 ${cat.color}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{cat.badge}</span>
+                        <span className="font-medium">{cat.label}</span>
+                      </div>
+                      <p className="text-xs opacity-75">{cat.examples}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 mb-5">
+                <h3 className="font-semibold text-white mb-3">Tips</h3>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">›</span>Click any row to expand the full structured details — useful for seeing old/new status on bundle changes</li>
+                  <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">›</span>Set a date range and click Export CSV to generate an evidence package for auditors</li>
+                  <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">›</span>Filter by action &ldquo;user.login_failed&rdquo; to review failed login attempts with source IPs</li>
+                  <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">›</span>Audit entries are never modified or deleted — suitable for compliance evidence</li>
+                </ul>
+              </div>
+
+              <Link
+                href="/audit-log"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Open Audit Log
+              </Link>
+            </div>
+          )}
+
           {/* Documentation */}
           {activeSection === "docs" && (
             <div>
@@ -673,6 +758,10 @@ export default function HelpPage() {
                   <div>
                     <p className="text-white font-medium mb-1">Notifications</p>
                     <p>A Slack webhook in Settings only enables the delivery channel. You still need an alert rule (Settings → Alert Rules) that uses Slack as its channel. Both are required for alerts to send.</p>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium mb-1">Audit Log</p>
+                    <p>Use date range filters to narrow audit exports for a specific audit period. Expand any row to see the full structured details JSON — especially useful for &ldquo;bundle.status_changed&rdquo; events which show before/after values. Failed logins show the source IP in the details panel.</p>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 # Glasswatch User Guide
 
-**Version:** Alpha · **Last updated:** April 2026
+**Version:** Alpha · **Last updated:** April 2026 (Sprint 10 — Audit Log, API Simulators)
 
 ---
 
@@ -25,6 +25,8 @@ This guide covers every major feature. It assumes you have access to Glasswatch 
 11. [Compliance & Reporting](#compliance--reporting)
 12. [Settings](#settings)
 13. [Importing Data](#importing-data)
+14. [Testing Integrations](#testing-integrations-simulator-mode)
+15. [Audit Log](#audit-log)
 
 ---
 
@@ -483,6 +485,72 @@ Authenticate with an API key (generate one in Settings → API Keys). These endp
 
 ---
 
+## Audit Log
+
+The Audit Log is a complete, tamper-evident record of every action taken in your Glasswatch workspace. It is available to admin users and is designed to support compliance reviews, security investigations, and accountability requirements.
+
+### What is recorded
+
+Every meaningful action generates an audit event:
+
+| Category | Examples |
+|---|---|
+| Bundle actions | Created, approved, status changed, executed |
+| Vulnerability data | CSV imported (with count), webhook ingestion |
+| User actions | Login, login failed, invited, invite accepted |
+| Maintenance windows | Created, deleted |
+| Goals | Created, updated |
+| System events | Configuration changes, integration events |
+
+Each entry records: timestamp, user (or "System" for automated events), action type, the resource affected (type + name), full context details, client IP address, and whether the action succeeded or failed.
+
+### Navigating the Audit Log
+
+Go to **Audit Log** in the sidebar (below Settings). The page shows the most recent events first, 50 per page.
+
+**Filters available:**
+- **Action Type** — narrow to a specific event class (e.g. "bundle.approved" or "user.invited")
+- **Resource Type** — show only bundle events, or only user events, etc.
+- **Date From / Date To** — restrict to a time window
+
+Apply active filters using the Apply button. Each active filter appears as a pill below the filter bar — click the × on a pill to remove it individually, or "Clear all" to reset.
+
+**Reading the table:**
+
+- **Timestamp** — relative time ("2 min ago") with the full ISO datetime visible on hover
+- **User** — colored avatar with initials for user actions; a "SYS" badge for system/automated events
+- **Action** — color-coded badge indicating the category:
+  - 📦 Indigo — bundle events
+  - 🛡️ Amber — vulnerability events
+  - 👤 Emerald — user events
+  - 🗓️ Blue — maintenance window events
+  - 🎯 Purple — goal events
+  - ⚙️ Gray — system events
+- **Resource** — the type and name of the affected object (e.g. "Bundle: KEV Emergency Response")
+- **Status** — ✓ green for success, ✗ red for failure (e.g. failed login attempt)
+
+**Expanding a row:** Click any row to expand it and see the full structured details. Fields vary by event type — for example, a `bundle.status_changed` event shows the old and new status; a `vulnerability.imported` event shows the count of CVEs imported.
+
+### Exporting for auditors
+
+Click **Export CSV** (top-right of the page) to download a CSV file containing all audit events matching the current filters. The CSV includes all columns including the full details JSON serialized as a string.
+
+This export is suitable for:
+- SOC 2 audit evidence packages
+- PCI DSS compliance reviews
+- Internal security investigations
+- Legal/eDiscovery requests
+
+### Failed login attempts
+
+Failed logins appear with a ✗ red status and the action `user.login_failed`. The IP address column shows where the attempt originated. This is useful for detecting brute-force attempts or compromised credentials.
+
+### Retention
+
+Audit log entries are retained indefinitely and are never automatically deleted. Entries cannot be modified after creation.
+
+---
+
 ## Settings
 
 ### Integrations
@@ -543,6 +611,49 @@ Navigate to **Import** in the sidebar. Select the data type (Vulnerabilities or 
 After you upload a CSV, Glasswatch shows a summary: rows created, rows updated (if the identifier already exists), and any validation errors. Errors are listed with row numbers and descriptions so you can fix and re-upload.
 
 Imported vulnerabilities are immediately scored using the same 8-factor algorithm as scanner-ingested data. They'll appear in the vulnerability list and contribute to asset risk scores within a few seconds of import completing.
+
+---
+
+## Testing Integrations (Simulator Mode)
+
+Glasswatch ships with a built-in simulator server that mimics all 11 external APIs — Tenable, Qualys, Rapid7, Slack, Teams, Jira, ServiceNow, Resend, CISA KEV, NVD, and EPSS — with exact auth validation and realistic vulnerability data.
+
+This lets you test the full integration flow without real credentials.
+
+### Starting the simulator
+
+```bash
+uvicorn backend.simulators.external_apis:app --port 8099
+```
+
+### Enabling simulator mode
+
+Set the environment variable before starting Glasswatch backend:
+
+```bash
+SIMULATOR_MODE=true uvicorn backend.main:app --port 8000
+```
+
+When `SIMULATOR_MODE=true`, all scanner health checks and integration calls route to `localhost:8099` instead of the real vendor APIs.
+
+### What the simulator provides
+
+- **10 real CVEs** (CVE-2024-21887, CVE-2024-3400, CVE-2024-1709, etc.) spread across 5 named assets
+- **Exact auth validation** — pass the wrong Tenable `X-ApiKeys` format and you get a real 401
+- **Tenable export state machine** — POST export → PROCESSING → FINISHED → chunk download, just like production
+- **Qualys XML responses** — proper `Content-Type: application/xml` with `VULN_LIST` structure
+- **Rapid7 HAL pagination** — `resources` + `page` + `links` structure
+- **Error simulation** — append `?simulate_error=true` to any endpoint to get a random 429, 500, or 503
+
+### Running the test suite against simulators
+
+```bash
+python3 backend/simulators/test_simulators.py
+```
+
+Prints PASS/FAIL for every simulated endpoint. All 11 systems should pass.
+
+See `docs/SIMULATORS.md` for full developer reference.
 
 ---
 
