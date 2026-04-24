@@ -64,31 +64,59 @@
 
   /* ── NARRATION BAR ──────────────────────────────────────── */
   #narration {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    height: 52px;
-    background: rgba(15,23,42,0.93);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid var(--border);
-    display: flex; align-items: center; padding: 0 80px 0 20px;
+    position: fixed; bottom: 0; left: 0; right: 260px;
+    background: rgba(10,17,35,0.97);
+    backdrop-filter: blur(16px);
+    border-top: 2px solid var(--accent);
+    border-right: 1px solid var(--border);
+    padding: 14px 24px 16px 20px;
     z-index: 999;
     transform: translateY(100%);
-    transition: transform 0.4s ease;
+    transition: transform 0.45s cubic-bezier(0.22,1,0.36,1);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
   #narration.visible { transform: translateY(0); }
-  #narration-icon { font-size: 16px; margin-right: 10px; flex-shrink: 0; }
+  #narration-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #narration-eyebrow::before { content: ''; display: inline-block; width: 18px; height: 2px; background: var(--accent); border-radius: 2px; }
+  #narration-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1.3;
+  }
   #narration-text {
-    font-size: 14px; color: var(--text-primary);
-    line-height: 1.4; flex: 1;
-    font-style: italic;
+    font-size: 14px;
+    color: #94a3b8;
+    line-height: 1.55;
+    flex: 1;
   }
 
   /* ── CONTROLS HUD ───────────────────────────────────────── */
   #controls {
     position: fixed; bottom: 0; right: 0;
-    height: 52px;
+    width: 260px;
+    height: 100%;
+    max-height: 110px;
     display: flex; align-items: center; gap: 4px;
     padding: 0 12px;
     z-index: 1001;
+    background: rgba(10,17,35,0.97);
+    border-top: 2px solid rgba(99,102,241,0.3);
+    border-left: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+    justify-content: center;
+    flex-wrap: wrap;
   }
   .ctrl-btn {
     background: rgba(255,255,255,0.07);
@@ -1609,7 +1637,8 @@
 
 <!-- Narration bar -->
 <div id="narration">
-  <div id="narration-icon">🔊</div>
+  <div id="narration-eyebrow">Now Showing</div>
+  <div id="narration-title"></div>
   <div id="narration-text"></div>
 </div>
 
@@ -1637,16 +1666,46 @@
   const TRANSITION_DURATION = 800; // ms crossfade
 
   const narrations = [
-    "One click to get started. No signup required for the demo.",
-    "Focus Mode cuts through the noise. One priority, one action.",
-    "8-factor AI risk scoring. EPSS + KEV + asset context in one view.",
-    "No more CVSS-only triage. Eight signals, one score.",
-    "Plain English goals. AI builds the patch schedule.",
-    "Compliance evidence, automatically generated. Audit-ready in one click.",
-    "Your AI security analyst. Live data, not generic advice.",
-    "Slack, Teams, or email. Alerts you define, delivered instantly.",
-    "Schedule patches around change freezes. Conflict detection built in.",
-    "Start free at frontend-production-ef3e.up.railway.app"
+    {
+      title: "Demo Login — Zero Friction",
+      body: "Most security tools require a 30-minute setup call before you can see anything. Glasswatch lets you click \"Try Demo\" and immediately explore a fully-loaded environment with real CVE data, bundles, and compliance dashboards. No account required."
+    },
+    {
+      title: "Focus Mode — One Priority, One Action",
+      body: "Security teams are buried in dashboards. Focus Mode solves alert fatigue by surfacing a single most-critical action each morning, based on EPSS probability, KEV status, asset criticality, and SLA deadlines. Skip the noise — act on what matters."
+    },
+    {
+      title: "Vulnerability Intelligence — Beyond CVSS",
+      body: "Traditional vuln scanners rank by CVSS score alone, so everything looks critical. Glasswatch adds EPSS exploit probability, CISA KEV status, affected asset count, and patch availability to produce a ranked, actionable list. Your team knows exactly what to patch next."
+    },
+    {
+      title: "AI Risk Scoring — Eight Signals, One Number",
+      body: "CVE-2024-21887 scores 96/100 not just because of its CVSS 9.8 — but because it's KEV-listed, has a public PoC exploit, affects 47 production assets, all internet-exposed, with a patch already available. Glasswatch combines all eight signals so triage takes seconds, not hours."
+    },
+    {
+      title: "Bundle Execution — From Goal to Schedule",
+      body: "Instead of assigning individual tickets, security engineers define an outcome: \"Remediate all KEV vulnerabilities by May 15.\" Glasswatch groups affected CVEs and assets into a patch bundle, slots it into available maintenance windows, and routes it for approval — all automatically."
+    },
+    {
+      title: "Compliance Dashboard — Evidence, Not Theater",
+      body: "Most teams scramble before an audit. Glasswatch continuously tracks CISA BOD 22-01, SOC 2, and PCI DSS posture in real time — showing patching rates, SLA performance, and MTTP trends. One click exports a PDF evidence package ready for your auditor."
+    },
+    {
+      title: "AI Security Analyst — Live Answers, Not Reports",
+      body: "Ask \"What needs my attention today?\" and get a prioritized briefing pulled from live data: which KEVs are approaching SLA deadlines, which bundles need approval, which compliance metrics are slipping, and what improved. No static weekly reports — real answers, right now."
+    },
+    {
+      title: "Alerts & Rules — Defined in Plain English",
+      body: "When a new KEV drops, your team needs to know in minutes — not at the next daily standup. Glasswatch alert rules let you express policy naturally: \"When a KEV is detected, post to #security-alerts in Slack.\" Delivered via Slack, Teams, or email. No YAML required."
+    },
+    {
+      title: "Maintenance Windows — No More Surprise Deploys",
+      body: "Patch bundles only execute during approved windows — preventing deployments during change freezes, peak traffic hours, or conflicting operations. Calendar view makes scheduling visible across environments. Glasswatch flags conflicts before they happen, not after."
+    },
+    {
+      title: "Ready to Try It?",
+      body: "Glasswatch is live and accepting alpha customers. Click Try Demo to explore the full platform right now — no signup, no sales call. Or self-host in 5 minutes with a single install command."
+    }
   ];
 
   let currentScene = 0;
@@ -1683,7 +1742,9 @@
     narrationEl.classList.remove('visible');
     if (narrationTimer) clearTimeout(narrationTimer);
     narrationTimer = setTimeout(() => {
-      narrationText.textContent = `"${narrations[idx]}"`;
+      const n = narrations[idx];
+      document.getElementById('narration-title').textContent = n.title;
+      narrationText.textContent = n.body;
       narrationEl.classList.add('visible');
     }, 600);
   }
