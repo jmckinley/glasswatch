@@ -52,10 +52,7 @@
     pointer-events: all;
   }
 
-  /* ── PROGRESS BAR (hidden) ─────────────────────────────── */
-  #progress-bar {
-    display: none;
-  }
+  /* progress bar removed */
 
   /* ── NARRATION BAR ──────────────────────────────────────── */
   #narration {
@@ -92,7 +89,7 @@
   }
   #narration-text {
     font-size: 16px;
-    color: #cbd5e1;
+    color: #f1f5f9;
     line-height: 1.6;
     flex: 1;
   }
@@ -1628,7 +1625,7 @@
 </div>
 
 <!-- Progress bar -->
-<div id="progress-bar"></div>
+
 
 <!-- Narration bar -->
 <div id="narration">
@@ -1713,7 +1710,7 @@
   let narrationTimer = null;
 
   const scenes = Array.from(document.querySelectorAll('.scene'));
-  const progressBar = document.getElementById('progress-bar');
+  const progressBar = { style: {}, getBoundingClientRect: () => {} }; // progress bar removed
   const narrationEl = document.getElementById('narration');
   const narrationText = document.getElementById('narration-text');
   const sceneCounter = document.getElementById('scene-counter');
@@ -1746,16 +1743,7 @@
 
   function startProgress(elapsed) {
     stopProgress();
-    progressBar.style.transition = 'none';
-    const startPct = (elapsed / SCENE_DURATION) * 100;
-    progressBar.style.width = startPct + '%';
-    // Force reflow
-    progressBar.getBoundingClientRect();
-
     const remaining = SCENE_DURATION - elapsed;
-    progressBar.style.transition = `width ${remaining}ms linear`;
-    progressBar.style.width = '100%';
-
     progressStart = performance.now() - elapsed;
     progressTimer = setTimeout(() => {
       if (isPlaying && !isPaused) {
@@ -1769,16 +1757,9 @@
       clearTimeout(progressTimer);
       progressTimer = null;
     }
-    // Record elapsed
     if (progressStart !== null) {
       progressElapsed = Math.min(performance.now() - progressStart, SCENE_DURATION);
     }
-    // Freeze the bar at current position
-    const currentWidth = parseFloat(getComputedStyle(progressBar).width);
-    const stageWidth = document.getElementById('stage').offsetWidth;
-    const pct = stageWidth > 0 ? (currentWidth / stageWidth * 100) : 0;
-    progressBar.style.transition = 'none';
-    progressBar.style.width = pct + '%';
   }
 
   function advanceScene() {
@@ -1789,8 +1770,6 @@
       // End of reel — stop
       isPlaying = false;
       playBtn.textContent = '▶';
-      progressBar.style.transition = 'none';
-      progressBar.style.width = '100%';
     }
   }
 
