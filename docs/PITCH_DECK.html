@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glasswatch — AI-Driven Patch Management</title>
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #161b27;
+      --bg3: #1e2536;
+      --indigo: #6366f1;
+      --indigo-light: #818cf8;
+      --indigo-dim: rgba(99,102,241,0.15);
+      --emerald: #10b981;
+      --emerald-dim: rgba(16,185,129,0.15);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --border: rgba(99,102,241,0.2);
+      --border-subtle: rgba(255,255,255,0.06);
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* ===== PRINT BANNER ===== */
+    .no-print {
+      background: #1e40af;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-size: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    /* ===== SLIDES ===== */
+    .slide {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 80px;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(to bottom, var(--indigo), transparent);
+    }
+
+    .slide::after {
+      content: '';
+      position: absolute;
+      top: -200px; right: -200px;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    .slide-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--indigo-light);
+      margin-bottom: 16px;
+    }
+
+    h1.wordmark {
+      font-size: 72px;
+      font-weight: 900;
+      letter-spacing: -3px;
+      background: linear-gradient(135deg, #fff 30%, var(--indigo-light) 70%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 24px;
+    }
+
+    h2.slide-title {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.1;
+    }
+
+    h2.slide-title .accent { color: var(--indigo-light); }
+    h2.slide-title .emerald { color: var(--emerald); }
+
+    .tagline {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--indigo-light);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 26px;
+      font-weight: 300;
+      color: var(--text-muted);
+      margin-bottom: 48px;
+      max-width: 700px;
+    }
+
+    p { color: var(--text-muted); }
+
+    /* ===== SLIDE NUMBER ===== */
+    .slide-num {
+      position: absolute;
+      bottom: 28px;
+      right: 40px;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+
+    .slide-domain {
+      position: absolute;
+      bottom: 28px;
+      left: 80px;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+    }
+
+    /* ===== DIVIDER ===== */
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(to right, var(--indigo), var(--emerald));
+      border-radius: 2px;
+      margin: 20px 0 36px;
+    }
+
+    /* ===== STAT CARDS ===== */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(to right, var(--indigo), var(--emerald));
+    }
+
+    .stat-number {
+      font-size: 42px;
+      font-weight: 900;
+      color: var(--indigo-light);
+      line-height: 1;
+      margin-bottom: 8px;
+      letter-spacing: -2px;
+    }
+
+    .stat-number.emerald { color: var(--emerald); }
+    .stat-number.red { color: #f87171; }
+
+    .stat-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ===== TIMELINE BAR ===== */
+    .timeline-wrapper {
+      margin: 32px 0 28px;
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 28px 32px;
+    }
+
+    .timeline-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    .timeline-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .timeline-bar-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      width: 200px;
+      flex-shrink: 0;
+    }
+
+    .timeline-bar-track {
+      flex: 1;
+      height: 28px;
+      background: var(--bg3);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .timeline-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .timeline-bar-fill.attacker {
+      width: 22%;
+      background: linear-gradient(to right, #ef4444, #f87171);
+    }
+
+    .timeline-bar-fill.enterprise {
+      width: 100%;
+      background: linear-gradient(to right, var(--indigo), var(--indigo-light));
+    }
+
+    .quote-block {
+      border-left: 3px solid var(--indigo);
+      padding-left: 20px;
+      margin-top: 4px;
+    }
+
+    .quote-block p {
+      font-size: 18px;
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    /* ===== THREE COLUMNS ===== */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      margin-top: 8px;
+    }
+
+    .col-card {
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 32px 28px;
+    }
+
+    .col-icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .col-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .col-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ===== STEPS ===== */
+    .steps-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin: 32px 0;
+    }
+
+    .step {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      position: relative;
+    }
+
+    .step-number {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--indigo);
+      margin-bottom: 8px;
+    }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .step-arrow {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      color: var(--indigo-light);
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .big-headline {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .platform-tagline {
+      font-size: 16px;
+      color: var(--emerald);
+      font-weight: 600;
+      margin-top: 20px;
+    }
+
+    /* ===== FEATURE GRID ===== */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-top: 8px;
+    }
+
+    .feature-tile {
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .feature-icon { font-size: 28px; }
+
+    .feature-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ===== INTEGRATION BADGES ===== */
+    .integration-section { margin-bottom: 28px; }
+
+    .integration-category {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--indigo-light);
+      margin-bottom: 10px;
+    }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .badge {
+      background: var(--bg3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .badge.highlight {
+      background: var(--indigo-dim);
+      border-color: var(--indigo);
+      color: var(--indigo-light);
+    }
+
+    /* ===== RISK SCORE ===== */
+    .risk-factors {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin: 24px 0;
+    }
+
+    .risk-factor {
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .risk-factor-bar-wrap { flex: 1; }
+
+    .risk-factor-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .risk-factor-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .risk-bar-track {
+      width: 100%;
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .risk-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(to right, var(--indigo), var(--indigo-light));
+    }
+
+    .risk-score-box {
+      background: linear-gradient(135deg, var(--indigo-dim), var(--emerald-dim));
+      border: 1px solid var(--indigo);
+      border-radius: 14px;
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 8px;
+    }
+
+    .risk-score-number {
+      font-size: 60px;
+      font-weight: 900;
+      color: var(--emerald);
+      line-height: 1;
+      letter-spacing: -3px;
+    }
+
+    .risk-score-label {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .risk-score-sub {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ===== LIFECYCLE ===== */
+    .lifecycle-flow {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin: 28px 0;
+    }
+
+    .lifecycle-stage { flex: 1; min-width: 0; }
+
+    .lifecycle-stage-header {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px 10px 0 0;
+      padding: 14px 16px 12px;
+      text-align: center;
+    }
+
+    .lifecycle-stage-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .lifecycle-stage-body {
+      background: var(--bg3);
+      border: 1px solid var(--border-subtle);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      min-height: 80px;
+    }
+
+    .lifecycle-arrow {
+      padding: 14px 6px 0;
+      color: var(--indigo-light);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .lifecycle-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+    }
+
+    .dot-draft { background: var(--text-dim); }
+    .dot-pending { background: #f59e0b; }
+    .dot-approved { background: var(--indigo-light); }
+    .dot-inprogress { background: #60a5fa; }
+    .dot-completed { background: var(--emerald); }
+
+    /* ===== COMPLIANCE CARDS ===== */
+    .compliance-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin: 24px 0;
+    }
+
+    .compliance-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .compliance-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+
+    .compliance-card.cisa::before { background: #f87171; }
+    .compliance-card.soc2::before { background: var(--indigo-light); }
+    .compliance-card.pci::before { background: var(--emerald); }
+
+    .compliance-framework {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .cisa .compliance-framework { color: #f87171; }
+    .soc2 .compliance-framework { color: var(--indigo-light); }
+    .pci .compliance-framework { color: var(--emerald); }
+
+    .compliance-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .compliance-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .compliance-extra {
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* ===== ALPHA ===== */
+    .alpha-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .alpha-item {
+      background: var(--bg2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 20px 22px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .alpha-check {
+      color: var(--emerald);
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .alpha-text { font-size: 14px; color: var(--text-muted); }
+    .alpha-text strong { color: var(--text); }
+
+    .demo-box {
+      background: var(--indigo-dim);
+      border: 1px solid var(--indigo);
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .demo-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--indigo-light);
+      margin-bottom: 4px;
+    }
+
+    .demo-url {
+      font-size: 15px;
+      color: var(--text);
+      font-family: 'SF Mono', 'Cascadia Code', monospace;
+    }
+
+    /* ===== ROADMAP ===== */
+    .roadmap-timeline {
+      margin: 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .roadmap-item {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .roadmap-item:last-child { border-bottom: none; }
+
+    .roadmap-quarter {
+      width: 100px;
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--indigo-light);
+      padding-top: 2px;
+    }
+
+    .roadmap-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--indigo);
+      background: var(--bg);
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .roadmap-content { flex: 1; }
+
+    .roadmap-features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .roadmap-tag {
+      background: var(--bg3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .roadmap-tag.always {
+      background: var(--emerald-dim);
+      border-color: var(--emerald);
+      color: var(--emerald);
+    }
+
+    /* ===== CTA ===== */
+    .cta-headline {
+      font-size: 54px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, #fff 20%, var(--indigo-light) 60%, var(--emerald) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.05;
+      margin-bottom: 32px;
+    }
+
+    .cta-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .cta-link-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+    }
+
+    .cta-link-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--indigo-light);
+      margin-bottom: 8px;
+    }
+
+    .cta-link-value {
+      font-size: 14px;
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .cta-footer {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cta-footer-left { font-size: 14px; color: var(--text-muted); }
+
+    .cta-footer-tagline {
+      font-size: 14px;
+      color: var(--text-dim);
+      font-style: italic;
+      max-width: 400px;
+      text-align: right;
+    }
+
+    /* ===== PRINT STYLES ===== */
+    @media print {
+      .no-print { display: none !important; }
+
+      @page {
+        size: landscape;
+        margin: 0;
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        background: #0f1117 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        color-adjust: exact;
+      }
+
+      .slide {
+        page-break-after: always;
+        break-after: page;
+        min-height: 100vh;
+        height: 100vh;
+        padding: 40px 60px;
+        border-bottom: none;
+      }
+
+      .slide:last-child {
+        page-break-after: avoid;
+        break-after: avoid;
+      }
+
+      .stat-card, .col-card, .feature-tile, .step,
+      .compliance-card, .alpha-item, .cta-link-card,
+      .lifecycle-stage-header, .lifecycle-stage-body,
+      .risk-factor, .roadmap-item, .demo-box,
+      .timeline-wrapper, .risk-score-box, .compliance-extra {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
+    /* ===== SLIDE 1: COVER ===== */
+    .slide-cover {
+      justify-content: space-between;
+      padding-top: 80px;
+      padding-bottom: 60px;
+    }
+
+    .cover-top { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+    .cover-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--emerald);
+      margin-bottom: 24px;
+    }
+
+    .cover-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 32px;
+      border-top: 1px solid var(--border-subtle);
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .cover-badge {
+      background: var(--indigo-dim);
+      border: 1px solid var(--indigo);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: var(--indigo-light);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRINT BANNER -->
+<div class="no-print" style="background:#1e40af;color:white;padding:12px;text-align:center;font-size:14px;">
+  To save as PDF: File &rarr; Print &rarr; Save as PDF (set to <strong>landscape</strong>, no margins)
+</div>
+
+<!-- ======================== SLIDE 1: COVER ======================== -->
+<div class="slide slide-cover">
+  <div class="cover-top">
+    <div class="cover-eyebrow">&#9889; Security Infrastructure &middot; Patch Intelligence</div>
+    <h1 class="wordmark">Glasswatch</h1>
+    <div class="tagline">AI-Driven Patch Management for Enterprise Security Teams</div>
+    <div class="subtitle">Stop drowning in CVEs.<br>Start patching with intent.</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span class="cover-badge">Alpha Access Open</span>
+      <span style="font-size:13px;color:var(--text-dim);">April 2026</span>
+    </div>
+  </div>
+
+  <div style="position:absolute;top:0;right:0;bottom:0;width:45%;opacity:0.03;background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(99,102,241,1) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(99,102,241,1) 40px);pointer-events:none;"></div>
+
+  <div class="cover-bottom">
+    <span>glasswatch.io &nbsp;&middot;&nbsp; April 2026</span>
+    <span>AI-Powered &middot; Compliance-Ready &middot; Enterprise-Grade</span>
+  </div>
+  <div class="slide-num">1 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 2: THE PROBLEM ======================== -->
+<div class="slide">
+  <div class="slide-label">The Problem</div>
+  <h2 class="slide-title">The Patch Management <span class="accent">Crisis</span></h2>
+  <div class="divider"></div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-number">57,000<span style="font-size:24px;">+</span></div>
+      <div class="stat-desc">Open vulnerabilities in the average enterprise at any given time <em style="color:var(--text-dim);font-size:12px;">(Industry data)</em></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number red">60<span style="font-size:24px;">d</span></div>
+      <div class="stat-desc">Mean time to patch critical vulnerabilities &mdash; while attackers exploit in <strong style="color:#f87171;">&lt;15 days</strong></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number emerald">80<span style="font-size:24px;">%</span></div>
+      <div class="stat-desc">Of breaches exploit known vulnerabilities with available patches already published</div>
+    </div>
+  </div>
+
+  <div class="timeline-wrapper">
+    <div class="timeline-label">Attacker Exploit Window vs. Enterprise Patch Cycle</div>
+    <div class="timeline-bar-row">
+      <div class="timeline-bar-label" style="color:#f87171;font-size:12px;font-weight:600;">&#9889; Attacker exploits</div>
+      <div class="timeline-bar-track">
+        <div class="timeline-bar-fill attacker">&lt;15 days</div>
+      </div>
+    </div>
+    <div class="timeline-bar-row" style="margin-bottom:0;">
+      <div class="timeline-bar-label" style="color:var(--indigo-light);font-size:12px;font-weight:600;">&#127970; Enterprise patches</div>
+      <div class="timeline-bar-track">
+        <div class="timeline-bar-fill enterprise">60 days average</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-dim);">The gap between disclosure and enterprise patching is where breaches happen.</div>
+  </div>
+
+  <div class="quote-block">
+    <p>"Security teams aren't failing &mdash; they're overwhelmed."</p>
+  </div>
+
+  <div class="slide-num">2 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 3: ROOT CAUSE ======================== -->
+<div class="slide">
+  <div class="slide-label">Root Cause</div>
+  <h2 class="slide-title">Why Patch Management <span class="accent">Fails</span></h2>
+  <div class="divider"></div>
+
+  <div class="three-col">
+    <div class="col-card">
+      <span class="col-icon">&#128293;</span>
+      <div class="col-title">Too Much Noise</div>
+      <div class="col-desc">CVSS scores rank everything as critical. With thousands of high-severity CVEs, nothing is actually prioritized. Teams spend more time triaging than patching.</div>
+      <div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text-dim);">
+        Result: Teams patch the <em>loudest</em> vulns,<br>not the <em>riskiest</em> ones.
+      </div>
+    </div>
+    <div class="col-card">
+      <span class="col-icon">&#127959;&#65039;</span>
+      <div class="col-title">No Business Context</div>
+      <div class="col-desc">CVEs are technical artifacts. Executives speak in risk, compliance, and business outcomes. There's no shared language between the security team and leadership.</div>
+      <div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text-dim);">
+        Result: "We patched 300 CVEs" means<br>nothing in a board meeting.
+      </div>
+    </div>
+    <div class="col-card">
+      <span class="col-icon">&#129306;</span>
+      <div class="col-title">Broken Workflows</div>
+      <div class="col-desc">Security finds vulnerabilities. IT patches them. No shared tooling, no common language, no handoff process. Tickets get lost. Windows get missed. Audits get failed.</div>
+      <div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text-dim);">
+        Result: Blame travels faster<br>than patches do.
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;padding:20px 24px;background:linear-gradient(to right, var(--indigo-dim), transparent);border:1px solid var(--indigo);border-radius:10px;font-size:15px;color:var(--text);">
+    These aren't people problems. They're <strong style="color:var(--indigo-light);">tooling and process</strong> problems &mdash; and they're solvable.
+  </div>
+
+  <div class="slide-num">3 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 4: THE SOLUTION ======================== -->
+<div class="slide">
+  <div class="slide-label">The Solution</div>
+  <h2 class="slide-title">Glasswatch: <span class="accent">Patch with Intent</span></h2>
+  <div class="divider"></div>
+
+  <div class="big-headline">Tell us your goal. We build the plan.</div>
+  <p style="font-size:15px;color:var(--text-muted);margin-bottom:28px;">Set a plain-English objective. Glasswatch's AI generates the optimal patch schedule, fits your maintenance windows, and tracks execution to completion.</p>
+
+  <div class="steps-row">
+    <div class="step">
+      <div class="step-number">Step 01 &middot; Define</div>
+      <div class="step-title">Set Your Goal</div>
+      <div class="step-desc" style="margin-bottom:14px;">"Eliminate all KEV vulnerabilities by June 30" &mdash; type it in plain English. No spreadsheets, no manual triage.</div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--emerald);font-family:monospace;">
+        "Patch all CISA KEV vulns by June 30, prioritizing internet-facing assets"
+      </div>
+    </div>
+    <div class="step-arrow">&rarr;</div>
+    <div class="step">
+      <div class="step-number">Step 02 &middot; Optimize</div>
+      <div class="step-title">AI Builds the Plan</div>
+      <div class="step-desc">AI analyzes risk scores, asset criticality, maintenance windows, and team capacity to generate an optimal patch schedule you can review and approve.</div>
+    </div>
+    <div class="step-arrow">&rarr;</div>
+    <div class="step">
+      <div class="step-number">Step 03 &middot; Execute</div>
+      <div class="step-title">Ship &amp; Prove It</div>
+      <div class="step-desc">Approve patch bundles, track real-time execution status, collect audit evidence automatically. One platform from objective to compliance proof.</div>
+    </div>
+  </div>
+
+  <div class="platform-tagline">&#10022; From objective to evidence in one platform.</div>
+
+  <div class="slide-num">4 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 5: KEY FEATURES ======================== -->
+<div class="slide">
+  <div class="slide-label">Product</div>
+  <h2 class="slide-title">What Glasswatch <span class="accent">Does</span></h2>
+  <div class="divider"></div>
+
+  <div class="feature-grid">
+    <div class="feature-tile">
+      <span class="feature-icon">&#127919;</span>
+      <div class="feature-title">Goal-Based Optimization</div>
+      <div class="feature-desc">Define outcomes, not tasks. AI generates the optimal patch schedule from your business objective.</div>
+    </div>
+    <div class="feature-tile">
+      <span class="feature-icon">&#128230;</span>
+      <div class="feature-title">Bundle Execution Engine</div>
+      <div class="feature-desc">Group patches into maintenance windows. Approve, execute, and rollback with a single click.</div>
+    </div>
+    <div class="feature-tile">
+      <span class="feature-icon">&#129302;</span>
+      <div class="feature-title">AI Assistant</div>
+      <div class="feature-desc">"What needs my attention?" &mdash; real-time answers backed by live vulnerability and asset data.</div>
+    </div>
+    <div class="feature-tile">
+      <span class="feature-icon">&#128202;</span>
+      <div class="feature-title">Compliance Dashboard</div>
+      <div class="feature-desc">CISA BOD 22-01, SOC 2, and PCI DSS posture status at a glance &mdash; always audit-ready.</div>
+    </div>
+    <div class="feature-tile">
+      <span class="feature-icon">&#128276;</span>
+      <div class="feature-title">Real-Time Alerts</div>
+      <div class="feature-desc">KEV alerts, SLA warnings, and bundle events delivered via Slack, Microsoft Teams, or email.</div>
+    </div>
+    <div class="feature-tile">
+      <span class="feature-icon">&#128203;</span>
+      <div class="feature-title">NLP Governance Rules</div>
+      <div class="feature-desc">"No deployments on Fridays after 3pm" &rarr; enforced policy. Write rules in plain English.</div>
+    </div>
+  </div>
+
+  <div class="slide-num">5 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 6: INTEGRATIONS ======================== -->
+<div class="slide">
+  <div class="slide-label">Integrations</div>
+  <h2 class="slide-title">Works With <span class="accent">Your Stack</span></h2>
+  <div class="divider"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:4px;">
+    <div>
+      <div class="integration-section">
+        <div class="integration-category">&#128269; Vulnerability Scanners</div>
+        <div class="badge-row">
+          <span class="badge highlight">Tenable</span>
+          <span class="badge highlight">Qualys</span>
+          <span class="badge highlight">Rapid7</span>
+          <span class="badge">CSV Import</span>
+        </div>
+      </div>
+      <div class="integration-section">
+        <div class="integration-category">&#127867; Ticketing &amp; ITSM</div>
+        <div class="badge-row">
+          <span class="badge highlight">Jira</span>
+          <span class="badge highlight">ServiceNow</span>
+        </div>
+      </div>
+      <div class="integration-section">
+        <div class="integration-category">&#128276; Notifications</div>
+        <div class="badge-row">
+          <span class="badge highlight">Slack</span>
+          <span class="badge highlight">Microsoft Teams</span>
+          <span class="badge">Email</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="integration-section">
+        <div class="integration-category">&#128274; Identity &amp; SSO</div>
+        <div class="badge-row">
+          <span class="badge highlight">Google OAuth</span>
+          <span class="badge highlight">GitHub</span>
+          <span class="badge highlight">WorkOS SSO</span>
+          <span class="badge">Okta</span>
+          <span class="badge">Azure AD</span>
+        </div>
+      </div>
+      <div class="integration-section">
+        <div class="integration-category">&#129504; Threat Intelligence</div>
+        <div class="badge-row">
+          <span class="badge highlight">CISA KEV</span>
+          <span class="badge highlight">NVD</span>
+          <span class="badge highlight">EPSS</span>
+          <span class="badge highlight">Anthropic Claude</span>
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;margin-top:8px;">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Coming Soon</div>
+        <div class="badge-row">
+          <span class="badge">VulnCheck</span>
+          <span class="badge">GreyNoise</span>
+          <span class="badge">Splunk</span>
+          <span class="badge">Elastic SIEM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;padding:16px 24px;background:var(--indigo-dim);border:1px solid var(--indigo);border-radius:10px;font-size:14px;color:var(--text-muted);">
+    <strong style="color:var(--text);">Open API first.</strong> Everything that goes in can come out. SIEM push, CMDB sync, evidence export &mdash; all via REST API.
+  </div>
+
+  <div class="slide-num">6 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 7: RISK SCORE ======================== -->
+<div class="slide">
+  <div class="slide-label">Intelligence</div>
+  <h2 class="slide-title">8-Factor AI <span class="accent">Risk Scoring</span></h2>
+  <div class="divider"></div>
+
+  <div class="risk-factors">
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">CVSS Base Score</div>
+        <div class="risk-factor-sub">Foundation severity rating</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:90%;"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">EPSS Score</div>
+        <div class="risk-factor-sub">Exploit Prediction Scoring System</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:75%;background:linear-gradient(to right,#f59e0b,#fbbf24);"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">KEV Status</div>
+        <div class="risk-factor-sub">CISA known-exploited vulnerability</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:100%;background:linear-gradient(to right,#ef4444,#f87171);"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">Asset Criticality</div>
+        <div class="risk-factor-sub">Business impact of the affected asset</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:80%;"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">Internet Exposure</div>
+        <div class="risk-factor-sub">Attack surface reachability</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:65%;background:linear-gradient(to right,#f59e0b,#fbbf24);"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">Patch Availability</div>
+        <div class="risk-factor-sub">Is a fix available right now?</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:55%;background:linear-gradient(to right,var(--emerald),#34d399);"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">Runtime Context</div>
+        <div class="risk-factor-sub">Is the service running in production?</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:85%;"></div></div>
+      </div>
+    </div>
+    <div class="risk-factor">
+      <div class="risk-factor-bar-wrap">
+        <div class="risk-factor-label">Exploit Availability</div>
+        <div class="risk-factor-sub">Public exploit code in the wild?</div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" style="width:95%;background:linear-gradient(to right,#ef4444,#f87171);"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="risk-score-box">
+    <div class="risk-score-number">87</div>
+    <div>
+      <div class="risk-score-label">Composite Risk Score &middot; 0 &ndash; 100</div>
+      <div class="risk-score-sub">Aggregated across all 8 factors &middot; Updated continuously &middot; Sort, filter, and prioritize with precision</div>
+    </div>
+  </div>
+
+  <div class="slide-num">7 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 8: BUNDLE LIFECYCLE ======================== -->
+<div class="slide">
+  <div class="slide-label">Execution</div>
+  <h2 class="slide-title">From Plan to <span class="emerald">Proof</span></h2>
+  <div class="divider"></div>
+
+  <div class="lifecycle-flow">
+    <div class="lifecycle-stage">
+      <div class="lifecycle-stage-header">
+        <div class="lifecycle-dot dot-draft"></div>
+        <div class="lifecycle-stage-name">Draft</div>
+      </div>
+      <div class="lifecycle-stage-body">
+        AI groups vulnerabilities by asset, environment, and risk score. Schedules fit within defined maintenance windows.
+      </div>
+    </div>
+    <div class="lifecycle-arrow">&rarr;</div>
+    <div class="lifecycle-stage">
+      <div class="lifecycle-stage-header">
+        <div class="lifecycle-dot dot-pending"></div>
+        <div class="lifecycle-stage-name">Pending Approval</div>
+      </div>
+      <div class="lifecycle-stage-body">
+        One-click approval workflow with pre-flight risk check. Change advisory board notifications included.
+      </div>
+    </div>
+    <div class="lifecycle-arrow">&rarr;</div>
+    <div class="lifecycle-stage">
+      <div class="lifecycle-stage-header">
+        <div class="lifecycle-dot dot-approved"></div>
+        <div class="lifecycle-stage-name">Approved</div>
+      </div>
+      <div class="lifecycle-stage-body">
+        Execution window is reserved. Team members are notified. Runbook and rollback plan attached.
+      </div>
+    </div>
+    <div class="lifecycle-arrow">&rarr;</div>
+    <div class="lifecycle-stage">
+      <div class="lifecycle-stage-header">
+        <div class="lifecycle-dot dot-inprogress"></div>
+        <div class="lifecycle-stage-name">In Progress</div>
+      </div>
+      <div class="lifecycle-stage-body">
+        Real-time patch status per asset. Live progress tracking. Instant rollback on failure detection.
+      </div>
+    </div>
+    <div class="lifecycle-arrow">&rarr;</div>
+    <div class="lifecycle-stage">
+      <div class="lifecycle-stage-header">
+        <div class="lifecycle-dot dot-completed"></div>
+        <div class="lifecycle-stage-name">Completed</div>
+      </div>
+      <div class="lifecycle-stage-body">
+        Full audit trail generated. Compliance evidence packaged automatically. MTTP metrics updated.
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px;">
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:16px 18px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:var(--indigo-light);">100%</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Audit trail coverage</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:16px 18px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:var(--emerald);">Auto</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Evidence generation</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:16px 18px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#f87171;">1-Click</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Emergency rollback</div>
+    </div>
+  </div>
+
+  <div class="slide-num">8 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 9: COMPLIANCE ======================== -->
+<div class="slide">
+  <div class="slide-label">Compliance</div>
+  <h2 class="slide-title">Prove Compliance, Not Just <span class="accent">Compliance Theater</span></h2>
+  <div class="divider"></div>
+
+  <div class="compliance-grid">
+    <div class="compliance-card cisa">
+      <div class="compliance-framework">CISA BOD 22-01</div>
+      <div class="compliance-title">Known Exploited Vulnerabilities</div>
+      <div class="compliance-desc">Track KEV patching progress against CISA-mandated deadlines. SLA countdown per CVE. Automatic breach warnings before deadlines expire.</div>
+    </div>
+    <div class="compliance-card soc2">
+      <div class="compliance-framework">SOC 2 Type II</div>
+      <div class="compliance-title">Continuous Security Controls</div>
+      <div class="compliance-desc">% critical vulns patched within 30 days. % high within 90. Evidence export ready for auditors. No scrambling at audit time.</div>
+    </div>
+    <div class="compliance-card pci">
+      <div class="compliance-framework">PCI DSS</div>
+      <div class="compliance-title">Payment System Security</div>
+      <div class="compliance-desc">Track % of internet-facing assets with zero critical vulnerabilities. Automated scope documentation and evidence packaging.</div>
+    </div>
+  </div>
+
+  <div class="compliance-extra">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--indigo-light);margin-bottom:6px;">MTTP Metrics</div>
+        <div style="font-size:13px;color:var(--text-muted);">Mean Time To Patch by severity, environment, and team</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--indigo-light);margin-bottom:6px;">PDF Export</div>
+        <div style="font-size:13px;color:var(--text-muted);">One-click audit report generation for any date range</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--indigo-light);margin-bottom:6px;">SIEM / CMDB</div>
+        <div style="font-size:13px;color:var(--text-muted);">REST API for automated evidence push to existing tools</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--indigo-light);margin-bottom:6px;">Coming Soon</div>
+        <div style="font-size:13px;color:var(--text-muted);">FedRAMP, HIPAA, ISO 27001 frameworks</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-num">9 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 10: ALPHA CUSTOMERS ======================== -->
+<div class="slide">
+  <div class="slide-label">Early Access</div>
+  <h2 class="slide-title">Early Access &mdash; <span class="emerald">What You Get</span></h2>
+  <div class="divider"></div>
+
+  <div class="alpha-grid">
+    <div class="alpha-item">
+      <span class="alpha-check">&#10003;</span>
+      <div class="alpha-text"><strong>Full Platform Access</strong><br>Every feature enabled. No artificial limitations. Full production-grade deployment.</div>
+    </div>
+    <div class="alpha-item">
+      <span class="alpha-check">&#10003;</span>
+      <div class="alpha-text"><strong>Zero Infrastructure Overhead</strong><br>Hosted on Railway. We handle deployments, scaling, and uptime. You just log in.</div>
+    </div>
+    <div class="alpha-item">
+      <span class="alpha-check">&#10003;</span>
+      <div class="alpha-text"><strong>Direct Line to Founders</strong><br>Slack connect, weekly check-ins. Your issues get fixed fast &mdash; not ticketed into a backlog.</div>
+    </div>
+    <div class="alpha-item">
+      <span class="alpha-check">&#10003;</span>
+      <div class="alpha-text"><strong>Roadmap Influence</strong><br>Alpha customers shape the product. Your workflows become features. Your pain points get prioritized.</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;">
+    <div class="demo-box">
+      <div>
+        <div class="demo-label">&#128640; Live Demo</div>
+        <div class="demo-url">frontend-production-ef3e.up.railway.app</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Click "Try Demo" &rarr; instant access, no signup</div>
+      </div>
+    </div>
+    <div class="demo-box" style="background:var(--emerald-dim);border-color:var(--emerald);">
+      <div>
+        <div class="demo-label" style="color:var(--emerald);">&#128051; Self-Host</div>
+        <div class="demo-url" style="font-size:13px;">curl -fsSL .../install.sh | bash</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Docker &middot; 5 minutes &middot; Your infrastructure</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-num">10 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 11: ROADMAP ======================== -->
+<div class="slide">
+  <div class="slide-label">Vision</div>
+  <h2 class="slide-title">Where We're <span class="accent">Headed</span></h2>
+  <div class="divider"></div>
+
+  <div class="roadmap-timeline">
+    <div class="roadmap-item">
+      <div class="roadmap-quarter">Q3 2026</div>
+      <div class="roadmap-dot"></div>
+      <div class="roadmap-content">
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Enterprise identity, audit infrastructure, and global scale</div>
+        <div class="roadmap-features">
+          <span class="roadmap-tag">WorkOS SSO</span>
+          <span class="roadmap-tag">Audit Log</span>
+          <span class="roadmap-tag">Evidence Packages</span>
+          <span class="roadmap-tag">Multi-Region Hosting</span>
+        </div>
+      </div>
+    </div>
+    <div class="roadmap-item">
+      <div class="roadmap-quarter">Q4 2026</div>
+      <div class="roadmap-dot"></div>
+      <div class="roadmap-content">
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Live threat intelligence feeds and autonomous asset discovery</div>
+        <div class="roadmap-features">
+          <span class="roadmap-tag">Live NVD / EPSS Sync</span>
+          <span class="roadmap-tag">VulnCheck Integration</span>
+          <span class="roadmap-tag">GreyNoise Feeds</span>
+          <span class="roadmap-tag">Asset Auto-Discovery</span>
+        </div>
+      </div>
+    </div>
+    <div class="roadmap-item">
+      <div class="roadmap-quarter">2027</div>
+      <div class="roadmap-dot"></div>
+      <div class="roadmap-content">
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Full ITSM integration, autonomous remediation, and mobility</div>
+        <div class="roadmap-features">
+          <span class="roadmap-tag">Jira Two-Way Sync</span>
+          <span class="roadmap-tag">ServiceNow Two-Way Sync</span>
+          <span class="roadmap-tag">Auto-Remediation Playbooks</span>
+          <span class="roadmap-tag">Mobile App</span>
+          <span class="roadmap-tag">Slack / Teams Bot</span>
+        </div>
+      </div>
+    </div>
+    <div class="roadmap-item">
+      <div class="roadmap-quarter">Always</div>
+      <div class="roadmap-dot" style="border-color:var(--emerald);"></div>
+      <div class="roadmap-content">
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Expanding compliance coverage and community integrations</div>
+        <div class="roadmap-features">
+          <span class="roadmap-tag always">FedRAMP</span>
+          <span class="roadmap-tag always">HIPAA</span>
+          <span class="roadmap-tag always">ISO 27001</span>
+          <span class="roadmap-tag always">Community Scanner Integrations</span>
+          <span class="roadmap-tag always">Open API</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-num">11 / 12</div>
+</div>
+
+
+<!-- ======================== SLIDE 12: CTA ======================== -->
+<div class="slide">
+  <div class="cta-headline">Ready to patch<br>with intent?</div>
+
+  <div class="cta-links">
+    <div class="cta-link-card">
+      <div class="cta-link-label">&#128640; Live Demo</div>
+      <div class="cta-link-value">https://frontend-production-ef3e.up.railway.app</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text-dim);">Click "Try Demo" &mdash; no signup required</div>
+    </div>
+    <div class="cta-link-card">
+      <div class="cta-link-label">&#128051; Self-Host (Docker &middot; 5 min)</div>
+      <div class="cta-link-value" style="font-size:12px;">curl -fsSL https://raw.githubusercontent.com/jmckinley/glasswatch/main/install.sh | bash</div>
+    </div>
+    <div class="cta-link-card">
+      <div class="cta-link-label">&#127970; Built By</div>
+      <div class="cta-link-value" style="font-family:system-ui;">McKinley Labs &middot; GreatFallsVentures</div>
+    </div>
+    <div class="cta-link-card">
+      <div class="cta-link-label">&#128187; Open Source</div>
+      <div class="cta-link-value">github.com/jmckinley/glasswatch</div>
+    </div>
+  </div>
+
+  <div class="cta-footer">
+    <div class="cta-footer-left">
+      <div style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.5px;">Glasswatch</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:2px;">glasswatch.io &middot; April 2026</div>
+    </div>
+    <div class="cta-footer-tagline">
+      "Because known vulnerabilities<br>shouldn't become breaches."
+    </div>
+  </div>
+
+  <div class="slide-num">12 / 12</div>
+</div>
+
+</body>
+</html>
