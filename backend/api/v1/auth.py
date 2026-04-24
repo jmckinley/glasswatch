@@ -11,27 +11,46 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, EmailStr
 
-from backend.db.session import get_db
-from backend.models.user import User, UserRole
-from backend.models.audit_log import AuditLog
 from backend.core.auth_workos import (
-    get_current_user,
-    create_sso_authorization_url,
-    handle_sso_callback,
-    generate_api_key,
     create_access_token,
-    create_google_auth_url,
-    handle_google_callback,
     create_github_auth_url,
+    create_google_auth_url,
+    create_sso_authorization_url,
+    generate_api_key,
+    get_current_user,
     handle_github_callback,
+    handle_google_callback,
+    handle_sso_callback,
 )
 from backend.core.config import settings
+from backend.db.session import get_db
+from backend.models.audit_log import AuditLog
+from backend.models.user import User, UserRole
+from backend.services.rate_limiter import get_rate_limiter
 
 
 router = APIRouter()
+
+
+async def _check_auth_rate_limit(request: Request, action: str = "auth") -> None:
+    """
+    Enforce per-IP rate limit on authentication endpoints.
+    Allows 10 attempts per 5-minute window; rejects with 429 when exceeded.
+    Falls back to allow-all when Redis is unavailable.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    key = f"ip:{client_ip}:{action}"
+    limiter = get_rate_limiter()
+    allowed, remaining = await limiter.check_rate_limit(key, limit=10, window_seconds=300)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication attempts. Please try again later.",
+            headers={"Retry-After": "300"},
+        )
 
 
 # Pydantic models for API
@@ -69,21 +88,23 @@ class APIKeyResponse(BaseModel):
 
 class EmailRegisterRequest(BaseModel):
     email: EmailStr
-    password: str
-    name: str
-    company_name: str
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str = Field(..., min_length=1, max_length=200)
+    company_name: str = Field(..., min_length=1, max_length=200)
 
 
 class EmailLoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=128)
 
 
 @router.post("/register", response_model=CallbackResponse)
 async def register_with_email(
+    request: Request,
     body: EmailRegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_auth_rate_limit(request, action="register")
     """
     Register a new user with email/password.
     Creates a new Tenant and admin User.
@@ -149,9 +170,11 @@ async def register_with_email(
 
 @router.post("/email-login", response_model=CallbackResponse)
 async def login_with_email(
+    request: Request,
     body: EmailLoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_auth_rate_limit(request, action="email-login")
     """
     Login with email/password credentials.
     """
@@ -262,8 +285,10 @@ async def handle_callback(
 @router.get("/demo-login", response_model=CallbackResponse)
 @router.post("/demo-login", response_model=CallbackResponse)
 async def demo_login(
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_auth_rate_limit(request, action="demo-login")
     """
     Demo login for development/testing without WorkOS.
     

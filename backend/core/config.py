@@ -122,6 +122,25 @@ def get_settings() -> Settings:
     """Get cached settings instance."""
     return settings
 
+
+# Warn on weak or default SECRET_KEY at import time
+_WEAK_KEY_SENTINELS = {
+    "your-secret-key-here-change-in-production",
+    "secret",
+    "changeme",
+    "insecure",
+}
+if (
+    len(settings.SECRET_KEY) < 32
+    or settings.SECRET_KEY.lower() in _WEAK_KEY_SENTINELS
+):
+    import warnings
+    warnings.warn(
+        "SECRET_KEY is too short or is a well-known placeholder. "
+        "Set a random value of at least 32 characters in production.",
+        stacklevel=1,
+    )
+
 # Log configuration on startup (hide sensitive values)
 if settings.DEBUG:
     print(f"🔧 Configuration loaded for environment: {settings.ENV}")
