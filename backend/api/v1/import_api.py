@@ -20,6 +20,7 @@ from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
+from backend.services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -206,6 +207,24 @@ async def import_vulnerabilities_csv(
                 break
 
     await db.commit()
+
+    # Audit: vulnerability CSV imported
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="vulnerability.imported",
+            resource_type="vulnerability",
+            details={
+                "count": vulns_created,
+                "rows_processed": rows_processed,
+                "errors": len(errors),
+                "filename": file.filename,
+            },
+        )
+        await db.commit()
+    except Exception:
+        pass
 
     return {
         "rows_processed": rows_processed,

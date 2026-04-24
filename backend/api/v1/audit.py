@@ -34,7 +34,7 @@ class AuditLogResponse(BaseModel):
     ip_address: Optional[str]
     user_agent: Optional[str]
     timestamp: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -93,10 +93,10 @@ async def list_audit_logs(
         filters.append(AuditLog.resource_id == resource_id)
     
     if start_date:
-        filters.append(AuditLog.timestamp >= start_date)
-    
+        filters.append(AuditLog.created_at >= start_date)
+
     if end_date:
-        filters.append(AuditLog.timestamp <= end_date)
+        filters.append(AuditLog.created_at <= end_date)
     
     if filters:
         query = query.where(and_(*filters))
@@ -106,7 +106,7 @@ async def list_audit_logs(
     total = await db.scalar(count_query)
     
     # Apply ordering, pagination
-    query = query.order_by(AuditLog.timestamp.desc())
+    query = query.order_by(AuditLog.created_at.desc())
     query = query.offset(skip).limit(limit)
     
     # Execute
@@ -125,7 +125,7 @@ async def list_audit_logs(
             details=log.details,
             ip_address=log.ip_address,
             user_agent=log.user_agent,
-            timestamp=log.timestamp,
+            timestamp=log.created_at,
         )
         for log in audit_logs
     ]
@@ -172,5 +172,5 @@ async def get_audit_log(
         details=audit_log.details,
         ip_address=audit_log.ip_address,
         user_agent=audit_log.user_agent,
-        timestamp=audit_log.timestamp,
+        timestamp=audit_log.created_at,
     )

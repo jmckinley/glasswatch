@@ -28,6 +28,7 @@ from backend.core.auth_workos import (
 from backend.core.config import settings
 from backend.db.session import get_db
 from backend.models.audit_log import AuditLog
+from backend.services.audit_service import AuditService
 from backend.models.user import User, UserRole
 from backend.services.rate_limiter import get_rate_limiter
 
@@ -190,12 +191,43 @@ async def login_with_email(
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not pwd_context.verify(body.password, user.password_hash):
+        # Log failed login — we have a tenant_id from the found user
+        try:
+            await AuditService.log(
+                db=db,
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                action="user.login_failed",
+                resource_type="user",
+                resource_id=str(user.id),
+                resource_name=user.email,
+                details={"reason": "invalid_password"},
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+                success=False,
+                error_message="Invalid password",
+            )
+            await db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is deactivated")
 
     user.last_login = datetime.now(timezone.utc)
+    # Log successful login
+    await AuditService.log(
+        db=db,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="user.login",
+        resource_type="user",
+        resource_id=str(user.id),
+        resource_name=user.email,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
     await db.commit()
 
     access_token = await create_access_token(
@@ -350,8 +382,20 @@ async def demo_login(
     
     # Update last login
     user.last_login = datetime.now(timezone.utc)
+    await AuditService.log(
+        db=db,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="user.login",
+        resource_type="user",
+        resource_id=str(user.id),
+        resource_name=user.email,
+        details={"provider": "demo"},
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
     await db.commit()
-    
+
     # Create access token
     access_token = await create_access_token(
         user_id=str(user.id),

@@ -6,6 +6,7 @@ Provides health checks for various provider types.
 from typing import Dict, Any, Tuple
 import httpx
 from datetime import datetime, timezone
+from backend.simulators.config import get_endpoint, SIMULATOR_MODE
 
 
 class ConnectionHealthService:
@@ -379,9 +380,10 @@ class ConnectionHealthService:
             if not access_key or not secret_key:
                 return False, "Credentials not configured — add in connection settings"
 
+            tenable_base = get_endpoint("tenable", "https://cloud.tenable.com")
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    "https://cloud.tenable.com/api/v1/health",
+                    f"{tenable_base}/api/v1/health",
                     headers={"X-ApiKeys": f"accessKey={access_key};secretKey={secret_key}"},
                     timeout=10.0,
                 )
@@ -413,7 +415,7 @@ class ConnectionHealthService:
         try:
             username = config.get("username")
             password = config.get("password")
-            platform_url = config.get("platform_url", "https://qualysapi.qualys.com")
+            platform_url = get_endpoint("qualys", config.get("platform_url", "https://qualysapi.qualys.com"))
 
             if not username or not password:
                 return False, "Credentials not configured — add in connection settings"
@@ -459,7 +461,7 @@ class ConnectionHealthService:
             if not host or not api_key:
                 return False, "Credentials not configured — add in connection settings"
 
-            host = host.rstrip("/")
+            host = get_endpoint("rapid7", host.rstrip("/"))
             url = f"{host}/api/3/health"
 
             async with httpx.AsyncClient(verify=False) as client:

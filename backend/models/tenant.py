@@ -65,6 +65,7 @@ class Tenant(Base):
     connections = relationship("Connection", back_populates="tenant")
     tags = relationship("Tag", back_populates="tenant")
     deployment_rules = relationship("DeploymentRule", back_populates="tenant")
-    
+    audit_logs = relationship("AuditLog", back_populates="tenant", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<Tenant {self.name} ({self.id})>"

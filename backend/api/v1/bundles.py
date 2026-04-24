@@ -22,6 +22,7 @@ from backend.core.auth_compat import get_current_tenant_compat as get_current_te
 from backend.services.deployment_service import deployment_service
 from backend.services.rule_engine import rule_engine
 from backend.services.notifications import notification_service
+from backend.services.audit_service import AuditService
 
 
 router = APIRouter()
@@ -258,7 +259,24 @@ async def update_bundle_status(
     
     await db.commit()
     await db.refresh(bundle)
-    
+
+    # Audit log: status change
+    try:
+        _old_status = bundle.status  # already new status after commit
+        _action = "bundle.approved" if new_status == "approved" else "bundle.status_changed"
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action=_action,
+            resource_type="bundle",
+            resource_id=str(bundle.id),
+            resource_name=bundle.name,
+            details={"new_status": new_status, "old_status": status_update.get("_prev_status", "unknown")},
+        )
+        await db.commit()
+    except Exception:
+        pass
+
     # Send notification for scheduled/approved bundles
     if new_status in ["scheduled", "approved"]:
         try:
@@ -319,11 +337,43 @@ async def execute_bundle(
     )
     
     if not result["success"]:
+        # Audit failed execution
+        try:
+            await AuditService.log(
+                db=db,
+                tenant_id=tenant.id,
+                action="bundle.executed",
+                resource_type="bundle",
+                resource_id=str(bundle_id),
+                success=False,
+                error_message=result.get("error", "Bundle execution failed"),
+            )
+            await db.commit()
+        except Exception:
+            pass
         raise HTTPException(
             status_code=400,
             detail=result.get("error", "Bundle execution failed")
         )
-    
+
+    # Audit successful execution
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="bundle.executed",
+            resource_type="bundle",
+            resource_id=str(bundle_id),
+            resource_name=result.get("bundle_name", ""),
+            details={
+                "success_count": result.get("success_count", 0),
+                "failure_count": result.get("failure_count", 0),
+            },
+        )
+        await db.commit()
+    except Exception:
+        pass
+
     return result
 
 
@@ -790,6 +840,21 @@ async def approve_bundle(
 
     await db.commit()
     await db.refresh(bundle)
+
+    # Audit log: bundle approved
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="bundle.approved",
+            resource_type="bundle",
+            resource_id=str(bundle.id),
+            resource_name=bundle.name,
+            details={"approved_by": bundle.approved_by},
+        )
+        await db.commit()
+    except Exception:
+        pass
 
     # Notify that the bundle is approved and ready for execution
     try:

@@ -23,6 +23,7 @@ from backend.core.auth_workos import create_access_token, get_current_user
 from backend.db.session import get_db
 from backend.models.invite import Invite
 from backend.models.user import User, UserRole
+from backend.services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -153,6 +154,22 @@ async def create_invite(
     db.add(invite)
     await db.commit()
     await db.refresh(invite)
+
+    # Audit: invite sent
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            action="user.invited",
+            resource_type="user",
+            resource_id=str(invite.id),
+            resource_name=body.email,
+            details={"email": body.email, "role": role},
+        )
+        await db.commit()
+    except Exception:
+        pass
 
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     invite_url = f"{frontend_url}/invite/accept?token={token}"
@@ -299,6 +316,22 @@ async def accept_invite(
     invite.accepted_at = now
     await db.commit()
     await db.refresh(user)
+
+    # Audit: invite accepted
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            action="user.invite_accepted",
+            resource_type="user",
+            resource_id=str(user.id),
+            resource_name=user.email,
+            details={"role": user.role.value},
+        )
+        await db.commit()
+    except Exception:
+        pass
 
     # Create access token
     access_token = create_access_token(data={"sub": str(user.id)})

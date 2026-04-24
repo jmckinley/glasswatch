@@ -21,6 +21,7 @@ from backend.models.tenant import Tenant
 from backend.models.bundle import Bundle
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.optimization import OptimizationService
+from backend.services.audit_service import AuditService
 
 
 router = APIRouter()
@@ -250,7 +251,22 @@ async def create_goal(
     goal.risk_score_current = initial_metrics["risk_score_total"]
     
     await db.commit()
-    
+
+    # Audit: goal created
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="goal.created",
+            resource_type="goal",
+            resource_id=str(goal.id),
+            resource_name=goal.name,
+            details={"type": goal.type},
+        )
+        await db.commit()
+    except Exception:
+        pass
+
     # Return enriched response
     return GoalResponse(
         id=goal.id,

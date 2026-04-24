@@ -19,6 +19,7 @@ from backend.models.bundle import Bundle
 from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
+from backend.services.audit_service import AuditService
 
 
 router = APIRouter()
@@ -232,7 +233,22 @@ async def create_maintenance_window(
     db.add(window)
     await db.commit()
     await db.refresh(window)
-    
+
+    # Audit: window created
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="maintenance_window.created",
+            resource_type="maintenance_window",
+            resource_id=str(window.id),
+            resource_name=window.name,
+            details={"type": window.type, "start_time": window.start_time.isoformat(), "end_time": window.end_time.isoformat()},
+        )
+        await db.commit()
+    except Exception:
+        pass
+
     return window.to_dict()
 
 
@@ -428,10 +444,26 @@ async def delete_maintenance_window(
             "Reschedule or cancel bundles first."
         )
     
+    _window_name = window.name
+    _window_id = str(window.id)
     await db.delete(window)
     await db.commit()
-    
-    return {"message": f"Maintenance window '{window.name}' deleted successfully"}
+
+    # Audit: window deleted
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="maintenance_window.deleted",
+            resource_type="maintenance_window",
+            resource_id=_window_id,
+            resource_name=_window_name,
+        )
+        await db.commit()
+    except Exception:
+        pass
+
+    return {"message": f"Maintenance window '{_window_name}' deleted successfully"}
 
 
 @router.post("/create-recurring")
