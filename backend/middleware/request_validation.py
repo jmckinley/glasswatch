@@ -7,8 +7,9 @@ and rate limiting headers.
 import re
 import structlog
 from typing import Callable, Optional
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
 logger = structlog.get_logger()
@@ -83,9 +84,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     max_size=self.max_body_size,
                     path=request.url.path,
                 )
-                raise HTTPException(
+                return JSONResponse(
                     status_code=413,
-                    detail=f"Request body too large. Maximum size is {self.max_body_size} bytes."
+                    content={"detail": f"Request body too large. Maximum size is {self.max_body_size} bytes."}
                 )
         
         # SQL injection detection on query parameters
@@ -101,14 +102,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             path=request.url.path,
                             client=request.client.host if request.client else "unknown",
                         )
-                        raise HTTPException(
+                        return JSONResponse(
                             status_code=400,
-                            detail="Invalid request parameters"
+                            content={"detail": "Invalid request parameters"}
                         )
         
         # Path traversal detection
         if self.enable_path_traversal_detection:
-            path = request.url.path
+            # Check both normalized path and raw path (before ASGI normalization)
+            raw_path = request.scope.get("raw_path", b"").decode("utf-8", errors="ignore")
+            path = raw_path if raw_path else request.url.path
             for pattern in self.path_patterns:
                 if pattern.search(path):
                     logger.warning(
@@ -117,9 +120,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         path=path,
                         client=request.client.host if request.client else "unknown",
                     )
-                    raise HTTPException(
+                    return JSONResponse(
                         status_code=400,
-                        detail="Invalid request path"
+                        content={"detail": "Invalid request path"}
                     )
         
         # Process request

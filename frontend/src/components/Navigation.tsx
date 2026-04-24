@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/approvals", label: "Approvals" },
   { href: "/rules", label: "Rules" },
   { href: "/compliance", label: "Compliance" },
+  { href: "/import", label: "Import" },
   { href: "/settings", label: "Settings" },
   { href: "/help", label: "Help" },
 ];

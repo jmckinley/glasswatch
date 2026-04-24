@@ -129,8 +129,10 @@ class TestRequestValidation:
         assert response.status_code == 400
     
     def test_path_traversal_detection(self, client):
-        """Test path traversal detection."""
-        response = client.get("/test/../../../etc/passwd")
+        """Test path traversal detection via URL-encoded sequences."""
+        # Note: literal ../ in paths gets normalized by HTTP clients before
+        # middleware sees them. Real traversal attacks come URL-encoded.
+        response = client.get("/test/%2e%2e/%2e%2e/etc/passwd")
         assert response.status_code == 400
         assert "invalid" in response.json()["detail"].lower()
     
