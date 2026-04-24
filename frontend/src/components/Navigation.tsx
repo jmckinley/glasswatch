@@ -18,6 +18,7 @@ const navLinks = [
   { href: "/agent", label: "AI Assistant" },
   { href: "/import", label: "Import" },
   { href: "/settings", label: "Settings" },
+  { href: "/audit-log", label: "Audit Log" },
   { href: "/help", label: "Help" },
 ];
 

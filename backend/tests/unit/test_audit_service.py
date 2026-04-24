@@ -96,7 +96,7 @@ class TestAuditServiceQuery:
         actions = [
             ("bundle.approved", "bundle", "bundle-1"),
             ("bundle.executed", "bundle", "bundle-2"),
-            ("user.login", "user", str(user.id)),
+            ("user.login", "user", str(test_user.id)),
             ("vulnerability.imported", "vulnerability", None),
             ("maintenance_window.created", "maintenance_window", "mw-1"),
         ]
