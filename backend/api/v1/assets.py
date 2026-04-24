@@ -24,6 +24,7 @@ from backend.models.bundle import Bundle
 from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
+from backend.services.audit_service import AuditService
 
 
 router = APIRouter()
@@ -1310,6 +1311,21 @@ async def create_asset_patch_bundle(
 
     await db.commit()
     await db.refresh(bundle)
+
+    # Audit: bundle created
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=tenant.id,
+            action="bundle.created",
+            resource_type="bundle",
+            resource_id=str(bundle.id),
+            resource_name=bundle.name,
+            details={"vuln_count": len(open_avs), "asset_id": str(asset_id), "asset_name": asset.name},
+        )
+        await db.commit()
+    except Exception:
+        pass
 
     return {
         "bundle_id": str(bundle.id),
