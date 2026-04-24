@@ -26,14 +26,14 @@ class TestApprovalsAPI:
                 "bundle_id": str(bundle.id),
                 "title": "Approval for test bundle",
                 "description": "Please review this bundle",
-                "risk_level": "MEDIUM"
+                "risk_level": "medium"
             }
         )
         
         assert response.status_code == 201
         data = response.json()
         assert data["bundle_id"] == str(bundle.id)
-        assert data["status"] == "PENDING"
+        assert data["status"].lower() == "pending"
         assert "id" in data
     
     async def test_list_approvals(
@@ -62,8 +62,9 @@ class TestApprovalsAPI:
         
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
-        assert len(data["items"]) > 0
+        # API returns a list directly
+        items = data if isinstance(data, list) else data.get("items", [])
+        assert len(items) > 0
     
     async def test_list_approvals_filter_by_status(
         self, authenticated_client: AsyncClient, test_tenant, test_user,
@@ -85,15 +86,16 @@ class TestApprovalsAPI:
             risk_level=RiskLevel.MEDIUM
         )
         
-        # Filter by PENDING status
+        # Filter by pending status (query param is status_filter, values are lowercase)
         response = await authenticated_client.get(
-            "/api/v1/approvals?status=PENDING"
+            "/api/v1/approvals?status_filter=pending"
         )
         
         assert response.status_code == 200
         data = response.json()
-        for item in data["items"]:
-            assert item["status"] == "PENDING"
+        items = data if isinstance(data, list) else data.get("items", [])
+        for item in items:
+            assert item["status"].lower() == "pending"
     
     async def test_approve_request(
         self, admin_client: AsyncClient, test_tenant, test_user,
@@ -123,7 +125,7 @@ class TestApprovalsAPI:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "APPROVED"
+        assert data["status"].lower() == "approved"
     
     async def test_reject_request(
         self, admin_client: AsyncClient, test_tenant, test_user,
@@ -153,7 +155,7 @@ class TestApprovalsAPI:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "REJECTED"
+        assert data["status"].lower() == "rejected"
     
     async def test_create_approval_policy(
         self, admin_client: AsyncClient
@@ -163,7 +165,7 @@ class TestApprovalsAPI:
             "/api/v1/approvals/policies",
             json={
                 "name": "High Risk Policy",
-                "risk_level": "HIGH",
+                "risk_level": "high",
                 "required_approvals": 2,
                 "auto_approve_low_risk": False,
                 "escalation_hours": 24

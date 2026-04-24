@@ -41,6 +41,12 @@ class ConnectionHealthService:
             return await self._check_servicenow(config)
         elif provider == "webhook":
             return await self._check_webhook(config)
+        elif provider == "tenable":
+            return await self._check_tenable(config)
+        elif provider == "qualys":
+            return await self._check_qualys(config)
+        elif provider == "rapid7":
+            return await self._check_rapid7(config)
         else:
             return False, f"Unknown provider: {provider}"
     
@@ -354,6 +360,130 @@ class ConnectionHealthService:
         
         except Exception as e:
             return False, f"Webhook health check failed: {str(e)}"
+
+
+    async def _check_tenable(self, config: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Check Tenable.io connection.
+
+        Args:
+            config: Tenable configuration (access_key, secret_key)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            access_key = config.get("access_key")
+            secret_key = config.get("secret_key")
+
+            if not access_key or not secret_key:
+                return False, "Credentials not configured — add in connection settings"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://cloud.tenable.com/api/v1/health",
+                    headers={"X-ApiKeys": f"accessKey={access_key};secretKey={secret_key}"},
+                    timeout=10.0,
+                )
+
+                if response.status_code == 200:
+                    return True, "Tenable connection healthy"
+                elif response.status_code == 401:
+                    return False, "Tenable authentication failed: invalid access/secret keys"
+                else:
+                    return False, f"Tenable API returned {response.status_code}"
+
+        except httpx.ConnectError:
+            return False, "Cannot reach Tenable API (cloud.tenable.com)"
+        except httpx.TimeoutException:
+            return False, "Tenable connection timed out"
+        except Exception as e:
+            return False, f"Tenable health check failed: {str(e)}"
+
+    async def _check_qualys(self, config: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Check Qualys connection.
+
+        Args:
+            config: Qualys configuration (username, password, platform_url)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            username = config.get("username")
+            password = config.get("password")
+            platform_url = config.get("platform_url", "https://qualysapi.qualys.com")
+
+            if not username or not password:
+                return False, "Credentials not configured — add in connection settings"
+
+            url = f"{platform_url.rstrip('/')}/msp/about.php"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    auth=(username, password),
+                    headers={"X-Requested-With": "Glasswatch"},
+                    timeout=10.0,
+                )
+
+                if response.status_code == 200:
+                    return True, "Qualys connection healthy"
+                elif response.status_code == 401:
+                    return False, "Qualys authentication failed: invalid credentials"
+                else:
+                    return False, f"Qualys API returned {response.status_code}"
+
+        except httpx.ConnectError:
+            return False, "Cannot reach Qualys API"
+        except httpx.TimeoutException:
+            return False, "Qualys connection timed out"
+        except Exception as e:
+            return False, f"Qualys health check failed: {str(e)}"
+
+    async def _check_rapid7(self, config: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Check Rapid7 InsightVM connection.
+
+        Args:
+            config: Rapid7 configuration (host, api_key)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            host = config.get("host")
+            api_key = config.get("api_key")
+
+            if not host or not api_key:
+                return False, "Credentials not configured — add in connection settings"
+
+            host = host.rstrip("/")
+            url = f"{host}/api/3/health"
+
+            async with httpx.AsyncClient(verify=False) as client:
+                response = await client.get(
+                    url,
+                    headers={"X-Api-Key": api_key},
+                    timeout=10.0,
+                )
+
+                if response.status_code == 200:
+                    return True, "Rapid7 InsightVM connection healthy"
+                elif response.status_code == 401:
+                    return False, "Rapid7 authentication failed: invalid API key"
+                elif response.status_code == 404:
+                    return False, f"Rapid7 health endpoint not found at {host}/api/3/health"
+                else:
+                    return False, f"Rapid7 API returned {response.status_code}"
+
+        except httpx.ConnectError:
+            return False, f"Cannot reach Rapid7 host: {config.get('host', 'unknown')}"
+        except httpx.TimeoutException:
+            return False, "Rapid7 connection timed out"
+        except Exception as e:
+            return False, f"Rapid7 health check failed: {str(e)}"
 
 
 # Global service instance

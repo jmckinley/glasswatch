@@ -116,6 +116,24 @@ PROVIDER_METADATA = {
         "required_fields": ["url"],
         "optional_fields": ["headers", "method"],
     },
+    "tenable": {
+        "display_name": "Tenable.io",
+        "description": "Connect to Tenable.io for vulnerability scanning and asset discovery",
+        "required_fields": ["access_key", "secret_key"],
+        "optional_fields": [],
+    },
+    "qualys": {
+        "display_name": "Qualys VMDR",
+        "description": "Connect to Qualys for vulnerability management and reporting",
+        "required_fields": ["username", "password"],
+        "optional_fields": ["platform_url"],
+    },
+    "rapid7": {
+        "display_name": "Rapid7 InsightVM",
+        "description": "Connect to Rapid7 InsightVM for vulnerability scanning",
+        "required_fields": ["host", "api_key"],
+        "optional_fields": [],
+    },
 }
 
 

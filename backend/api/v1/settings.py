@@ -351,6 +351,56 @@ async def test_connection(
                 except (OSError, TimeoutError) as e:
                     return TestConnectionResponse(success=False, message=f"Cannot reach {smtp_host}:{smtp_port} — {e}")
 
+            elif integration == "tenable":
+                access_key = config.get("access_key", "")
+                secret_key = config.get("secret_key", "")
+                if not access_key or not secret_key:
+                    return TestConnectionResponse(success=False, message="access_key and secret_key are required")
+                resp = await client.get(
+                    "https://cloud.tenable.com/api/v1/health",
+                    headers={"X-ApiKeys": f"accessKey={access_key};secretKey={secret_key}"},
+                )
+                if resp.status_code == 200:
+                    return TestConnectionResponse(success=True, message="Tenable connection healthy")
+                elif resp.status_code == 401:
+                    return TestConnectionResponse(success=False, message="Tenable: invalid access/secret keys")
+                else:
+                    return TestConnectionResponse(success=False, message=f"Tenable returned HTTP {resp.status_code}")
+
+            elif integration == "qualys":
+                username = config.get("username", "")
+                password = config.get("password", "")
+                platform_url = config.get("platform_url", "https://qualysapi.qualys.com")
+                if not username or not password:
+                    return TestConnectionResponse(success=False, message="username and password are required")
+                resp = await client.get(
+                    f"{platform_url.rstrip('/')}/msp/about.php",
+                    auth=(username, password),
+                    headers={"X-Requested-With": "Glasswatch"},
+                )
+                if resp.status_code == 200:
+                    return TestConnectionResponse(success=True, message="Qualys connection healthy")
+                elif resp.status_code == 401:
+                    return TestConnectionResponse(success=False, message="Qualys: invalid credentials")
+                else:
+                    return TestConnectionResponse(success=False, message=f"Qualys returned HTTP {resp.status_code}")
+
+            elif integration == "rapid7":
+                host = config.get("host", "").rstrip("/")
+                api_key = config.get("api_key", "")
+                if not host or not api_key:
+                    return TestConnectionResponse(success=False, message="host and api_key are required")
+                resp = await client.get(
+                    f"{host}/api/3/health",
+                    headers={"X-Api-Key": api_key},
+                )
+                if resp.status_code == 200:
+                    return TestConnectionResponse(success=True, message="Rapid7 InsightVM connection healthy")
+                elif resp.status_code == 401:
+                    return TestConnectionResponse(success=False, message="Rapid7: invalid API key")
+                else:
+                    return TestConnectionResponse(success=False, message=f"Rapid7 returned HTTP {resp.status_code}")
+
             else:
                 return TestConnectionResponse(success=False, message=f"Unknown integration: {integration}")
 

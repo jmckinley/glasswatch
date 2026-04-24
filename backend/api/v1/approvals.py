@@ -218,6 +218,109 @@ async def list_approval_requests(
     return list(requests)
 
 
+# Policy Management (must be before /{approval_id} to avoid route shadowing)
+
+@router.get("/approvals/policies", response_model=List[ApprovalPolicyResponse])
+async def list_approval_policies(
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List approval policies for the tenant.
+
+    Only accessible to ADMIN users.
+    """
+    result = await db.execute(
+        select(ApprovalPolicy)
+        .where(ApprovalPolicy.tenant_id == current_user.tenant_id)
+        .order_by(ApprovalPolicy.risk_level, ApprovalPolicy.created_at.desc())
+    )
+
+    policies = result.scalars().all()
+    return list(policies)
+
+
+@router.post("/approvals/policies", response_model=ApprovalPolicyResponse, status_code=status.HTTP_201_CREATED)
+async def create_approval_policy_early(
+    policy: ApprovalPolicyCreate,
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new approval policy (registered early to avoid route shadowing).
+    """
+    if policy.required_roles:
+        valid_roles = [role.value for role in UserRole]
+        invalid_roles = [r for r in policy.required_roles if r not in valid_roles]
+        if invalid_roles:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid roles: {invalid_roles}"
+            )
+
+    new_policy = ApprovalPolicy(
+        tenant_id=current_user.tenant_id,
+        name=policy.name,
+        description=policy.description,
+        risk_level=policy.risk_level,
+        required_approvals=policy.required_approvals,
+        required_roles=policy.required_roles,
+        auto_approve_low_risk=policy.auto_approve_low_risk,
+        escalation_hours=policy.escalation_hours,
+    )
+
+    db.add(new_policy)
+    await db.commit()
+    await db.refresh(new_policy)
+
+    return new_policy
+
+
+@router.get("/approvals/stats", response_model=ApprovalStatsResponse)
+async def get_approval_stats_early(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get approval statistics (registered early to avoid route shadowing)."""
+    result = await db.execute(
+        select(ApprovalRequest).where(
+            ApprovalRequest.tenant_id == current_user.tenant_id
+        )
+    )
+    requests = result.scalars().all()
+
+    total_requests = len(requests)
+    pending_requests = sum(1 for r in requests if r.status == ApprovalStatus.PENDING)
+    approved_requests = sum(1 for r in requests if r.status == ApprovalStatus.APPROVED)
+    rejected_requests = sum(1 for r in requests if r.status == ApprovalStatus.REJECTED)
+    expired_requests = sum(1 for r in requests if r.status == ApprovalStatus.EXPIRED)
+
+    approval_times = [
+        (r.approved_at - r.created_at).total_seconds() / 3600
+        for r in requests
+        if r.status == ApprovalStatus.APPROVED and r.approved_at
+    ]
+    avg_approval_time = sum(approval_times) / len(approval_times) if approval_times else None
+
+    by_risk_level = {}
+    for risk_level in RiskLevel:
+        by_risk_level[risk_level.value] = sum(
+            1 for r in requests if r.risk_level == risk_level
+        )
+
+    return ApprovalStatsResponse(
+        total_requests=total_requests,
+        pending_requests=pending_requests,
+        approved_requests=approved_requests,
+        rejected_requests=rejected_requests,
+        expired_requests=expired_requests,
+        avg_approval_time_hours=avg_approval_time,
+        by_risk_level=by_risk_level,
+    )
+
+
+# Per-request endpoints
+
 @router.get("/approvals/{approval_id}", response_model=ApprovalRequestResponse)
 async def get_approval_request(
     approval_id: UUID,

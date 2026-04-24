@@ -507,4 +507,62 @@ export const reportingApi = {
   getExecutiveSummary: () => apiCall<any>('/reporting/executive-summary'),
 };
 
+// Connections API
+export const connectionsApi = {
+  list: (provider?: string) =>
+    apiCall<any[]>(`/connections${provider ? `?provider=${provider}` : ""}`),
+  get: (id: string) => apiCall<any>(`/connections/${id}`),
+  create: (data: { provider: string; name: string; config: Record<string, any> }) =>
+    apiCall<any>("/connections", { method: "POST", body: data }),
+  update: (id: string, data: Partial<{ name: string; config: Record<string, any> }>) =>
+    apiCall<any>(`/connections/${id}`, { method: "PATCH", body: data }),
+  delete: (id: string) =>
+    apiCall<any>(`/connections/${id}`, { method: "DELETE" }),
+  test: (id: string) =>
+    apiCall<{ success: boolean; message: string; checked_at: string }>(`/connections/${id}/test`, { method: "POST" }),
+  providers: () => apiCall<any>("/connections/providers"),
+};
+
+// CSV Import API
+export const importApi = {
+  importVulnerabilities: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const DEMO_TENANT = "550e8400-e29b-41d4-a716-446655440000";
+    const headers: Record<string, string> = { "X-Tenant-ID": DEMO_TENANT };
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("glasswatch_token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}/api/v1/import/vulnerabilities/csv`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Import failed");
+    return data;
+  },
+  importAssets: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const DEMO_TENANT = "550e8400-e29b-41d4-a716-446655440000";
+    const headers: Record<string, string> = { "X-Tenant-ID": DEMO_TENANT };
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("glasswatch_token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}/api/v1/import/assets/csv`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Import failed");
+    return data;
+  },
+};
+
 export { apiCall };

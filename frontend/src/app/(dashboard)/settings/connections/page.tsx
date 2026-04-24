@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useRef } from "react";
+import { connectionsApi } from "@/lib/api";
 
 interface Connection {
   id: string;
   provider: string;
   name: string;
   status: string;
+  config: Record<string, any>;
   last_health_check?: string;
   last_error?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 interface Provider {
@@ -29,14 +31,42 @@ const PROVIDER_ICONS: Record<string, string> = {
   jira: "📋",
   servicenow: "🎫",
   webhook: "🔗",
+  tenable: "🔍",
+  qualys: "🛡️",
+  rapid7: "⚡",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-500",
-  pending: "bg-yellow-500",
-  error: "bg-red-500",
-  disabled: "bg-gray-500",
+const STATUS_CONFIG: Record<string, { dot: string; label: string; text: string }> = {
+  active: { dot: "bg-green-500", label: "Connected", text: "text-green-400" },
+  pending: { dot: "bg-yellow-500", label: "Pending", text: "text-yellow-400" },
+  error: { dot: "bg-red-500", label: "Error", text: "text-red-400" },
+  disabled: { dot: "bg-gray-500", label: "Disabled", text: "text-gray-400" },
 };
+
+function StatusDot({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`inline-block w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+      <span className={`text-xs font-medium ${cfg.text}`}>{cfg.label}</span>
+    </span>
+  );
+}
+
+function TestResult({ result }: { result: { success: boolean; message: string } | null }) {
+  if (!result) return null;
+  return (
+    <div
+      className={`mt-2 p-2 rounded-lg text-xs ${
+        result.success
+          ? "bg-green-500/10 border border-green-500/20 text-green-300"
+          : "bg-red-500/10 border border-red-500/20 text-red-300"
+      }`}
+    >
+      {result.success ? "✓" : "✗"} {result.message}
+    </div>
+  );
+}
 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -45,229 +75,245 @@ export default function ConnectionsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [testingConnection, setTestingConnection] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchConnections();
-    fetchProviders();
+    loadData();
   }, []);
 
-  const fetchConnections = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await fetch("/api/v1/connections", {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch connections:", error);
+      const [conns, prov] = await Promise.all([
+        connectionsApi.list().catch(() => []),
+        connectionsApi.providers().catch(() => ({ providers: [] })),
+      ]);
+      setConnections(Array.isArray(conns) ? conns : []);
+      setProviders(prov?.providers ?? []);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProviders = async () => {
+  const handleTest = async (id: string) => {
+    setTestingId(id);
     try {
-      const response = await fetch("/api/v1/connections/providers", {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setProviders(data.providers);
-      }
-    } catch (error) {
-      console.error("Failed to fetch providers:", error);
-    }
-  };
-
-  const handleAddConnection = () => {
-    setShowAddModal(true);
-    setSelectedProvider(null);
-    setFormData({});
-  };
-
-  const handleProviderSelect = (provider: Provider) => {
-    setSelectedProvider(provider);
-    // Initialize form data with empty values for required fields
-    const initialData: Record<string, string> = {};
-    provider.required_fields.forEach((field) => {
-      initialData[field] = "";
-    });
-    setFormData(initialData);
-  };
-
-  const handleFormChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
-  const handleSubmitConnection = async () => {
-    if (!selectedProvider) return;
-
-    // Validate required fields
-    const missingFields = selectedProvider.required_fields.filter(
-      (field) => !formData[field]
-    );
-    if (missingFields.length > 0) {
-      alert(`Please fill in required fields: ${missingFields.join(", ")}`);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/v1/connections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          provider: selectedProvider.name,
-          name: formData.name || `${selectedProvider.display_name} Connection`,
-          config: formData,
-        }),
-      });
-
-      if (response.ok) {
-        setShowAddModal(false);
-        fetchConnections();
-      } else {
-        const error = await response.json();
-        alert(`Failed to create connection: ${error.detail}`);
-      }
-    } catch (error) {
-      alert(`Failed to create connection: ${error}`);
-    }
-  };
-
-  const handleTestConnection = async (connectionId: string) => {
-    try {
-      setTestingConnection(connectionId);
-      const response = await fetch(`/api/v1/connections/${connectionId}/test`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
-        fetchConnections(); // Refresh to show updated status
-      }
-    } catch (error) {
-      alert(`Failed to test connection: ${error}`);
+      const result = await connectionsApi.test(id);
+      setTestResults((prev) => ({ ...prev, [id]: result }));
+      await loadData(); // refresh status
+    } catch {
+      setTestResults((prev) => ({ ...prev, [id]: { success: false, message: "Request failed" } }));
     } finally {
-      setTestingConnection(null);
+      setTestingId(null);
     }
   };
 
-  const handleDeleteConnection = async (connectionId: string) => {
-    if (!confirm("Are you sure you want to delete this connection?")) {
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this connection? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      await connectionsApi.delete(id);
+      setConnections((prev) => prev.filter((c) => c.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const startEdit = (conn: Connection) => {
+    setEditingId(conn.id);
+    // Build editable form from current config (masked values shown as empty)
+    const prov = providers.find((p) => p.name === conn.provider);
+    const fields = [...(prov?.required_fields ?? []), ...(prov?.optional_fields ?? [])];
+    const initial: Record<string, string> = { name: conn.name };
+    fields.forEach((f) => { initial[f] = ""; }); // start empty so user can enter new values
+    setEditForm(initial);
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    setSaving(true);
+    try {
+      const config: Record<string, string> = {};
+      const prov = providers.find((p) => p.name === connections.find((c) => c.id === id)?.provider);
+      const fields = [...(prov?.required_fields ?? []), ...(prov?.optional_fields ?? [])];
+      fields.forEach((f) => {
+        if (editForm[f]) config[f] = editForm[f];
+      });
+      await connectionsApi.update(id, {
+        name: editForm.name || undefined,
+        config: Object.keys(config).length > 0 ? config : undefined,
+      });
+      setEditingId(null);
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmitNew = async () => {
+    if (!selectedProvider) return;
+    const missing = selectedProvider.required_fields.filter((f) => !formData[f]);
+    if (missing.length) {
+      alert(`Fill in required fields: ${missing.join(", ")}`);
       return;
     }
-
+    setSaving(true);
     try {
-      const response = await fetch(`/api/v1/connections/${connectionId}`, {
-        method: "DELETE",
-        credentials: "include",
+      await connectionsApi.create({
+        provider: selectedProvider.name,
+        name: formData.name || `${selectedProvider.display_name} Connection`,
+        config: formData,
       });
-
-      if (response.ok) {
-        fetchConnections();
-      }
-    } catch (error) {
-      alert(`Failed to delete connection: ${error}`);
+      setShowAddModal(false);
+      setSelectedProvider(null);
+      setFormData({});
+      await loadData();
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Connections</h1>
-          <p className="text-gray-400">Manage cloud providers and external services</p>
+          <h1 className="text-3xl font-bold text-white mb-1">Connections</h1>
+          <p className="text-gray-400">Manage cloud providers, scanners, and external services</p>
         </div>
-        <div className="flex gap-3">
-          <Link
-            href="/settings"
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            ← Back to Settings
-          </Link>
-          <button
-            onClick={handleAddConnection}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-          >
-            + Add Connection
-          </button>
-        </div>
+        <button
+          onClick={() => { setShowAddModal(true); setSelectedProvider(null); setFormData({}); }}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          + Add Connection
+        </button>
       </div>
 
-      {/* Connections List */}
+      {/* Connection cards */}
       {loading ? (
-        <div className="text-gray-400">Loading connections...</div>
+        <div className="text-gray-400 text-sm">Loading connections…</div>
       ) : connections.length === 0 ? (
-        <div className="bg-gray-800 rounded-lg border-2 border-gray-700 p-12 text-center">
-          <div className="text-6xl mb-4">🔌</div>
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
+          <div className="text-5xl mb-4">🔌</div>
           <h3 className="text-xl font-semibold text-white mb-2">No connections yet</h3>
-          <p className="text-gray-400 mb-6">
-            Connect cloud providers and external services to enable automated discovery
-          </p>
+          <p className="text-gray-400 mb-6">Connect scanners and cloud providers to enable vulnerability sync</p>
           <button
-            onClick={handleAddConnection}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+            onClick={() => setShowAddModal(true)}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Add Your First Connection
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-3">
           {connections.map((conn) => (
-            <div
-              key={conn.id}
-              className="bg-gray-800 rounded-lg border-2 border-gray-700 p-6 hover:border-gray-600 transition-all"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="text-4xl">{PROVIDER_ICONS[conn.provider] || "🔗"}</div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{conn.name}</h3>
-                    <p className="text-gray-400 text-sm capitalize">{conn.provider}</p>
+            <div key={conn.id} className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+              <div className="flex items-start justify-between gap-4">
+                {/* Left: icon + name + status */}
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="text-3xl flex-shrink-0">{PROVIDER_ICONS[conn.provider] ?? "🔗"}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-white font-semibold">{conn.name}</h3>
+                      <span className="text-gray-500 text-xs capitalize">{conn.provider}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <StatusDot status={conn.status} />
+                      {conn.last_health_check && (
+                        <span className="text-gray-500 text-xs">
+                          Checked {new Date(conn.last_health_check).toLocaleString()}
+                        </span>
+                      )}
+                      {!conn.last_health_check && (
+                        <span className="text-gray-600 text-xs">Never checked</span>
+                      )}
+                    </div>
+                    {conn.last_error && (
+                      <p className="text-red-400 text-xs mt-1 truncate max-w-lg">{conn.last_error}</p>
+                    )}
                   </div>
                 </div>
-                <div
-                  className={`w-3 h-3 rounded-full ${STATUS_COLORS[conn.status] || "bg-gray-500"}`}
-                  title={conn.status}
-                />
+
+                {/* Right: actions */}
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleTest(conn.id)}
+                    disabled={testingId === conn.id}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    {testingId === conn.id ? "Testing…" : "Test"}
+                  </button>
+                  <button
+                    onClick={() => editingId === conn.id ? setEditingId(null) : startEdit(conn)}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-colors"
+                  >
+                    {editingId === conn.id ? "Cancel" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(conn.id)}
+                    disabled={deletingId === conn.id}
+                    className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white text-xs rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    {deletingId === conn.id ? "…" : "Delete"}
+                  </button>
+                </div>
               </div>
 
-              {conn.last_health_check && (
-                <div className="text-sm text-gray-400 mb-2">
-                  Last checked: {new Date(conn.last_health_check).toLocaleString()}
-                </div>
-              )}
+              {/* Test result */}
+              {testResults[conn.id] && <TestResult result={testResults[conn.id]} />}
 
-              {conn.last_error && (
-                <div className="text-sm text-red-400 mb-4 p-2 bg-red-900/20 rounded">
-                  {conn.last_error}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleTestConnection(conn.id)}
-                  disabled={testingConnection === conn.id}
-                  className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-sm transition-colors disabled:bg-gray-800"
-                >
-                  {testingConnection === conn.id ? "Testing..." : "Test"}
-                </button>
-                <button
-                  onClick={() => handleDeleteConnection(conn.id)}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+              {/* Inline edit form */}
+              {editingId === conn.id && (() => {
+                const prov = providers.find((p) => p.name === conn.provider);
+                const allFields = [...(prov?.required_fields ?? []), ...(prov?.optional_fields ?? [])];
+                return (
+                  <div className="mt-4 pt-4 border-t border-gray-700 space-y-3">
+                    <p className="text-xs text-gray-400">Leave credential fields empty to keep current values.</p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">Connection Name</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={editForm.name ?? conn.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                      />
+                    </div>
+                    {allFields.map((field) => (
+                      <div key={field}>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          {field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </label>
+                        <input
+                          type={field.includes("secret") || field.includes("password") || field.includes("key") ? "password" : "text"}
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                          value={editForm[field] ?? ""}
+                          onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))}
+                          placeholder="Enter new value to update…"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSaveEdit(conn.id)}
+                        disabled={saving}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+                      >
+                        {saving ? "Saving…" : "Save Changes"}
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -275,71 +321,78 @@ export default function ConnectionsPage() {
 
       {/* Add Connection Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border-2 border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-700">
-              <h2 className="text-2xl font-bold text-white">Add Connection</h2>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+              <h2 className="text-xl font-bold text-white">
+                {selectedProvider ? `Configure ${selectedProvider.display_name}` : "Add Connection"}
+              </h2>
+              <button
+                onClick={() => { setShowAddModal(false); setSelectedProvider(null); }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-5">
               {!selectedProvider ? (
-                <div className="grid grid-cols-2 gap-4">
-                  {providers.map((provider) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {providers.map((prov) => (
                     <button
-                      key={provider.name}
-                      onClick={() => handleProviderSelect(provider)}
-                      className="p-6 bg-gray-700 hover:bg-gray-600 rounded-lg text-left transition-all border-2 border-transparent hover:border-blue-500"
+                      key={prov.name}
+                      onClick={() => {
+                        setSelectedProvider(prov);
+                        const init: Record<string, string> = {};
+                        [...prov.required_fields, ...prov.optional_fields].forEach((f) => { init[f] = ""; });
+                        setFormData(init);
+                      }}
+                      className="p-4 bg-gray-700 hover:bg-gray-600 border-2 border-transparent hover:border-blue-500 rounded-xl text-left transition-all"
                     >
-                      <div className="text-4xl mb-2">{PROVIDER_ICONS[provider.name] || "🔗"}</div>
-                      <h3 className="text-lg font-semibold text-white mb-1">
-                        {provider.display_name}
-                      </h3>
-                      <p className="text-gray-400 text-sm">{provider.description}</p>
+                      <div className="text-3xl mb-2">{PROVIDER_ICONS[prov.name] ?? "🔗"}</div>
+                      <h3 className="text-white font-medium text-sm mb-1">{prov.display_name}</h3>
+                      <p className="text-gray-400 text-xs">{prov.description}</p>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Connection Name
-                    </label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Connection Name</label>
                     <input
                       type="text"
-                      value={formData.name || ""}
-                      onChange={(e) => handleFormChange("name", e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                      value={formData.name ?? ""}
+                      onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value }))}
                       placeholder={`${selectedProvider.display_name} Connection`}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
-
                   {selectedProvider.required_fields.map((field) => (
                     <div key={field}>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {field.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())} *
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        {field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} <span className="text-red-400">*</span>
                       </label>
                       <input
-                        type={field.includes("secret") || field.includes("password") ? "password" : "text"}
-                        value={formData[field] || ""}
-                        onChange={(e) => handleFormChange(field, e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
+                        type={field.includes("secret") || field.includes("password") || field.includes("key") ? "password" : "text"}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={formData[field] ?? ""}
+                        onChange={(e) => setFormData((f) => ({ ...f, [field]: e.target.value }))}
                       />
                     </div>
                   ))}
-
                   {selectedProvider.optional_fields.length > 0 && (
                     <>
-                      <div className="text-sm text-gray-400 mt-4">Optional Fields</div>
+                      <p className="text-xs text-gray-500 mt-2">Optional</p>
                       {selectedProvider.optional_fields.map((field) => (
                         <div key={field}>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            {field.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                          <label className="block text-sm font-medium text-gray-300 mb-1">
+                            {field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                           </label>
                           <input
                             type="text"
-                            value={formData[field] || ""}
-                            onChange={(e) => handleFormChange(field, e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
+                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                            value={formData[field] ?? ""}
+                            onChange={(e) => setFormData((f) => ({ ...f, [field]: e.target.value }))}
                           />
                         </div>
                       ))}
@@ -349,22 +402,23 @@ export default function ConnectionsPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700 flex gap-3 justify-end">
+            <div className="flex justify-between p-5 border-t border-gray-700">
               <button
                 onClick={() => {
-                  setShowAddModal(false);
-                  setSelectedProvider(null);
+                  if (selectedProvider) setSelectedProvider(null);
+                  else setShowAddModal(false);
                 }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
               >
-                Cancel
+                {selectedProvider ? "← Back" : "Cancel"}
               </button>
               {selectedProvider && (
                 <button
-                  onClick={handleSubmitConnection}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                  onClick={handleSubmitNew}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
                 >
-                  Create Connection
+                  {saving ? "Creating…" : "Create Connection"}
                 </button>
               )}
             </div>

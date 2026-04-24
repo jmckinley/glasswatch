@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { settingsApi } from "@/lib/api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { settingsApi, importApi } from "@/lib/api";
 
 interface IntegrationSettings {
   vulncheck_api_key: string | null;
@@ -125,6 +125,33 @@ export default function IntegrationsPage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [nlpEnabled, setNlpEnabled] = useState(true);
 
+  // Tenable
+  const [tenableAccessKey, setTenableAccessKey] = useState("");
+  const [tenableSecretKey, setTenableSecretKey] = useState("");
+  const [tenableConfigured, setTenableConfigured] = useState(false);
+  const [tenableLastSync, setTenableLastSync] = useState<string | null>(null);
+
+  // Qualys
+  const [qualysUsername, setQualysUsername] = useState("");
+  const [qualysPassword, setQualysPassword] = useState("");
+  const [qualysPlatformUrl, setQualysPlatformUrl] = useState("https://qualysapi.qualys.com");
+  const [qualysConfigured, setQualysConfigured] = useState(false);
+  const [qualysLastSync, setQualysLastSync] = useState<string | null>(null);
+
+  // Rapid7
+  const [rapid7Host, setRapid7Host] = useState("");
+  const [rapid7ApiKey, setRapid7ApiKey] = useState("");
+  const [rapid7Configured, setRapid7Configured] = useState(false);
+  const [rapid7LastSync, setRapid7LastSync] = useState<string | null>(null);
+
+  // CSV Import
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importType, setImportType] = useState<"vulnerabilities" | "assets">("vulnerabilities");
+  const [importPreview, setImportPreview] = useState<string[][] | null>(null);
+  const [importResult, setImportResult] = useState<any | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -134,6 +161,18 @@ export default function IntegrationsPage() {
       const data = await settingsApi.get();
       const int: IntegrationSettings = data.settings?.integrations || {};
       const ai: AISettings = data.settings?.ai || {};
+      const scanners = data.settings?.scanners || {};
+
+      // Load scanner settings
+      setTenableConfigured(!!scanners.tenable_configured);
+      setTenableLastSync(scanners.tenable_last_sync || null);
+      setQualysUsername(scanners.qualys_username || "");
+      setQualysPlatformUrl(scanners.qualys_platform_url || "https://qualysapi.qualys.com");
+      setQualysConfigured(!!scanners.qualys_configured);
+      setQualysLastSync(scanners.qualys_last_sync || null);
+      setRapid7Host(scanners.rapid7_host || "");
+      setRapid7Configured(!!scanners.rapid7_configured);
+      setRapid7LastSync(scanners.rapid7_last_sync || null);
 
       setVulncheckConfigured(int.vulncheck_api_key_configured || false);
       setSnapperConfigured(int.snapper_webhook_secret_configured || false);
@@ -164,6 +203,42 @@ export default function IntegrationsPage() {
       alert("Failed to save settings");
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImportResult(null);
+
+    // Parse CSV preview (first 5 rows)
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const lines = text.split("\n").slice(0, 6).filter(Boolean);
+      const parsed = lines.map((line) => line.split(",").map((c) => c.trim().replace(/^"|"$/g, "")));
+      setImportPreview(parsed);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const result = importType === "vulnerabilities"
+        ? await importApi.importVulnerabilities(importFile)
+        : await importApi.importAssets(importFile);
+      setImportResult(result);
+      setImportFile(null);
+      setImportPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: any) {
+      setImportResult({ error: err.message || "Import failed" });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -346,6 +421,216 @@ export default function IntegrationsPage() {
             </button>
           </div>
           <TestResult result={testResults.jira || null} />
+        </div>
+      </Section>
+
+      {/* ─── Scanner Connections ─── */}
+
+      {/* Tenable */}
+      <Section title="Tenable.io" icon="🔍" description="Vulnerability scanning and asset discovery via Tenable.io cloud">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">Status:</span>
+            <ConfiguredBadge configured={tenableConfigured} />
+            {tenableLastSync && <span className="text-xs text-gray-500">Last sync: {new Date(tenableLastSync).toLocaleString()}</span>}
+          </div>
+          <MaskedInput label="Access Key" value={tenableAccessKey} onChange={setTenableAccessKey}
+            placeholder={tenableConfigured ? "Enter new key to replace…" : "xxxxxxxxxxxxxxxx"} />
+          <MaskedInput label="Secret Key" value={tenableSecretKey} onChange={setTenableSecretKey}
+            placeholder={tenableConfigured ? "Enter new key to replace…" : "xxxxxxxxxxxxxxxx"} />
+          <div className="flex gap-2">
+            <SaveBtn loading={saving === "tenable"} disabled={!tenableAccessKey || !tenableSecretKey}
+              onClick={() => save("scanners", { tenable_access_key: tenableAccessKey, tenable_secret_key: tenableSecretKey, tenable_configured: true })} />
+            <button
+              disabled={(!tenableAccessKey && !tenableConfigured) || testing === "tenable"}
+              onClick={() => testConn("tenable", "tenable", { access_key: tenableAccessKey, secret_key: tenableSecretKey })}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {testing === "tenable" ? "Testing…" : "Test Connection"}
+            </button>
+          </div>
+          <TestResult result={testResults.tenable || null} />
+        </div>
+      </Section>
+
+      {/* Qualys */}
+      <Section title="Qualys VMDR" icon="🛡️" description="Vulnerability management and reporting via Qualys platform">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">Status:</span>
+            <ConfiguredBadge configured={qualysConfigured} />
+            {qualysLastSync && <span className="text-xs text-gray-500">Last sync: {new Date(qualysLastSync).toLocaleString()}</span>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+            <input type="text" className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+              value={qualysUsername} onChange={(e) => setQualysUsername(e.target.value)} placeholder="qualys_user" />
+          </div>
+          <MaskedInput label="Password" value={qualysPassword} onChange={setQualysPassword}
+            placeholder={qualysConfigured ? "Enter new password to replace…" : "••••••••"} />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Platform URL</label>
+            <input type="url" className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+              value={qualysPlatformUrl} onChange={(e) => setQualysPlatformUrl(e.target.value)} placeholder="https://qualysapi.qualys.com" />
+          </div>
+          <div className="flex gap-2">
+            <SaveBtn loading={saving === "qualys"} disabled={!qualysUsername}
+              onClick={() => save("scanners", { qualys_username: qualysUsername, qualys_password: qualysPassword || undefined, qualys_platform_url: qualysPlatformUrl, qualys_configured: !!(qualysUsername && qualysPassword) })} />
+            <button
+              disabled={(!qualysPassword && !qualysConfigured) || testing === "qualys"}
+              onClick={() => testConn("qualys", "qualys", { username: qualysUsername, password: qualysPassword, platform_url: qualysPlatformUrl })}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {testing === "qualys" ? "Testing…" : "Test Connection"}
+            </button>
+          </div>
+          <TestResult result={testResults.qualys || null} />
+        </div>
+      </Section>
+
+      {/* Rapid7 */}
+      <Section title="Rapid7 InsightVM" icon="⚡" description="Vulnerability scanning via Rapid7 InsightVM">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">Status:</span>
+            <ConfiguredBadge configured={rapid7Configured} />
+            {rapid7LastSync && <span className="text-xs text-gray-500">Last sync: {new Date(rapid7LastSync).toLocaleString()}</span>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Host URL</label>
+            <input type="url" className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+              value={rapid7Host} onChange={(e) => setRapid7Host(e.target.value)} placeholder="https://insightvm.company.com:3780" />
+          </div>
+          <MaskedInput label="API Key" value={rapid7ApiKey} onChange={setRapid7ApiKey}
+            placeholder={rapid7Configured ? "Enter new key to replace…" : "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"} />
+          <div className="flex gap-2">
+            <SaveBtn loading={saving === "rapid7"} disabled={!rapid7Host}
+              onClick={() => save("scanners", { rapid7_host: rapid7Host, rapid7_api_key: rapid7ApiKey || undefined, rapid7_configured: !!(rapid7Host && rapid7ApiKey) })} />
+            <button
+              disabled={(!rapid7ApiKey && !rapid7Configured) || testing === "rapid7"}
+              onClick={() => testConn("rapid7", "rapid7", { host: rapid7Host, api_key: rapid7ApiKey })}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {testing === "rapid7" ? "Testing…" : "Test Connection"}
+            </button>
+          </div>
+          <TestResult result={testResults.rapid7 || null} />
+        </div>
+      </Section>
+
+      {/* ─── CSV Import ─── */}
+      <Section title="CSV Import" icon="📂" description="Bulk import vulnerabilities or assets from CSV files">
+        <div className="space-y-4">
+          {/* Type selector */}
+          <div className="flex gap-3">
+            {(["vulnerabilities", "assets"] as const).map((t) => (
+              <button key={t} onClick={() => { setImportType(t); setImportFile(null); setImportPreview(null); setImportResult(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  importType === t ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Column guide */}
+          <div className="text-xs text-gray-500 bg-gray-700/50 rounded-lg p-3">
+            {importType === "vulnerabilities" ? (
+              <><strong className="text-gray-300">Expected columns:</strong> asset_name, cve_id, severity, cvss_score, discovered_date</>
+            ) : (
+              <><strong className="text-gray-300">Expected columns:</strong> name, type, environment, ip_address, owner_team, criticality</>
+            )}
+          </div>
+
+          {/* File upload */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const ev = { target: { files: [f] } } as any; handleFileChange(ev); } }}
+            className="border-2 border-dashed border-gray-600 hover:border-blue-500 rounded-xl p-8 text-center cursor-pointer transition-colors"
+          >
+            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+            {importFile ? (
+              <div>
+                <div className="text-2xl mb-2">📄</div>
+                <p className="text-white font-medium">{importFile.name}</p>
+                <p className="text-gray-400 text-sm">{(importFile.size / 1024).toFixed(1)} KB</p>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl mb-2">⬆️</div>
+                <p className="text-gray-300">Drop CSV here or <span className="text-blue-400">browse</span></p>
+                <p className="text-gray-500 text-xs mt-1">Max 10 MB</p>
+              </div>
+            )}
+          </div>
+
+          {/* Preview */}
+          {importPreview && importPreview.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-gray-700">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-700">
+                    {importPreview[0].map((h, i) => (
+                      <th key={i} className="px-3 py-2 text-left text-gray-300 font-medium">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.slice(1, 6).map((row, ri) => (
+                    <tr key={ri} className="border-t border-gray-700">
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="px-3 py-1.5 text-gray-300 truncate max-w-[160px]">{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {importPreview.length > 6 && <p className="text-xs text-gray-500 px-3 py-1">…and more rows</p>}
+            </div>
+          )}
+
+          {/* Import button */}
+          {importFile && (
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {importing ? "Importing…" : `Import ${importType}`}
+            </button>
+          )}
+
+          {/* Results */}
+          {importResult && (
+            <div className={`p-4 rounded-xl border text-sm ${
+              importResult.error
+                ? "bg-red-500/10 border-red-500/20 text-red-300"
+                : "bg-green-500/10 border-green-500/20 text-green-300"
+            }`}>
+              {importResult.error ? (
+                <p>✗ {importResult.error}</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-medium">✓ Import complete</p>
+                  <p>Processed {importResult.rows_processed} rows</p>
+                  {importType === "vulnerabilities" ? (
+                    <><p>Assets created: {importResult.assets_created}</p><p>Vulnerabilities created: {importResult.vulns_created}</p></>
+                  ) : (
+                    <><p>Assets created: {importResult.assets_created}</p><p>Assets updated: {importResult.assets_updated}</p></>
+                  )}
+                  {importResult.errors?.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-yellow-300">{importResult.errors.length} row errors</summary>
+                      <ul className="mt-1 space-y-0.5 text-yellow-200 text-xs">
+                        {importResult.errors.slice(0, 10).map((e: string, i: number) => <li key={i}>{e}</li>)}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Section>
 
