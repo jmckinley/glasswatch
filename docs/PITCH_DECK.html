@@ -1325,7 +1325,7 @@
   <h2 class="slide-title">Prove Compliance, Not Just <span class="accent">Compliance Theater</span></h2>
   <div class="divider"></div>
 
-  <div class="compliance-grid">
+  <div class="compliance-grid" style="grid-template-columns:repeat(4,1fr);">
     <div class="compliance-card cisa">
       <div class="compliance-framework">CISA BOD 22-01</div>
       <div class="compliance-title">Known Exploited Vulnerabilities</div>
@@ -1340,6 +1340,11 @@
       <div class="compliance-framework">PCI DSS</div>
       <div class="compliance-title">Payment System Security</div>
       <div class="compliance-desc">Track % of internet-facing assets with zero critical vulnerabilities. Automated scope documentation and evidence packaging.</div>
+    </div>
+    <div class="compliance-card" style="border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.05);">
+      <div class="compliance-framework" style="color:var(--emerald);">Audit Trail</div>
+      <div class="compliance-title">Complete Action History</div>
+      <div class="compliance-desc">Every bundle approval, vulnerability import, user login, and policy change is recorded with timestamp, user, IP address, and full context. Export for auditors in one click.</div>
     </div>
   </div>
 
@@ -1368,7 +1373,51 @@
 </div>
 
 
-<!-- ======================== SLIDE 10: ALPHA CUSTOMERS ======================== -->
+<!-- ======================== SLIDE 10: ENTERPRISE TRUST ======================== -->
+<div class="slide">
+  <div class="slide-label">Enterprise Trust</div>
+  <div class="slide-num">10 / 13</div>
+
+  <h2 class="slide-title">Built for <span class="accent">Enterprise</span> from Day One</h2>
+  <div class="divider"></div>
+  <p class="slide-subtitle" style="color:var(--text-muted);font-size:15px;margin:0 0 20px;">Security, compliance, and auditability aren&rsquo;t afterthoughts.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#128203;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">Audit Log</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">Every bundle approval, CSV import, user login, and policy change &mdash; timestamped with user, IP, and full context. CSV export for auditors.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#129514;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">API Simulators</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">Test every integration &mdash; Tenable, Qualys, Rapid7, Slack, Jira, ServiceNow &mdash; without real credentials. Full auth validation, realistic data, error simulation.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#128274;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">Multi-Tenant Isolation</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">All data isolated per tenant. Auth rate limiting. Input validation. Secret key enforcement. No cross-tenant data leakage.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#9989;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">SOC 2 Ready</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">Continuous compliance tracking. Evidence packages. SIEM/CMDB API. Maintenance window governance. Audit-ready from day one.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#128101;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">Role-Based Access</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">Admin, analyst, and viewer roles. Team invites with email verification. Granular permissions across every resource.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;">
+      <div style="font-size:20px;margin-bottom:8px;">&#128295;</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">CI/CD Pipeline</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">GitHub Actions &rarr; GHCR &rarr; Railway auto-deploy. <strong style="color:var(--emerald);">473 automated tests</strong> on every push. Zero-downtime deploys.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================== SLIDE 11: ALPHA CUSTOMERS ======================== -->
 <div class="slide">
   <div class="slide-label">Early Access</div>
   <h2 class="slide-title">Early Access &mdash; <span class="emerald">What You Get</span></h2>

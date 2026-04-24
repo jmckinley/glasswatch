@@ -1595,9 +1595,130 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════
-       SCENE 10 — END CARD
+       SCENE 10 — AUDIT LOG
   ══════════════════════════════════════════════════════ -->
   <div class="scene" id="scene-10">
+    <div class="app-shell">
+      <div class="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">⚡</div>
+          <div class="sidebar-logo-text">Glasswatch</div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="nav-item"><span class="nav-icon">⊞</span> Dashboard</div>
+          <div class="nav-item"><span class="nav-icon">⚠</span> Vulnerabilities</div>
+          <div class="nav-item"><span class="nav-icon">📦</span> Bundles</div>
+          <div class="nav-item"><span class="nav-icon">✓</span> Compliance</div>
+          <div class="nav-item"><span class="nav-icon">🤖</span> AI Agent</div>
+          <div class="nav-item active"><span class="nav-icon">📋</span> Audit Log</div>
+          <div class="nav-item"><span class="nav-icon">⚙</span> Settings</div>
+          <div class="nav-item"><span class="nav-icon">🔔</span> Notifications</div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="avatar">JM</div>
+          <div class="avatar-info">
+            <div class="avatar-name">John McKinley</div>
+            <div class="avatar-role">Admin</div>
+          </div>
+        </div>
+      </div>
+      <div class="main-area">
+        <div class="topbar">
+          <div class="topbar-title">Audit Log</div>
+          <div class="topbar-actions">
+            <button class="btn btn-secondary btn-sm">Export CSV</button>
+            <div class="topbar-icon">🔔<div class="badge">3</div></div>
+            <div class="avatar" style="width:34px;height:34px;font-size:12px;">JM</div>
+          </div>
+        </div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--text);">Audit Log</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Complete record of all actions in your workspace &middot; 847 events</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <select style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text-muted);"><option>All Action Types</option></select>
+              <select style="background:var(--bg2);border:1px solid var(--border-subtle);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text-muted);"><option>All Resources</option></select>
+              <button class="btn btn-secondary btn-sm">Export CSV</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:var(--bg2);">
+                  <th style="padding:10px 14px;text-align:left;color:var(--text-dim);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;font-size:10px;">Actor</th>
+                  <th style="padding:10px 14px;text-align:left;color:var(--text-dim);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;font-size:10px;">Action</th>
+                  <th style="padding:10px 14px;text-align:left;color:var(--text-dim);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;font-size:10px;">Resource</th>
+                  <th style="padding:10px 14px;text-align:center;color:var(--text-dim);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;font-size:10px;">Status</th>
+                  <th style="padding:10px 14px;text-align:right;color:var(--text-dim);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;font-size:10px;">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Row 1: bundle.approved -->
+                <tr style="border-top:1px solid var(--border-subtle);border-left:3px solid #6366f1;">
+                  <td style="padding:10px 14px;color:var(--text);">John McKinley</td>
+                  <td style="padding:10px 14px;"><span style="background:rgba(99,102,241,0.15);color:#a5b4fc;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;">bundle.approved</span></td>
+                  <td style="padding:10px 14px;color:var(--text-muted);">📦 Bundle: KEV Emergency Response</td>
+                  <td style="padding:10px 14px;text-align:center;"><span style="color:var(--success);">✓</span></td>
+                  <td style="padding:10px 14px;text-align:right;color:var(--text-dim);">2 min ago</td>
+                </tr>
+                <!-- Row 2: vulnerability.imported (expanded) -->
+                <tr style="border-top:1px solid var(--border-subtle);border-left:3px solid #f59e0b;background:rgba(245,158,11,0.04);">
+                  <td style="padding:10px 14px;color:var(--text);">System</td>
+                  <td style="padding:10px 14px;"><span style="background:rgba(245,158,11,0.15);color:#fcd34d;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;">vulnerability.imported</span></td>
+                  <td style="padding:10px 14px;color:var(--text-muted);">🛡️ Vulnerability: 47 CVEs from Tenable</td>
+                  <td style="padding:10px 14px;text-align:center;"><span style="color:var(--success);">✓</span></td>
+                  <td style="padding:10px 14px;text-align:right;color:var(--text-dim);">15 min ago</td>
+                </tr>
+                <!-- Expanded details row -->
+                <tr style="border-left:3px solid #f59e0b;background:rgba(245,158,11,0.04);">
+                  <td colspan="5" style="padding:0 14px 12px 14px;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:var(--bg2);border-radius:6px;padding:10px;">
+                      <div><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;">IP Address</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">10.0.1.42</div></div>
+                      <div><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;">Source</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Tenable.io API</div></div>
+                      <div><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;">Duration</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">3.2s</div></div>
+                      <div><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;">CVEs Added</div><div style="font-size:12px;color:var(--success);margin-top:2px;font-weight:700;">47 new</div></div>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Row 3: user.invited -->
+                <tr style="border-top:1px solid var(--border-subtle);border-left:3px solid #10b981;">
+                  <td style="padding:10px 14px;color:var(--text);">John McKinley</td>
+                  <td style="padding:10px 14px;"><span style="background:rgba(16,185,129,0.15);color:#6ee7b7;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;">user.invited</span></td>
+                  <td style="padding:10px 14px;color:var(--text-muted);">👤 User: sarah@acme.com (analyst)</td>
+                  <td style="padding:10px 14px;text-align:center;"><span style="color:var(--success);">✓</span></td>
+                  <td style="padding:10px 14px;text-align:right;color:var(--text-dim);">1h ago</td>
+                </tr>
+                <!-- Row 4: bundle.status_changed -->
+                <tr style="border-top:1px solid var(--border-subtle);border-left:3px solid #6366f1;">
+                  <td style="padding:10px 14px;color:var(--text);">System</td>
+                  <td style="padding:10px 14px;"><span style="background:rgba(99,102,241,0.15);color:#a5b4fc;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;">bundle.status_changed</span></td>
+                  <td style="padding:10px 14px;color:var(--text-muted);">📦 Bundle: Monthly Patch April</td>
+                  <td style="padding:10px 14px;text-align:center;"><span style="color:var(--success);">✓</span></td>
+                  <td style="padding:10px 14px;text-align:right;color:var(--text-dim);">3h ago</td>
+                </tr>
+                <!-- Row 5: user.login_failed -->
+                <tr style="border-top:1px solid var(--border-subtle);border-left:3px solid #ef4444;">
+                  <td style="padding:10px 14px;color:var(--text-muted);font-style:italic;">Unknown</td>
+                  <td style="padding:10px 14px;"><span style="background:rgba(239,68,68,0.15);color:#fca5a5;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;">user.login_failed</span></td>
+                  <td style="padding:10px 14px;color:var(--text-muted);">👤 User: failed attempt from 203.0.113.42</td>
+                  <td style="padding:10px 14px;text-align:center;"><span style="color:var(--danger);">✗</span></td>
+                  <td style="padding:10px 14px;text-align:right;color:var(--text-dim);">6h ago</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       SCENE 11 — END CARD
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-11">
     <div class="end-logo">⚡</div>
     <div class="end-title">Glasswatch</div>
     <div class="end-tagline">From CVE to compliant — in one platform.</div>
@@ -1638,7 +1759,7 @@
 <!-- Controls HUD -->
 <div id="controls">
   <button class="ctrl-btn" id="prev-btn" title="Previous (←)">◀</button>
-  <span id="scene-counter">1 / 10</span>
+  <span id="scene-counter">1 / 11</span>
   <button class="ctrl-btn" id="next-btn" title="Next (→)">▶</button>
   <button class="ctrl-btn" id="fs-btn" title="Fullscreen (F)">⛶</button>
   <div style="width:100%;text-align:center;font-size:10px;color:#475569;margin-top:4px;">12s · v1743</div>
@@ -1695,13 +1816,17 @@
       body: "Patch bundles only execute during approved windows — preventing deployments during change freezes, peak traffic hours, or conflicting operations. Calendar view makes scheduling visible across environments. Glasswatch flags conflicts before they happen, not after."
     },
     {
+      title: "Audit Log — Complete Accountability",
+      body: "Every action in Glasswatch is recorded: who approved a bundle, when a vulnerability batch was imported, which user was invited, and every failed login attempt. Timestamped, searchable, exportable to CSV for auditors. This is the evidence trail that makes compliance reviews fast and defensible."
+    },
+    {
       title: "Ready to Try It?",
-      body: "Glasswatch is live and accepting alpha customers. Click Try Demo to explore the full platform right now — no signup, no sales call. Or self-host in 5 minutes with a single install command."
+      body: "Glasswatch is live and accepting alpha customers. Full audit trail, 11 external integrations, compliance dashboards — the complete enterprise patch management platform. Click Try Demo to explore right now — no signup, no sales call."
     }
   ];
 
   let currentScene = 0;
-  const totalScenes = 10;
+  const totalScenes = 11;
   let narrationTimer = null;
 
   const scenes = Array.from(document.querySelectorAll('.scene'));
