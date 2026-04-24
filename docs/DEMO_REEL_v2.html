@@ -1639,13 +1639,12 @@
 <div id="controls">
   <button class="ctrl-btn" id="prev-btn" title="Previous (←)">◀</button>
   <span id="scene-counter">1 / 10</span>
-  <button class="ctrl-btn" id="play-btn" title="Play/Pause (Space)">⏸</button>
   <button class="ctrl-btn" id="next-btn" title="Next (→)">▶</button>
   <button class="ctrl-btn" id="fs-btn" title="Fullscreen (F)">⛶</button>
   <div style="width:100%;text-align:center;font-size:10px;color:#475569;margin-top:4px;">12s · v1743</div>
 </div>
 
-<div id="pause-indicator">⏸ Paused</div>
+
 
 <style>
   @keyframes blink {
@@ -1656,7 +1655,6 @@
 
 <script>
 (function() {
-  const SCENE_DURATION = 12000; // 12 seconds per scene — do not reduce
   const TRANSITION_DURATION = 800; // ms crossfade
 
   const narrations = [
@@ -1703,25 +1701,17 @@
   ];
 
   let currentScene = 0;
-  let totalScenes = 10;
-  let isPlaying = true;
-  let isPaused = false;
-  let progressTimer = null;
-  let progressStart = null;
-  let progressElapsed = 0;
+  const totalScenes = 10;
   let narrationTimer = null;
 
   const scenes = Array.from(document.querySelectorAll('.scene'));
-  const progressBar = { style: {}, getBoundingClientRect: () => {} }; // progress bar removed
   const narrationEl = document.getElementById('narration');
   const narrationText = document.getElementById('narration-text');
   const sceneCounter = document.getElementById('scene-counter');
-  const playBtn = document.getElementById('play-btn');
   const prevBtn = document.getElementById('prev-btn');
   const nextBtn = document.getElementById('next-btn');
   const fsBtn = document.getElementById('fs-btn');
   const replayBtn = document.getElementById('replay-btn');
-  const pauseIndicator = document.getElementById('pause-indicator');
 
   function showScene(idx, direction) {
     const prev = scenes.findIndex(s => s.classList.contains('active'));
@@ -1740,104 +1730,25 @@
       document.getElementById('narration-title').textContent = n.title;
       narrationText.textContent = n.body;
       narrationEl.classList.add('visible');
-    }, 600);
-  }
-
-  function startProgress(elapsed) {
-    stopProgress();
-    const remaining = SCENE_DURATION - elapsed;
-    progressStart = performance.now() - elapsed;
-    progressTimer = setTimeout(() => {
-      if (isPlaying && !isPaused) {
-        advanceScene();
-      }
-    }, remaining);
-  }
-
-  function stopProgress() {
-    if (progressTimer) {
-      clearTimeout(progressTimer);
-      progressTimer = null;
-    }
-    if (progressStart !== null) {
-      progressElapsed = Math.min(performance.now() - progressStart, SCENE_DURATION);
-    }
-  }
-
-  function advanceScene() {
-    progressElapsed = 0;
-    if (currentScene < totalScenes - 1) {
-      goToScene(currentScene + 1);
-    } else {
-      // End of reel — stop
-      isPlaying = false;
-      playBtn.textContent = '▶';
-    }
+    }, 400);
   }
 
   function goToScene(idx) {
     if (idx < 0 || idx >= totalScenes) return;
-    progressElapsed = 0;
+    const prev = scenes.findIndex(s => s.classList.contains('active'));
+    if (prev !== -1) scenes[prev].classList.remove('active');
     currentScene = idx;
-    showScene(idx);
+    scenes[idx].classList.add('active');
+    sceneCounter.textContent = `${idx + 1} / ${totalScenes}`;
     showNarration(idx);
-    if (isPlaying && !isPaused) {
-      startProgress(0);
-    } else {
-      // Just show bar at 0
-      progressBar.style.transition = 'none';
-      progressBar.style.width = '0%';
-    }
+    // Update prev/next button states
+    prevBtn.style.opacity = idx === 0 ? '0.3' : '1';
+    nextBtn.style.opacity = idx === totalScenes - 1 ? '0.3' : '1';
   }
 
-  function play() {
-    isPlaying = true;
-    isPaused = false;
-    playBtn.textContent = '⏸';
-    pauseIndicator.classList.remove('visible');
-    startProgress(progressElapsed);
-  }
+  prevBtn.addEventListener('click', (e) => { e.stopPropagation(); goToScene(currentScene - 1); });
+  nextBtn.addEventListener('click', (e) => { e.stopPropagation(); goToScene(currentScene + 1); });
 
-  function pause() {
-    isPaused = true;
-    stopProgress();
-    playBtn.textContent = '▶';
-    pauseIndicator.classList.add('visible');
-  }
-
-  function togglePlay() {
-    if (isPaused || !isPlaying) {
-      if (!isPlaying && currentScene === totalScenes - 1) {
-        // Replay
-        goToScene(0);
-        isPlaying = true;
-        isPaused = false;
-        playBtn.textContent = '⏸';
-        startProgress(0);
-      } else {
-        play();
-      }
-    } else {
-      pause();
-    }
-  }
-
-  // Stage hover → pause
-  const stage = document.getElementById('stage');
-  stage.addEventListener('mouseenter', () => {
-    if (isPlaying && !isPaused) pause();
-  });
-  stage.addEventListener('mouseleave', () => {
-    if (isPaused && isPlaying) {
-      isPaused = false;
-      play();
-    }
-  });
-
-  // Controls
-  playBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
-  prevBtn.addEventListener('click', (e) => { e.stopPropagation(); stopProgress(); progressElapsed = 0; goToScene(currentScene - 1); if (isPlaying && !isPaused) startProgress(0); });
-  nextBtn.addEventListener('click', (e) => { e.stopPropagation(); stopProgress(); progressElapsed = 0; goToScene(currentScene + 1); if (isPlaying && !isPaused) startProgress(0); });
   fsBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (!document.fullscreenElement) {
@@ -1847,50 +1758,21 @@
     }
   });
 
-  // Replay button
   if (replayBtn) {
-    replayBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      isPlaying = true;
-      isPaused = false;
-      progressElapsed = 0;
-      playBtn.textContent = '⏸';
-      goToScene(0);
-      startProgress(0);
-    });
+    replayBtn.addEventListener('click', (e) => { e.stopPropagation(); goToScene(0); });
   }
 
-  // Keyboard
   document.addEventListener('keydown', (e) => {
-    switch(e.key) {
-      case ' ':
-        e.preventDefault();
-        togglePlay();
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        stopProgress(); progressElapsed = 0; goToScene(currentScene + 1);
-        if (isPlaying && !isPaused) startProgress(0);
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        stopProgress(); progressElapsed = 0; goToScene(currentScene - 1);
-        if (isPlaying && !isPaused) startProgress(0);
-        break;
-      case 'f':
-      case 'F':
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen();
-        }
-        break;
+    if (e.key === 'ArrowRight') { e.preventDefault(); goToScene(currentScene + 1); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); goToScene(currentScene - 1); }
+    if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else document.exitFullscreen();
     }
   });
 
   // Init
   goToScene(0);
-  play();
 })();
 </script>
 
