@@ -87,6 +87,39 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown.
 
 ---
 
+## Roadmap — Next Phase
+
+Glasswatch is functional end-to-end today. Here's what's on deck for the next major phases:
+
+### Phase 2 — Enterprise Readiness (Q3 2026)
+- **WorkOS SSO** — SAML/OIDC single sign-on for enterprise identity providers (Okta, Azure AD, Google Workspace)
+- **RBAC enforcement** — Hard role gates (Viewer/Analyst/Operator/Admin) enforced at the API layer, not just the UI
+- **Audit log** — Immutable, exportable record of every user action (who approved what, when, from which IP) for SOC 2 evidence
+- **Evidence packages** — One-click export of patch records, approval trails, and compliance snapshots formatted for auditors
+- **Multi-region deployment** — EU and APAC hosting for data residency requirements
+
+### Phase 3 — Deeper Intelligence (Q4 2026)
+- **Live NVD/EPSS sync** — Automatic enrichment of new CVEs as they're published, without manual import
+- **Threat intel feeds** — Direct integrations with VulnCheck, GreyNoise, and Shodan for real-time exploit signal
+- **Asset auto-discovery** — Passive network scanning to find assets not in any scanner (rogue hosts, shadow IT)
+- **Patch impact prediction** — ML model trained on historical data to predict which patches are likely to cause issues
+- **Business context mapping** — Tie assets to revenue-generating services for true business-risk scoring
+
+### Phase 4 — Workflow Automation (2027)
+- **Jira/ServiceNow native sync** — Two-way ticket sync: Glasswatch bundle → ticket, ticket closed → bundle item marked patched
+- **Auto-remediation playbooks** — For low-risk patches on non-production assets, trigger automated patch + verify cycles
+- **Slack/Teams bot** — Full approval and status workflow without leaving chat
+- **API-first integrations** — Webhooks out for every event (new KEV, bundle completed, SLA breached) for customer automation
+- **Mobile app** — Approval workflows and alert triage on iOS and Android
+
+### Always-on improvements
+- Performance at scale (100k+ vulnerabilities, 10k+ assets)
+- Deeper AI agent capabilities (natural language queries over all your data)
+- More compliance frameworks (FedRAMP, HIPAA, ISO 27001, NIST CSF)
+- Community-contributed scanner integrations
+
+---
+
 ## For Alpha Customers
 
 Glasswatch is in active alpha development. All sprints through Sprint 23 are complete. The live demo at [https://frontend-production-ef3e.up.railway.app](https://frontend-production-ef3e.up.railway.app) reflects the current state — click **Try Demo** to explore without signing up.
