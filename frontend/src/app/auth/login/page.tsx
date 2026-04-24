@@ -166,7 +166,7 @@ function LoginContent() {
         {/* Logo / Title */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Glasswatch</h1>
-          <p className="text-gray-400">Intelligent Patch Decision Platform</p>
+          <p className="text-gray-400">No account required — explore with live demo data</p>
         </div>
 
         <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8">
@@ -181,7 +181,6 @@ function LoginContent() {
             </svg>
             {isLoading ? "Loading..." : "Try Demo"}
           </button>
-          <p className="text-center text-gray-400 text-sm mb-6">No account required — explore with live demo data</p>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">

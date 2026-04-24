@@ -424,7 +424,8 @@ export default function OnboardingPage() {
           {/* Step 1: Organization */}
           {currentStep === 1 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">1. Organization Setup</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 1 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Organization Setup</h2>
               <p className="text-indigo-300 text-sm mb-1">So we can personalize compliance recommendations and risk thresholds to your context.</p>
               <p className="text-gray-500 text-sm mb-6">Tell us about your organization</p>
               <div className="space-y-4">
@@ -475,7 +476,8 @@ export default function OnboardingPage() {
           {/* Step 2: Connect Tools */}
           {currentStep === 2 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">2. Connect Your Tools</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 2 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Connect Your Tools</h2>
               <p className="text-indigo-300 text-sm mb-1">So Glasswatch can automatically discover your assets and pull live vulnerability data.</p>
               <p className="text-gray-500 text-sm mb-6">Select the cloud providers and tools you use</p>
               <div className="grid grid-cols-2 gap-4">
@@ -563,7 +565,8 @@ export default function OnboardingPage() {
           {/* Step 3: Asset Discovery */}
           {currentStep === 3 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">3. Asset Discovery</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 3 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Asset Discovery</h2>
               <p className="text-indigo-300 text-sm mb-1">So we know exactly what your environment looks like and what needs protecting.</p>
               <p className="text-gray-500 text-sm mb-6">Import your infrastructure assets</p>
 
@@ -616,7 +619,8 @@ export default function OnboardingPage() {
           {/* Step 4: Create Goal */}
           {currentStep === 4 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">4. Create Your First Goal</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 4 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Create Your First Goal</h2>
               <p className="text-indigo-300 text-sm mb-1">Goals keep your team focused and give you a clear metric to track patching progress.</p>
               <p className="text-gray-500 text-sm mb-6">Choose a template or create a custom goal</p>
               <div className="grid grid-cols-2 gap-4 mb-6">
@@ -675,7 +679,8 @@ export default function OnboardingPage() {
           {/* Step 5: Schedule */}
           {currentStep === 5 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">5. Configure Maintenance Windows</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 5 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Configure Maintenance Windows</h2>
               <p className="text-indigo-300 text-sm mb-1">So patches deploy at times that minimize disruption to your business.</p>
               <p className="text-gray-500 text-sm mb-6">When can patches be deployed? You can add more windows later.</p>
               <div className="space-y-4">
@@ -787,7 +792,8 @@ export default function OnboardingPage() {
           {/* Step 6: Review */}
           {currentStep === 6 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">6. Review &amp; Launch</h2>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Step 6 of {STEPS.length}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Review &amp; Launch</h2>
               <p className="text-indigo-300 text-sm mb-1">Double-check your setup before we initialize your workspace.</p>
               <p className="text-gray-500 text-sm mb-6">Your workspace is ready to go!</p>
               <div className="space-y-4 text-center py-8">
@@ -862,7 +868,14 @@ export default function OnboardingPage() {
                 disabled={isSaving}
                 className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? "Saving..." : "Continue →"}
+                {isSaving ? "Saving..." : (
+                  currentStep === 1 ? "Save Organization →" :
+                  currentStep === 2 ? "Connect Scanner →" :
+                  currentStep === 3 ? "Continue →" :
+                  currentStep === 4 ? "Set Goal →" :
+                  currentStep === 5 ? "Set Schedule →" :
+                  "Continue →"
+                )}
               </button>
             ) : (
               <button

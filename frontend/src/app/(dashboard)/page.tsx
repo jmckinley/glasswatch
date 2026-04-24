@@ -178,11 +178,51 @@ function FocusDashboard({ stats }: { stats: DashboardStats }) {
   const kevInternetFacing = Math.min(stats.vulnerabilities.kev_listed, stats.assets.internet_exposed);
   const nextWindow = stats.windows[0];
   const [showMore, setShowMore] = useState(false);
+  const [showSecondary, setShowSecondary] = useState(false);
+
+  // Determine secondary priority items beyond the main panel
+  const secondaryItems: Array<{ label: string; count: number; href: string; color: string }> = [];
+  if (kevInternetFacing > 0 && stats.vulnerabilities.critical > kevInternetFacing) {
+    secondaryItems.push({ label: "additional critical vulnerabilities", count: stats.vulnerabilities.critical - kevInternetFacing, href: "/vulnerabilities?severity=CRITICAL", color: "text-orange-300" });
+  }
+  if ((kevInternetFacing > 0 || stats.vulnerabilities.critical > 0) && stats.vulnerabilities.high > 0) {
+    secondaryItems.push({ label: "high-severity vulnerabilities", count: stats.vulnerabilities.high, href: "/vulnerabilities?severity=HIGH", color: "text-yellow-300" });
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Panel 1: Right Now — THE single priority card */}
       <RightNowPanel stats={stats} kevInternetFacing={kevInternetFacing} />
+
+      {/* Secondary priority items — collapsed by default */}
+      {secondaryItems.length > 0 && (
+        <div>
+          {!showSecondary ? (
+            <button
+              onClick={() => setShowSecondary(true)}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Show {secondaryItems.length} more priority {secondaryItems.length === 1 ? "item" : "items"} →
+            </button>
+          ) : (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-semibold text-gray-300">Additional Priority Items</h3>
+                <button onClick={() => setShowSecondary(false)} className="text-xs text-gray-500 hover:text-gray-300">Hide ↑</button>
+              </div>
+              {secondaryItems.map((item) => (
+                <div key={item.href} className="flex items-center justify-between">
+                  <span className={`text-sm ${item.color}`}>
+                    <span className="font-bold text-base mr-1">{item.count}</span>
+                    {item.label}
+                  </span>
+                  <Link href={item.href} className="text-xs text-blue-400 hover:underline">Review →</Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Expand toggle */}
       {!showMore && (
@@ -460,7 +500,7 @@ function FullDashboard({ stats, riskPairs }: { stats: DashboardStats; riskPairs:
   return (
     <>
       {/* Top stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard
           label="Total Vulnerabilities"
           value={stats.vulnerabilities.total.toLocaleString()}
@@ -492,7 +532,14 @@ function FullDashboard({ stats, riskPairs }: { stats: DashboardStats; riskPairs:
           }
         />
         <StatCard
-          label="Bundles Scheduled"
+          label="Unpatched Criticals"
+          value={stats.vulnerabilities.critical.toLocaleString()}
+          sub={stats.vulnerabilities.kev_listed > 0 ? `${stats.vulnerabilities.kev_listed} KEV-listed` : "No KEV-listed"}
+          subColor={stats.vulnerabilities.kev_listed > 0 ? "text-red-400" : "text-gray-400"}
+          href="/vulnerabilities?severity=CRITICAL"
+        />
+        <StatCard
+          label="Patches Scheduled"
           value={stats.bundles.scheduled.toString()}
           sub={
             stats.bundles.pending_approval > 0
@@ -693,8 +740,16 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="h-8 bg-gray-700 rounded w-1/4" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-gray-800 rounded-xl p-5 h-28 border border-gray-700">
+            <div className="h-3 bg-gray-700 rounded w-1/2 mb-3" />
+            <div className="h-8 bg-gray-700 rounded w-3/4 mb-2" />
+            <div className="h-3 bg-gray-700 rounded w-1/3" />
+          </div>
+        ))}
+      </div>
       <div className="h-40 bg-gray-800 rounded-xl" />
-      <div className="h-48 bg-gray-800 rounded-xl" />
       <div className="h-32 bg-gray-800 rounded-xl" />
     </div>
   );
