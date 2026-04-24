@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { rulesApi } from "@/lib/api";
 import TagAutocomplete from "@/components/TagAutocomplete";
+import { Toast } from "@/components/ui/Toast";
 
 interface Rule {
   id: string;
@@ -100,6 +101,7 @@ export default function RulesPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => { document.title = 'Deployment Rules | Glasswatch'; }, []);
   useEffect(() => { fetchRules(); }, []);
@@ -131,8 +133,10 @@ export default function RulesPage() {
     try {
       await rulesApi.delete(rule.id);
       await fetchRules();
+      setToast({ message: 'Rule deleted', type: 'success' });
     } catch (error) {
       console.error("Failed to delete rule:", error);
+      setToast({ message: 'Failed to delete rule', type: 'error' });
     }
   };
 
@@ -253,7 +257,7 @@ export default function RulesPage() {
       {showCreateDialog && (
         <NLPRuleDialog
           onClose={() => setShowCreateDialog(false)}
-          onSuccess={() => { setShowCreateDialog(false); fetchRules(); }}
+          onSuccess={() => { setShowCreateDialog(false); fetchRules(); setToast({ message: 'Rule created successfully', type: 'success' }); }}
         />
       )}
 
@@ -262,9 +266,12 @@ export default function RulesPage() {
         <RuleFormDialog
           rule={editingRule}
           onClose={() => setEditingRule(null)}
-          onSuccess={() => { setEditingRule(null); fetchRules(); }}
+          onSuccess={() => { setEditingRule(null); fetchRules(); setToast({ message: 'Rule updated successfully', type: 'success' }); }}
         />
       )}
+
+      {/* Toast notifications */}
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
     </div>
   );
 }
