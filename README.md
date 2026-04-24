@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/jmckinley/glasswatch/main/install.s
 
 That's it. Requires [Docker](https://docs.docker.com/get-docker/). Up and running in under 5 minutes.
 
-**Manual setup:** See [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md)
+**Full installation guide:** [INSTALL.md](INSTALL.md) · **Advanced setup:** [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md)
 
 ---
 
