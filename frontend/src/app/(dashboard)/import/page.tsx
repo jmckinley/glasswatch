@@ -321,24 +321,72 @@ export default function ImportPage() {
       )}
 
       {/* Format guide */}
-      <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-4 text-xs text-gray-500 space-y-2">
-        <p className="text-gray-400 font-medium">Expected CSV columns</p>
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-gray-300 font-medium">CSV Format Reference</p>
+          <a
+            href="https://github.com/jmckinley/glasswatch/blob/main/docs/CSV_IMPORT.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-400 hover:text-indigo-300"
+          >
+            Full documentation →
+          </a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
           <div>
-            <p className="text-gray-400 mb-1">Vulnerabilities</p>
-            <code className="block text-gray-600">
-              identifier, title, severity, cvss_score, epss_score, kev_listed,
-              patch_available, published_at, description
-            </code>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-400 font-medium">Vulnerabilities CSV</p>
+              <button
+                onClick={() => {
+                  const csv = "asset_name,cve_id,severity,cvss_score,discovered_date\nweb-prod-01,CVE-2024-21887,CRITICAL,9.8,2024-03-01\ndb-prod-01,CVE-2024-3400,HIGH,8.1,2024-04-12";
+                  const a = document.createElement("a");
+                  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+                  a.download = "vulnerabilities_template.csv";
+                  a.click();
+                }}
+                className="text-indigo-400 hover:text-indigo-300"
+              >
+                ↓ template
+              </button>
+            </div>
+            <div className="bg-gray-900 rounded p-3 space-y-1 font-mono">
+              <p><span className="text-green-400">asset_name</span> <span className="text-gray-600">(required) hostname or IP</span></p>
+              <p><span className="text-green-400">cve_id</span> <span className="text-gray-600">(required) e.g. CVE-2024-1234</span></p>
+              <p><span className="text-green-400">severity</span> <span className="text-gray-600">(required) CRITICAL/HIGH/MEDIUM/LOW</span></p>
+              <p><span className="text-gray-500">cvss_score</span> <span className="text-gray-600">0.0–10.0</span></p>
+              <p><span className="text-gray-500">discovered_date</span> <span className="text-gray-600">YYYY-MM-DD</span></p>
+            </div>
+            <p className="text-gray-600 mt-2">Also accepts: <code>asset_ip</code>, <code>hostname</code>, <code>cve</code></p>
           </div>
           <div>
-            <p className="text-gray-400 mb-1">Assets</p>
-            <code className="block text-gray-600">
-              identifier, name, type, criticality, exposure, environment,
-              os_family, os_version, ip_addresses, tags
-            </code>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-400 font-medium">Assets CSV</p>
+              <button
+                onClick={() => {
+                  const csv = "name,type,environment,ip_address,owner_team,criticality\nweb-prod-01,server,production,10.0.1.10,Platform,5\ndb-prod-01,database,production,10.0.2.10,Data,5";
+                  const a = document.createElement("a");
+                  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+                  a.download = "assets_template.csv";
+                  a.click();
+                }}
+                className="text-indigo-400 hover:text-indigo-300"
+              >
+                ↓ template
+              </button>
+            </div>
+            <div className="bg-gray-900 rounded p-3 space-y-1 font-mono">
+              <p><span className="text-green-400">name</span> <span className="text-gray-600">(required) asset hostname</span></p>
+              <p><span className="text-gray-500">type</span> <span className="text-gray-600">server/container/database/application</span></p>
+              <p><span className="text-gray-500">environment</span> <span className="text-gray-600">production/staging/development</span></p>
+              <p><span className="text-gray-500">ip_address</span> <span className="text-gray-600">primary IP</span></p>
+              <p><span className="text-gray-500">owner_team</span> <span className="text-gray-600">team name</span></p>
+              <p><span className="text-gray-500">criticality</span> <span className="text-gray-600">1–5 (5 = most critical)</span></p>
+            </div>
+            <p className="text-gray-600 mt-2">Also accepts: <code>hostname</code>, <code>identifier</code>, <code>ip</code>, <code>team</code></p>
           </div>
         </div>
+        <p className="text-gray-600 text-xs">Imports are idempotent — re-uploading the same file is safe. Max file size: 10 MB.</p>
       </div>
     </div>
   );

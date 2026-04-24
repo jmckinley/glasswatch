@@ -130,7 +130,7 @@ Click **Try Demo** on the login page — you should land on a dashboard with sam
 | **Tenable** (Nessus / Tenable.io) | Add API keys in Settings → Integrations. Webhook: `POST /api/v1/webhooks/tenable` |
 | **Qualys** | Add credentials + platform URL in Settings → Integrations. Webhook: `POST /api/v1/webhooks/qualys` |
 | **Rapid7 InsightVM** | Add host URL + API key in Settings → Integrations. Webhook: `POST /api/v1/webhooks/rapid7` |
-| **CSV Import** | Upload any scanner's CSV export at `/import` — no scanner account needed |
+| **CSV Import** | Upload any scanner's CSV export at `/import` — no scanner account needed. See [CSV Import Reference](docs/CSV_IMPORT.md) for column specs and scanner-specific mapping guides. |
 
 For scanner webhooks, set `X-Webhook-Secret` (from Settings → Integrations) as the secret header in your scanner's webhook config.
 
