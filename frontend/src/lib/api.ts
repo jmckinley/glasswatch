@@ -149,6 +149,34 @@ export const assetsApi = {
     const query = new URLSearchParams(params || {}).toString();
     return apiCall<any[]>(`/assets/export${query ? '?' + query : ''}`);
   },
+
+  getVulnerabilities: (id: string, params?: { status?: string; severity?: string; min_score?: number }) => {
+    const query = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && query.append(k, String(v)));
+    return apiCall<any>(`/assets/${id}/vulnerabilities${query.toString() ? '?' + query : ''}`);
+  },
+
+  getPatchHistory: (id: string) => apiCall<any>(`/assets/${id}/patch-history`),
+
+  getRiskBreakdown: (id: string) => apiCall<any>(`/assets/${id}/risk-breakdown`),
+
+  createPatchBundle: (id: string) =>
+    apiCall<any>(`/assets/${id}/create-patch-bundle`, { method: 'POST' }),
+
+  stale: (days?: number) => {
+    const query = days ? `?days=${days}` : '';
+    return apiCall<any>(`/assets/stale${query}`);
+  },
+
+  groups: (groupBy?: string) => {
+    const query = groupBy ? `?group_by=${groupBy}` : '';
+    return apiCall<any>(`/assets/groups${query}`);
+  },
+
+  coverage: (limit?: number) => {
+    const query = limit ? `?limit=${limit}` : '';
+    return apiCall<any>(`/assets/coverage${query}`);
+  },
 };
 
 // Goals API
