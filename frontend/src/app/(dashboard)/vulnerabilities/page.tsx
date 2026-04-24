@@ -54,6 +54,7 @@ export default function VulnerabilitiesPage() {
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
   const [stats, setStats] = useState<VulnStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Pre-populate filters from URL query params (?filter=kev, ?severity=CRITICAL)
   const [filters, setFilters] = useState(() => ({
@@ -77,6 +78,7 @@ export default function VulnerabilitiesPage() {
   const fetchVulnerabilities = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params: any = {
         skip: pagination.skip,
         limit: pagination.limit,
@@ -88,8 +90,9 @@ export default function VulnerabilitiesPage() {
       const data = await vulnerabilitiesApi.list(params);
       setVulnerabilities(data.vulnerabilities || data.items || []);
       setPagination(prev => ({ ...prev, total: data.total || 0 }));
-    } catch (error) {
-      console.error("Failed to fetch vulnerabilities:", error);
+    } catch (err: any) {
+      console.error("Failed to fetch vulnerabilities:", err);
+      setError(err?.message || "Failed to load vulnerabilities. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -109,6 +112,18 @@ export default function VulnerabilitiesPage() {
 
   return (
     <>
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6 text-red-400 flex items-center gap-3">
+          <span>⚠</span>
+          <span>{error}</span>
+          <button
+            onClick={() => { setError(null); fetchVulnerabilities(); }}
+            className="ml-auto text-xs text-red-300 hover:text-white border border-red-700 px-2 py-1 rounded"
+          >Retry</button>
+        </div>
+      )}
+
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
@@ -227,15 +242,35 @@ export default function VulnerabilitiesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} className="text-center py-12 text-neutral-400">
-                  Loading vulnerabilities...
-                </td>
-              </tr>
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} className="border-b border-border">
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <td key={j} className="px-6 py-4">
+                      <div className="h-4 bg-neutral-800 rounded animate-pulse" style={{ width: j === 0 ? "80%" : j === 6 ? "40%" : "60%" }} />
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : vulnerabilities.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-neutral-400">
-                  No vulnerabilities found
+                <td colSpan={7}>
+                  <div className="text-center py-16">
+                    <div className="text-5xl mb-4">🔍</div>
+                    <h3 className="text-lg font-medium text-white mb-2">No vulnerabilities found</h3>
+                    <p className="text-neutral-400 mb-4">
+                      {(filters.severity || filters.kev_listed || filters.search)
+                        ? "Try clearing your filters to see all vulnerabilities."
+                        : "Connect a scanner or import a CSV to get started."}
+                    </p>
+                    {(filters.severity || filters.kev_listed || filters.search) && (
+                      <button
+                        onClick={() => setFilters({ severity: "", kev_listed: false, search: "" })}
+                        className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (

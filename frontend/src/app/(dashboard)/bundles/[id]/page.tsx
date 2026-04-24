@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { bundlesApi, vulnerabilitiesApi, maintenanceWindowsApi } from "@/lib/api";
+import { useToast, ToastNotification } from "@/components/Toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,8 @@ export default function BundleDetailPage() {
   const [logExpanded, setLogExpanded] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [confirmRollback, setConfirmRollback] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { toast, showToast, dismissToast } = useToast();
 
   const fetchBundle = useCallback(async () => {
     try {
@@ -134,11 +137,13 @@ export default function BundleDetailPage() {
 
   const handleApprove = async () => {
     setActionLoading(true);
+    setActionError(null);
     try {
       await bundlesApi.approve(id);
       await fetchBundle();
+      showToast("Bundle approved.", "success");
     } catch (err: any) {
-      alert(err.message || "Failed to approve bundle");
+      setActionError(err.message || "Failed to approve bundle");
     } finally {
       setActionLoading(false);
     }
@@ -146,11 +151,13 @@ export default function BundleDetailPage() {
 
   const handleExecute = async () => {
     setActionLoading(true);
+    setActionError(null);
     try {
       await bundlesApi.execute(id);
       await fetchBundle();
+      showToast("Bundle execution started.", "success");
     } catch (err: any) {
-      alert(err.message || "Failed to execute bundle");
+      setActionError(err.message || "Failed to execute bundle");
     } finally {
       setActionLoading(false);
     }
@@ -159,11 +166,13 @@ export default function BundleDetailPage() {
   const handleRollback = async () => {
     setConfirmRollback(false);
     setActionLoading(true);
+    setActionError(null);
     try {
       await bundlesApi.rollback(id);
       await fetchBundle();
+      showToast("Rollback initiated.", "info");
     } catch (err: any) {
-      alert(err.message || "Failed to rollback bundle");
+      setActionError(err.message || "Failed to rollback bundle");
     } finally {
       setActionLoading(false);
     }
@@ -262,6 +271,15 @@ export default function BundleDetailPage() {
       {(bundle.status === "draft" || bundle.status === "scheduled") && (
         <PreflightChecklist bundle={bundle} itemCount={totalItems} />
       )}
+
+      {/* Action error */}
+      {actionError && (
+        <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠</span> {actionError}
+          <button onClick={() => setActionError(null)} aria-label="Dismiss error" className="ml-auto text-red-300 hover:text-white text-lg leading-none">×</button>
+        </div>
+      )}
+      <ToastNotification toast={toast} onDismiss={dismissToast} />
 
       {/* Action Bar */}
       <ActionBar
@@ -665,6 +683,7 @@ function EditPanel({
 }) {
   const [tab, setTab] = useState<"details" | "items">("details");
   const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Details form state
   const [name, setName] = useState(bundle.name);

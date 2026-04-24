@@ -342,24 +342,52 @@ async def viewer_user(create_test_user, test_tenant: Tenant) -> User:
 
 
 @pytest_asyncio.fixture
-async def authenticated_client(client: AsyncClient, test_user: User) -> AsyncClient:
-    """Create an authenticated client (engineer role)."""
+async def authenticated_client(test_session: AsyncSession, test_user: User) -> AsyncGenerator[AsyncClient, None]:
+    """Create an authenticated client (engineer role) with its own AsyncClient instance.
+
+    This fixture creates a *separate* AsyncClient so that tests requiring both
+    ``authenticated_client`` and ``admin_client`` don't share the same underlying
+    client object (and inadvertently overwrite each other's Authorization header).
+    """
+    async def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
     token = await create_access_token(user_id=str(test_user.id), tenant_id=str(test_user.tenant_id))
-    client.headers["Authorization"] = f"Bearer {token}"
-    return client
+    async with AsyncClient(app=app, base_url="http://localhost") as ac:
+        ac.headers["Authorization"] = f"Bearer {token}"
+        yield ac
 
 
 @pytest_asyncio.fixture
-async def admin_client(client: AsyncClient, admin_user: User) -> AsyncClient:
-    """Create an authenticated admin client."""
+async def admin_client(test_session: AsyncSession, admin_user: User) -> AsyncGenerator[AsyncClient, None]:
+    """Create an authenticated admin client with its own AsyncClient instance.
+
+    Independent from the shared ``client`` fixture — see ``authenticated_client``
+    for the rationale.
+    """
+    async def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
     token = await create_access_token(user_id=str(admin_user.id), tenant_id=str(admin_user.tenant_id))
-    client.headers["Authorization"] = f"Bearer {token}"
-    return client
+    async with AsyncClient(app=app, base_url="http://localhost") as ac:
+        ac.headers["Authorization"] = f"Bearer {token}"
+        yield ac
 
 
 @pytest_asyncio.fixture
-async def viewer_client(client: AsyncClient, viewer_user: User) -> AsyncClient:
-    """Create an authenticated viewer client."""
+async def viewer_client(test_session: AsyncSession, viewer_user: User) -> AsyncGenerator[AsyncClient, None]:
+    """Create an authenticated viewer client with its own AsyncClient instance.
+
+    Independent from the shared ``client`` fixture — see ``authenticated_client``
+    for the rationale.
+    """
+    async def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
     token = await create_access_token(user_id=str(viewer_user.id), tenant_id=str(viewer_user.tenant_id))
-    client.headers["Authorization"] = f"Bearer {token}"
-    return client
+    async with AsyncClient(app=app, base_url="http://localhost") as ac:
+        ac.headers["Authorization"] = f"Bearer {token}"
+        yield ac

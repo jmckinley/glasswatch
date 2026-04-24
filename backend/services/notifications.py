@@ -3,12 +3,10 @@ Notification service for alerts and updates.
 
 Supports Slack, Microsoft Teams, Email, and in-app notifications.
 """
-import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Literal
 from enum import Enum
 import httpx
-import json
 
 from backend.core.config import settings
 from backend.models.tenant import Tenant

@@ -121,7 +121,7 @@ class RateLimiter:
             
             return allowed, remaining
         
-        except Exception as e:
+        except Exception:
             # On any error, fail open (allow request)
             # Log error in production
             return True, limit

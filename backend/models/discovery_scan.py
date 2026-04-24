@@ -3,9 +3,8 @@ Discovery Scan model for tracking asset discovery history.
 
 Stores metadata and results for each discovery scan execution.
 """
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
+from typing import Dict, Any
+from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, ForeignKey, JSON, Text

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from backend.models.approval import (
@@ -164,7 +164,7 @@ class ApprovalService:
         
         # Check if user has permission to approve
         if not await self._can_approve(db, user, approval_request):
-            raise ValueError(f"User does not have permission to approve this request")
+            raise ValueError("User does not have permission to approve this request")
         
         # Check if user already approved
         existing_approval = next(
@@ -265,7 +265,7 @@ class ApprovalService:
         
         # Check if user has permission to reject
         if not await self._can_approve(db, user, approval_request):
-            raise ValueError(f"User does not have permission to reject this request")
+            raise ValueError("User does not have permission to reject this request")
         
         # Create rejection action
         approval_action = ApprovalAction(

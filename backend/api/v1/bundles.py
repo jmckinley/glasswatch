@@ -174,8 +174,29 @@ async def update_bundle_status(
     
     if not bundle:
         raise HTTPException(404, "Bundle not found")
-    
-    # Rule evaluation for scheduled/approved status changes
+
+    # ── State machine guard ──────────────────────────────────────────────────
+    # Define which transitions are legal.  Any attempt to move a bundle to a
+    # state that isn't reachable from its current state is rejected with 409
+    # so the caller gets a clear error rather than silent data corruption.
+    VALID_TRANSITIONS: Dict[str, list] = {
+        "draft":       ["scheduled", "approved", "cancelled"],
+        "scheduled":   ["approved", "draft", "cancelled"],
+        "approved":    ["in_progress", "draft", "cancelled"],
+        "in_progress": ["completed", "failed"],
+        "completed":   [],  # terminal
+        "failed":      ["draft"],  # allow retry from failed
+        "cancelled":   [],  # terminal
+    }
+    allowed = VALID_TRANSITIONS.get(bundle.status, [])
+    if new_status != bundle.status and new_status not in allowed:
+        raise HTTPException(
+            409,
+            f"Cannot transition bundle from '{bundle.status}' to '{new_status}'. "
+            f"Allowed next states: {allowed or ['none (terminal state)']}",
+        )
+
+    # ── Rule evaluation for scheduled/approved status changes ─────────────────
     rule_eval_result = None
     if new_status in ["scheduled", "approved"]:
         # Collect assets from bundle items

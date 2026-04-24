@@ -4,9 +4,7 @@ Executive reporting service for PatchGuide.
 Generates PDF reports, compliance packages, and analytics exports.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, List, Optional
-from io import BytesIO
-import json
+from typing import Dict, Any, List
 
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession

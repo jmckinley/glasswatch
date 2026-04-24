@@ -8,7 +8,7 @@ from enum import Enum as PyEnum
 from uuid import uuid4
 
 from sqlalchemy import (
-    Column, String, DateTime, ForeignKey, 
+    Column, DateTime, ForeignKey, 
     Index, JSON, Float, Enum as SQLEnum
 )
 from sqlalchemy.dialects.postgresql import UUID

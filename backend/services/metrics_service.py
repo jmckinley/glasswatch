@@ -3,8 +3,7 @@ Prometheus-compatible metrics service for Glasswatch.
 
 Tracks application performance, business metrics, and system health.
 """
-import time
-from typing import Dict, Optional
+from typing import Optional
 from prometheus_client import (
     Counter,
     Histogram,

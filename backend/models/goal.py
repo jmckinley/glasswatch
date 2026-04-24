@@ -5,7 +5,7 @@ Goals allow users to express objectives like "Be Glasswing-ready by July 1"
 and the system optimizes a patch plan to achieve it.
 """
 from datetime import datetime, timezone
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 from uuid import uuid4
 
 from sqlalchemy import (

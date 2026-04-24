@@ -5,11 +5,11 @@ This is the secret sauce - uses OR-Tools constraint solver to find optimal
 patch schedules that meet business objectives.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Any, Optional, Set, Tuple
+from typing import Dict, List, Any
 from uuid import UUID, uuid4
 import logging
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -190,7 +190,7 @@ class OptimizationService:
         bundles_created = 0
         if not preview_only:
             for bundle_data in schedule:
-                bundle = await self._create_bundle(db, goal, bundle_data)
+                await self._create_bundle(db, goal, bundle_data)
                 bundles_created += 1
             await db.commit()
         

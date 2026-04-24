@@ -5,7 +5,6 @@ Bundles are the output of the goal optimizer - they group patches that can
 be safely deployed together during a maintenance window.
 """
 from datetime import datetime, timezone
-from typing import Optional, List
 from uuid import uuid4
 
 from sqlalchemy import (

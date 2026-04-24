@@ -4,8 +4,8 @@ Notification model for in-app notifications.
 Stores notifications for display in the UI.
 """
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
-from uuid import UUID, uuid4
+from typing import Dict, Any
+from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Text, 

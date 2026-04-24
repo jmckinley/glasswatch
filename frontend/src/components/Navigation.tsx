@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NotificationBell from "@/components/notifications/NotificationBell";
@@ -21,6 +22,7 @@ const navLinks = [
 
 export default function Navigation() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -31,11 +33,12 @@ export default function Navigation() {
     <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+          {/* Logo + desktop nav */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="text-2xl font-bold text-white">
+            <Link href="/" className="text-2xl font-bold text-white shrink-0">
               Glasswatch
             </Link>
-            <nav className="hidden md:flex space-x-4">
+            <nav className="hidden md:flex space-x-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -51,11 +54,52 @@ export default function Navigation() {
               ))}
             </nav>
           </div>
-          <div className="flex items-center">
+
+          {/* Right side */}
+          <div className="flex items-center gap-2">
             <NotificationBell />
+            {/* Hamburger – mobile only */}
+            <button
+              className="md:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+              onClick={() => setMobileOpen((o) => !o)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-gray-700 bg-gray-800">
+          <nav className="flex flex-col py-2 px-4 space-y-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className={`px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive(link.href)
+                    ? "text-white bg-gray-900"
+                    : "text-gray-300 hover:text-white hover:bg-gray-700"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
