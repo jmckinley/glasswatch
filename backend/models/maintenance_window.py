@@ -56,6 +56,8 @@ class MaintenanceWindow(Base):
     
     # Scope
     environment = Column(String(50), nullable=True)  # production, staging, etc.
+    datacenter = Column(String(100), nullable=True)  # e.g. "us-east-1", "eu-west-2", "on-prem-nyc"
+    geography = Column(String(100), nullable=True)   # e.g. "North America", "Europe", "APAC"
     asset_tags = Column(JSON, nullable=True)  # Which assets can use this window
     excluded_assets = Column(JSON, nullable=True)  # Specific exclusions
     
@@ -235,6 +237,8 @@ class MaintenanceWindow(Base):
             "max_assets": self.max_assets,
             "max_risk_score": self.max_risk_score,
             "environment": self.environment,
+            "datacenter": self.datacenter,
+            "geography": self.geography,
             "priority": self.priority,
             "asset_group": self.asset_group,
             "service_name": self.service_name,

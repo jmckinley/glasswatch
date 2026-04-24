@@ -33,6 +33,8 @@ class WindowCreate(BaseModel):
     end_time: datetime
     timezone: Optional[str] = Field(None, max_length=50)
     environment: Optional[str] = Field(None, max_length=50)
+    datacenter: Optional[str] = Field(None, max_length=100)
+    geography: Optional[str] = Field(None, max_length=100)
     max_duration_hours: Optional[float] = Field(None, ge=0.5, le=24)
     max_assets: Optional[int] = Field(None, ge=1)
     approved_activities: List[str] = Field(default_factory=lambda: ["patching"])
@@ -54,6 +56,8 @@ class WindowUpdate(BaseModel):
     max_assets: Optional[int] = Field(None, ge=1)
     change_freeze: Optional[bool] = None
     change_freeze_reason: Optional[str] = None
+    datacenter: Optional[str] = Field(None, max_length=100)
+    geography: Optional[str] = Field(None, max_length=100)
     # Sprint 13 additions
     priority: Optional[int] = Field(None, ge=0, le=100)
     asset_group: Optional[str] = Field(None, max_length=100)
@@ -210,6 +214,8 @@ async def create_maintenance_window(
         end_time=window_data.end_time,
         timezone=window_data.timezone,
         environment=window_data.environment,
+        datacenter=window_data.datacenter,
+        geography=window_data.geography,
         max_duration_hours=window_data.max_duration_hours,
         max_assets=window_data.max_assets,
         approved_activities=window_data.approved_activities,
@@ -531,3 +537,68 @@ async def list_asset_groups(
     asset_groups = [row[0] for row in result.fetchall()]
     
     return {"asset_groups": sorted(asset_groups)}
+
+@router.get("/grouped")
+async def get_windows_grouped(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    group_by: str = Query("environment", description="Group by field", pattern="^(environment|datacenter|geography|type)$"),
+    active_only: bool = Query(True, description="Only show active windows"),
+) -> Dict[str, Any]:
+    """
+    Return maintenance windows grouped by a dimension (environment, datacenter, geography, type).
+    Useful for visual analysis of many windows at once.
+    """
+    query = (
+        select(MaintenanceWindow)
+        .where(MaintenanceWindow.tenant_id == tenant.id)
+        .options(selectinload(MaintenanceWindow.bundles))
+        .order_by(MaintenanceWindow.start_time)
+    )
+    if active_only:
+        query = query.where(MaintenanceWindow.active == True)
+
+    result = await db.execute(query)
+    windows = result.scalars().all()
+
+    # Group windows
+    groups: Dict[str, list] = {}
+    now = datetime.now(timezone.utc)
+
+    for window in windows:
+        key = getattr(window, group_by, None) or "unspecified"
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(window)
+
+    # Build response
+    group_list = []
+    for key, group_windows in sorted(groups.items()):
+        # Find next upcoming window in this group
+        future_windows = [
+            w for w in group_windows
+            if w.start_time > now or (w.start_time.tzinfo is None and w.start_time > now.replace(tzinfo=None))
+        ]
+        next_window = None
+        if future_windows:
+            next_window = min(future_windows, key=lambda w: w.start_time)
+
+        windows_list = []
+        for w in group_windows:
+            w_dict = w.to_dict()
+            w_dict["bundles_count"] = len(w.bundles)
+            # Next occurrence (for recurring: approximate using recurrence_rule if present)
+            w_dict["next_occurrence"] = None
+            if w.start_time > now:
+                w_dict["next_occurrence"] = w.start_time.isoformat()
+            windows_list.append(w_dict)
+
+        group_list.append({
+            "key": key,
+            "label": key.replace("_", " ").title() if key != "unspecified" else "Unspecified",
+            "count": len(group_windows),
+            "windows": windows_list,
+            "next_window": next_window.to_dict() if next_window else None,
+        })
+
+    return {"groups": group_list, "group_by": group_by, "total": len(windows)}

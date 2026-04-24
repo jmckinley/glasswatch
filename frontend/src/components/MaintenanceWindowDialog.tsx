@@ -51,6 +51,8 @@ export default function MaintenanceWindowDialog({
   const [endTime, setEndTime] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [environment, setEnvironment] = useState("");
+  const [datacenter, setDatacenter] = useState("");
+  const [geography, setGeography] = useState("");
   const [assetGroup, setAssetGroup] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [isDefault, setIsDefault] = useState(false);
@@ -84,6 +86,8 @@ export default function MaintenanceWindowDialog({
       
       setTimezone(windowData.timezone || "UTC");
       setEnvironment(windowData.environment || "");
+      setDatacenter(windowData.datacenter || "");
+      setGeography(windowData.geography || "");
       setAssetGroup(windowData.asset_group || "");
       setServiceName(windowData.service_name || "");
       setIsDefault(windowData.is_default || false);
@@ -111,6 +115,8 @@ export default function MaintenanceWindowDialog({
     setEndTime("");
     setTimezone("UTC");
     setEnvironment("");
+    setDatacenter("");
+    setGeography("");
     setAssetGroup("");
     setServiceName("");
     setIsDefault(false);
@@ -202,6 +208,8 @@ export default function MaintenanceWindowDialog({
         end_time: new Date(`${endDate}T${endTime}`).toISOString(),
         timezone,
         environment: environment || undefined,
+        datacenter: datacenter || undefined,
+        geography: geography || undefined,
         asset_group: assetGroup || undefined,
         service_name: serviceName || undefined,
         is_default: isDefault,
@@ -396,7 +404,19 @@ export default function MaintenanceWindowDialog({
                   <input
                     type="text"
                     value={environment}
-                    onChange={e => setEnvironment(e.target.value)}
+                    onChange={e => {
+                      setEnvironment(e.target.value);
+                      // Auto-fill datacenter/geography based on environment
+                      const envPresets: Record<string, {datacenter: string; geography: string}> = {
+                        production: { datacenter: 'us-east-1', geography: 'North America' },
+                        staging: { datacenter: 'us-west-2', geography: 'North America' },
+                        development: { datacenter: 'us-east-1', geography: 'North America' },
+                        dev: { datacenter: 'us-east-1', geography: 'North America' },
+                      };
+                      const preset = envPresets[e.target.value.toLowerCase()];
+                      if (preset && !datacenter) setDatacenter(preset.datacenter);
+                      if (preset && !geography) setGeography(preset.geography);
+                    }}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
                     placeholder="e.g., production, staging"
                     disabled={isDefault}
@@ -413,6 +433,44 @@ export default function MaintenanceWindowDialog({
                     placeholder="e.g., web-servers, databases"
                     disabled={isDefault}
                   />
+                </div>
+              </div>
+
+              {/* Datacenter & Geography */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Datacenter</label>
+                  <input
+                    type="text"
+                    list="datacenter-suggestions"
+                    value={datacenter}
+                    onChange={e => setDatacenter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
+                    placeholder="e.g., us-east-1"
+                    disabled={isDefault}
+                  />
+                  <datalist id="datacenter-suggestions">
+                    <option value="us-east-1" />
+                    <option value="us-west-2" />
+                    <option value="eu-west-1" />
+                    <option value="ap-southeast-1" />
+                    <option value="on-prem" />
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Geography</label>
+                  <select
+                    value={geography}
+                    onChange={e => setGeography(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
+                    disabled={isDefault}
+                  >
+                    <option value="">Select geography...</option>
+                    <option value="North America">North America</option>
+                    <option value="Europe">Europe</option>
+                    <option value="APAC">APAC</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
               </div>
               
