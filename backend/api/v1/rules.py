@@ -19,7 +19,7 @@ from backend.models.rule import DeploymentRule
 from backend.models.asset import Asset
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
-from backend.services.rule_engine import rule_engine, RuleMatch as RuleMatchDataclass
+from backend.services.rule_engine import rule_engine
 
 
 router = APIRouter()

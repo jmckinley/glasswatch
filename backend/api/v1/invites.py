@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.auth_workos import create_access_token, get_current_user
 from backend.db.session import get_db
 from backend.models.invite import Invite
-from backend.models.tenant import Tenant
 from backend.models.user import User, UserRole
 
 router = APIRouter()
@@ -125,7 +124,7 @@ async def _send_invite_email(
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("/invites", response_model=InviteResponse)
+@router.post("/invites", response_model=InviteResponse, status_code=201)
 async def create_invite(
     body: CreateInviteRequest,
     db: AsyncSession = Depends(get_db),

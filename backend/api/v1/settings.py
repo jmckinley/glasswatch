@@ -4,7 +4,6 @@ Settings API endpoints.
 Handles tenant settings management with deep merge support.
 Includes sensitive field masking and integration test-connection.
 """
-import os
 from typing import Dict, Any
 
 import httpx

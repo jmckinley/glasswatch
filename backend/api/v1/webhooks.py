@@ -6,7 +6,6 @@ Scanner webhooks are authenticated via X-Webhook-Secret header matched
 against tenant.settings.integrations.snapper_webhook_secret.
 """
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession

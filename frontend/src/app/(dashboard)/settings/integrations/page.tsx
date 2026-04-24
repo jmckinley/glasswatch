@@ -193,14 +193,21 @@ export default function IntegrationsPage() {
     }
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
   const save = async (section: string, data: any) => {
     setSaving(section);
+    setSaveError(null);
+    setSaveSuccess(null);
     try {
       await settingsApi.update({ [section]: data });
       await loadSettings();
-    } catch (err) {
+      setSaveSuccess("Settings saved.");
+      setTimeout(() => setSaveSuccess(null), 3000);
+    } catch (err: any) {
       console.error("Save failed", err);
-      alert("Failed to save settings");
+      setSaveError(err?.message || "Failed to save settings");
     } finally {
       setSaving(null);
     }
@@ -262,6 +269,18 @@ export default function IntegrationsPage() {
         <h1 className="text-3xl font-bold text-white mb-1">Integrations</h1>
         <p className="text-gray-400">Connect external services and configure API access</p>
       </div>
+
+      {saveError && (
+        <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠</span> {saveError}
+          <button onClick={() => setSaveError(null)} aria-label="Dismiss" className="ml-auto hover:text-white">×</button>
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="bg-green-900/20 border border-green-700 rounded-lg p-4 text-green-400 text-sm">
+          ✓ {saveSuccess}
+        </div>
+      )}
 
       {/* VulnCheck */}
       <Section title="VulnCheck" icon="🔍" description="Commercial vulnerability intelligence — CVE enrichment and exploit data">

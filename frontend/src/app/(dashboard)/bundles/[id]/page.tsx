@@ -689,6 +689,7 @@ function EditPanel({
 
   const handleSaveDetails = async () => {
     setSaving(true);
+    setEditError(null);
     try {
       await bundlesApi.update(bundleId, {
         name,
@@ -698,7 +699,7 @@ function EditPanel({
       });
       onSaved();
     } catch (err: any) {
-      alert(err.message || "Save failed");
+      setEditError(err.message || "Save failed");
     } finally {
       setSaving(false);
     }
@@ -728,13 +729,13 @@ function EditPanel({
       await bundlesApi.removeItem(bundleId, itemId);
       setLocalItems(prev => prev.filter(i => i.id !== itemId));
     } catch (err: any) {
-      alert(err.message || "Failed to remove item");
+      setEditError(err.message || "Failed to remove item");
     }
   };
 
   const handleAddItem = async () => {
     if (!selectedVuln || !assetId.trim()) {
-      alert("Select a vulnerability and enter an asset ID");
+      setEditError("Select a vulnerability and enter an asset ID.");
       return;
     }
     try {
@@ -748,8 +749,9 @@ function EditPanel({
       setVulnSearch("");
       setVulnResults([]);
       setAssetId("");
+      setEditError(null);
     } catch (err: any) {
-      alert(err.message || "Failed to add item");
+      setEditError(err.message || "Failed to add item");
     }
   };
 
@@ -800,6 +802,12 @@ function EditPanel({
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {editError && (
+            <div className="mb-4 bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm flex items-center gap-2">
+              <span>⚠</span> {editError}
+              <button onClick={() => setEditError(null)} aria-label="Dismiss" className="ml-auto hover:text-white">×</button>
+            </div>
+          )}
           {tab === "details" && (
             <div className="space-y-4">
               <div>

@@ -7,27 +7,20 @@ using constraint solving.
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Any, Dict
 from uuid import UUID
-import json
 import logging
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, validator
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from backend.db.session import get_db
 from backend.models.goal import Goal
 from backend.models.tenant import Tenant
 from backend.models.bundle import Bundle
-from backend.models.vulnerability import Vulnerability
-from backend.models.asset import Asset
-from backend.models.asset_vulnerability import AssetVulnerability
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.optimization import OptimizationService
-from backend.services.scoring import scoring_service
-from backend.services.notifications import notification_service
 
 
 router = APIRouter()
@@ -195,7 +188,7 @@ class RecommendationResponse(BaseModel):
     recommendation_reason: str
 
 
-@router.post("", response_model=GoalResponse)
+@router.post("", response_model=GoalResponse, status_code=201)
 async def create_goal(
     goal_data: GoalCreate,
     db: AsyncSession = Depends(get_db),

@@ -4,7 +4,6 @@ Dashboard API endpoints.
 Provides aggregated data for the main dashboard view.
 """
 from typing import Any, Dict, List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, and_, or_
@@ -12,8 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.db.session import get_db
-from backend.models.asset import Asset
-from backend.models.vulnerability import Vulnerability
 from backend.models.asset_vulnerability import AssetVulnerability
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant

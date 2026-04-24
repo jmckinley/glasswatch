@@ -101,6 +101,7 @@ export default function RulesPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
+  useEffect(() => { document.title = 'Deployment Rules | Glasswatch'; }, []);
   useEffect(() => { fetchRules(); }, []);
 
   const fetchRules = async () => {
@@ -336,7 +337,7 @@ function NLPRuleDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess:
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-white">Create Rule</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">×</button>
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white text-xl">×</button>
           </div>
 
           {!showManualForm ? (
@@ -525,7 +526,7 @@ function RuleFormDialog({
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-white">Edit Rule</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">×</button>
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white text-xl">×</button>
           </div>
           <RuleForm
             initialData={rule}

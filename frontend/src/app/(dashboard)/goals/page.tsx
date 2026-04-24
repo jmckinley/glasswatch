@@ -40,7 +40,10 @@ export default function GoalsPage() {
   const router = useRouter();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  useEffect(() => { document.title = 'Goals | Glasswatch'; }, []);
 
   useEffect(() => {
     fetchGoals();
@@ -49,10 +52,12 @@ export default function GoalsPage() {
   const fetchGoals = async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const data = await goalsApi.list({ active_only: false });
       setGoals(data);
-    } catch (error) {
-      console.error("Failed to fetch goals:", error);
+    } catch (err: any) {
+      console.error("Failed to fetch goals:", err);
+      setFetchError(err?.message || "Failed to load goals.");
     } finally {
       setLoading(false);
     }
@@ -68,6 +73,13 @@ export default function GoalsPage() {
 
   return (
     <>
+      {fetchError && (
+        <div className="mb-6 bg-red-900/20 border border-red-700 rounded-lg p-4 text-red-400 flex items-center gap-3">
+          <span>⚠</span> {fetchError}
+          <button onClick={fetchGoals} className="ml-auto text-xs border border-red-700 px-2 py-1 rounded hover:text-white">Retry</button>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -229,8 +241,11 @@ function CreateGoalModal({
     tags: [] as string[],
   });
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     try {
       const payload = {
         ...formData,
@@ -238,9 +253,9 @@ function CreateGoalModal({
       };
       await goalsApi.create(payload);
       onSuccess();
-    } catch (error) {
-      console.error("Failed to create goal:", error);
-      alert("Failed to create goal. Please try again.");
+    } catch (err: any) {
+      console.error("Failed to create goal:", err);
+      setSubmitError(err?.message || "Failed to create goal. Please try again.");
     }
   };
 
@@ -248,6 +263,11 @@ function CreateGoalModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-card border border-border rounded-lg p-6 max-w-lg w-full">
         <h2 className="text-2xl font-bold mb-4">Create New Goal</h2>
+        {submitError && (
+          <div className="mb-4 bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
+            {submitError}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Goal Name</label>

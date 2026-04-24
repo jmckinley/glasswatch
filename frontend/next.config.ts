@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // Tree-shake icon/utility packages — avoids importing full barrel files
+    optimizePackageImports: ["@heroicons/react", "lucide-react", "date-fns"],
+  },
   // API proxy — rewrites frontend /api/* to the backend service
   async rewrites() {
     return [

@@ -11,7 +11,7 @@ Handles:
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -233,9 +233,7 @@ async def handle_slack_commands(
     
     command = data.get("command", [""])[0]
     text = data.get("text", [""])[0]
-    team_id = data.get("team_id", [""])[0]
-    
-    # TODO: Map team_id to tenant_id
+    # TODO: Map team_id to tenant_id (data.get("team_id", [""])[0])
     tenant_id = "unknown"
     
     # Handle command

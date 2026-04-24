@@ -113,6 +113,8 @@ export default function AssetsPage() {
     total: 0,
   });
 
+  useEffect(() => { document.title = 'Assets | Glasswatch'; }, []);
+
   useEffect(() => {
     fetchAssets();
     fetchTags();
@@ -859,6 +861,7 @@ function AssetRow({
                     e.preventDefault();
                     onRemoveTag(tag);
                   }}
+                  aria-label={`Remove tag ${tag}`}
                   className="hover:text-white"
                 >
                   ×
@@ -873,8 +876,8 @@ function AssetRow({
               e.preventDefault();
               setShowTagPopover(!showTagPopover);
             }}
+            aria-label="Add tag"
             className="w-5 h-5 flex items-center justify-center rounded bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white text-xs transition-colors"
-            title="Add tag"
           >
             +
           </button>

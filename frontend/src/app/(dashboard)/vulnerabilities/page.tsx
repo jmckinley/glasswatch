@@ -67,6 +67,8 @@ export default function VulnerabilitiesPage() {
     total: 0,
   });
 
+  useEffect(() => { document.title = 'Vulnerabilities | Glasswatch'; }, []);
+
   useEffect(() => {
     fetchVulnerabilities();
     fetchStats();

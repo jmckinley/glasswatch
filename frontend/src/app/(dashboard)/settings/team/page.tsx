@@ -98,7 +98,7 @@ export default function TeamSettingsPage() {
       await apiCall(`/invites/${inviteId}`, { method: "DELETE" });
       setInvites((prev) => prev.filter((i) => i.id !== inviteId));
     } catch (e: any) {
-      alert(`Failed to revoke invite: ${e.message}`);
+      setInvitesError(`Failed to revoke invite: ${e.message}`);
     }
   };
 

@@ -154,7 +154,7 @@ async def list_maintenance_windows(
     }
 
 
-@router.post("")
+@router.post("", status_code=201)
 async def create_maintenance_window(
     window_data: WindowCreate,
     db: AsyncSession = Depends(get_db),

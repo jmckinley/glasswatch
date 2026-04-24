@@ -45,6 +45,8 @@ export default function BundlesPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabFilter>("all");
 
+  useEffect(() => { document.title = 'Patch Bundles | Glasswatch'; }, []);
+
   useEffect(() => {
     fetchBundles();
   }, [activeTab]);

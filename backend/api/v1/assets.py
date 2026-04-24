@@ -11,7 +11,7 @@ import csv
 from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, and_, or_, func, text
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,7 +24,6 @@ from backend.models.bundle import Bundle
 from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
-from backend.services.scoring import scoring_service
 
 
 router = APIRouter()
@@ -243,7 +242,7 @@ async def get_asset(
     }
 
 
-@router.post("/")
+@router.post("/", status_code=201)
 async def create_asset(
     asset_data: Dict[str, Any],
     db: AsyncSession = Depends(get_db),

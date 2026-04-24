@@ -91,6 +91,8 @@ export default function CompliancePage() {
   const [slaFilter, setSlaFilter] = useState<string>("ALL");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
+  useEffect(() => { document.title = 'Compliance | Glasswatch'; }, []);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -116,11 +118,12 @@ export default function CompliancePage() {
   const handleExportPdf = async () => {
     try {
       setExportLoading(true);
+      setError(null);
       const data = await reportingApi.getExecutiveSummary();
       setExecSummary(data);
       setShowPrint(true);
     } catch (e: any) {
-      alert("Failed to load executive summary: " + (e?.message || "Unknown error"));
+      setError("Failed to load executive summary: " + (e?.message || "Unknown error"));
     } finally {
       setExportLoading(false);
     }

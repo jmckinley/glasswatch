@@ -174,8 +174,6 @@ async def save_step(
         if step_data.data.get("weekly_enabled"):
             from backend.models.maintenance_window import MaintenanceWindow
             from datetime import datetime, timezone as tz, timedelta
-            import calendar
-
             day_name = step_data.data.get("weekly_day", "Sunday")
             start_hour_str = step_data.data.get("weekly_start_hour", "02:00")
             duration_hours = int(step_data.data.get("weekly_duration", 4))

@@ -3,8 +3,7 @@ Snapshot and rollback API endpoints.
 
 Provides snapshot capture, comparison, and rollback capabilities.
 """
-from datetime import datetime
-from typing import Optional, List, Any, Dict
+from typing import Optional, Any, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query

@@ -3,7 +3,7 @@ Asset Discovery API endpoints.
 
 Trigger discovery scans, view progress, and configure auto-sync.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks

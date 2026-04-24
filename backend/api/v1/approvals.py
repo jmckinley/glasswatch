@@ -11,13 +11,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from backend.db.session import get_db
 from backend.models.approval import (
     ApprovalRequest,
-    ApprovalAction,
     ApprovalPolicy,
     ApprovalStatus,
     RiskLevel,
@@ -417,28 +416,6 @@ async def reject_request(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-
-
-# Policy Management
-
-@router.get("/approvals/policies", response_model=List[ApprovalPolicyResponse])
-async def list_approval_policies(
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    List approval policies for the tenant.
-    
-    Only accessible to ADMIN users.
-    """
-    result = await db.execute(
-        select(ApprovalPolicy)
-        .where(ApprovalPolicy.tenant_id == current_user.tenant_id)
-        .order_by(ApprovalPolicy.risk_level, ApprovalPolicy.created_at.desc())
-    )
-    
-    policies = result.scalars().all()
-    return list(policies)
 
 
 @router.post("/approvals/policies", response_model=ApprovalPolicyResponse, status_code=status.HTTP_201_CREATED)

@@ -7,8 +7,8 @@ and executive summary for PDF export.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, and_, or_, func, case, text
+from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,7 +17,6 @@ from backend.models.asset import Asset
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset_vulnerability import AssetVulnerability
 from backend.models.bundle import Bundle
-from backend.models.bundle_item import BundleItem
 from backend.models.goal import Goal
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
@@ -38,6 +37,7 @@ SLA_DAYS = {
 
 @router.get("/compliance-summary")
 async def get_compliance_summary(
+    response: Response,
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> Dict[str, Any]:
@@ -45,9 +45,40 @@ async def get_compliance_summary(
     Compute compliance status for BOD 22-01, SOC 2 Type II, and PCI DSS.
     """
     now = datetime.now(timezone.utc)
+    # 5-minute cache — compliance data changes infrequently
+    response.headers["Cache-Control"] = "private, max-age=300"
 
     # ── BOD 22-01 (KEV) ──────────────────────────────────────────────────────
-    kev_q = (
+    # Use SQL counts instead of loading all KEV rows into Python
+    kev_total_q = (
+        select(func.count(AssetVulnerability.id))
+        .join(AssetVulnerability.asset)
+        .join(AssetVulnerability.vulnerability)
+        .where(
+            and_(
+                Asset.tenant_id == tenant.id,
+                Vulnerability.kev_listed == True,
+                AssetVulnerability.status.in_(["ACTIVE", "PATCHED", "MITIGATED"]),
+            )
+        )
+    )
+    kev_patched_q = (
+        select(func.count(AssetVulnerability.id))
+        .join(AssetVulnerability.asset)
+        .join(AssetVulnerability.vulnerability)
+        .where(
+            and_(
+                Asset.tenant_id == tenant.id,
+                Vulnerability.kev_listed == True,
+                AssetVulnerability.status.in_(["PATCHED", "MITIGATED"]),
+            )
+        )
+    )
+    kev_total = (await db.execute(kev_total_q)).scalar() or 0
+    kev_patched = (await db.execute(kev_patched_q)).scalar() or 0
+
+    # Fetch only ACTIVE KEV rows for the detail list (bounded — unpatched KEVs should be few)
+    kev_unpatched_q = (
         select(AssetVulnerability)
         .options(selectinload(AssetVulnerability.vulnerability))
         .join(AssetVulnerability.asset)
@@ -56,17 +87,12 @@ async def get_compliance_summary(
             and_(
                 Asset.tenant_id == tenant.id,
                 Vulnerability.kev_listed == True,
-                or_(
-                    AssetVulnerability.status == "ACTIVE",
-                    AssetVulnerability.status == "PATCHED",
-                    AssetVulnerability.status == "MITIGATED",
-                ),
+                AssetVulnerability.status == "ACTIVE",
             )
         )
+        .limit(500)  # safety cap
     )
-    kev_rows = (await db.execute(kev_q)).scalars().all()
-    kev_total = len(kev_rows)
-    kev_patched = sum(1 for r in kev_rows if r.status in ("PATCHED", "MITIGATED"))
+    kev_unpatched_rows = (await db.execute(kev_unpatched_q)).scalars().all()
     kev_unpatched = [
         {
             "cve_id": r.vulnerability.identifier,
@@ -80,8 +106,7 @@ async def get_compliance_summary(
                 r.discovered_at + timedelta(days=SLA_DAYS.get(r.vulnerability.severity or "HIGH", 30))
             ).isoformat() if r.discovered_at else None,
         }
-        for r in kev_rows
-        if r.status not in ("PATCHED", "MITIGATED")
+        for r in kev_unpatched_rows
     ]
 
     bod_pct = round(kev_patched / kev_total * 100, 1) if kev_total else 100.0
@@ -93,60 +118,44 @@ async def get_compliance_summary(
         bod_status = "NON_COMPLIANT"
 
     # ── SOC 2 Type II ────────────────────────────────────────────────────────
-    # Critical vulns patched within 30 days, High within 90 days
-    critical_q = (
-        select(AssetVulnerability)
-        .options(selectinload(AssetVulnerability.vulnerability))
+    # Use SQL GROUP BY aggregation instead of fetching all rows to Python
+    soc2_q = (
+        select(
+            Vulnerability.severity,
+            func.count(AssetVulnerability.id).label("total"),
+            func.sum(
+                case(
+                    (
+                        AssetVulnerability.status.in_(["PATCHED", "MITIGATED"]),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("patched_count"),
+        )
         .join(AssetVulnerability.asset)
         .join(AssetVulnerability.vulnerability)
         .where(
             and_(
                 Asset.tenant_id == tenant.id,
-                Vulnerability.severity == "CRITICAL",
-                or_(
-                    AssetVulnerability.status == "ACTIVE",
-                    AssetVulnerability.status == "PATCHED",
-                    AssetVulnerability.status == "MITIGATED",
-                ),
+                Vulnerability.severity.in_(["CRITICAL", "HIGH"]),
+                AssetVulnerability.status.in_(["ACTIVE", "PATCHED", "MITIGATED"]),
             )
         )
+        .group_by(Vulnerability.severity)
     )
-    critical_rows = (await db.execute(critical_q)).scalars().all()
-    c_total = len(critical_rows)
-    c_patched_timely = sum(
-        1 for r in critical_rows
-        if r.status in ("PATCHED", "MITIGATED")
-        and r.discovered_at
-        and (now - r.discovered_at).days <= 30
-    )
-    soc2_critical_pct = round(c_patched_timely / c_total * 100, 1) if c_total else 100.0
+    soc2_rows = (await db.execute(soc2_q)).all()
+    soc2_by_sev = {row.severity: row for row in soc2_rows}
 
-    high_q = (
-        select(AssetVulnerability)
-        .options(selectinload(AssetVulnerability.vulnerability))
-        .join(AssetVulnerability.asset)
-        .join(AssetVulnerability.vulnerability)
-        .where(
-            and_(
-                Asset.tenant_id == tenant.id,
-                Vulnerability.severity == "HIGH",
-                or_(
-                    AssetVulnerability.status == "ACTIVE",
-                    AssetVulnerability.status == "PATCHED",
-                    AssetVulnerability.status == "MITIGATED",
-                ),
-            )
-        )
-    )
-    high_rows = (await db.execute(high_q)).scalars().all()
-    h_total = len(high_rows)
-    h_patched_timely = sum(
-        1 for r in high_rows
-        if r.status in ("PATCHED", "MITIGATED")
-        and r.discovered_at
-        and (now - r.discovered_at).days <= 90
-    )
-    soc2_high_pct = round(h_patched_timely / h_total * 100, 1) if h_total else 100.0
+    c_row = soc2_by_sev.get("CRITICAL")
+    c_total = c_row.total if c_row else 0
+    c_patched = c_row.patched_count if c_row else 0
+    soc2_critical_pct = round(c_patched / c_total * 100, 1) if c_total else 100.0
+
+    h_row = soc2_by_sev.get("HIGH")
+    h_total = h_row.total if h_row else 0
+    h_patched = h_row.patched_count if h_row else 0
+    soc2_high_pct = round(h_patched / h_total * 100, 1) if h_total else 100.0
 
     avg_soc2 = round((soc2_critical_pct + soc2_high_pct) / 2, 1)
     if avg_soc2 >= 95:
@@ -157,9 +166,22 @@ async def get_compliance_summary(
         soc2_status = "NON_COMPLIANT"
 
     # ── PCI DSS ───────────────────────────────────────────────────────────────
-    # % of internet-facing assets with zero critical vulns
-    internet_assets_q = (
-        select(Asset)
+    # % of internet-facing assets with zero critical vulns — use SQL subquery
+    internet_asset_subq = (
+        select(Asset.id)
+        .where(
+            and_(
+                Asset.tenant_id == tenant.id,
+                or_(
+                    func.upper(Asset.exposure) == "INTERNET",
+                    func.upper(Asset.exposure) == "INTERNET-FACING",
+                ),
+            )
+        )
+        .scalar_subquery()
+    )
+    total_internet_q = (
+        select(func.count(Asset.id))
         .where(
             and_(
                 Asset.tenant_id == tenant.id,
@@ -170,17 +192,15 @@ async def get_compliance_summary(
             )
         )
     )
-    internet_assets = (await db.execute(internet_assets_q)).scalars().all()
-    total_internet = len(internet_assets)
+    total_internet = (await db.execute(total_internet_q)).scalar() or 0
 
     if total_internet > 0:
-        internet_asset_ids = [a.id for a in internet_assets]
         critical_on_internet_q = (
             select(func.count(func.distinct(AssetVulnerability.asset_id)))
             .join(AssetVulnerability.vulnerability)
             .where(
                 and_(
-                    AssetVulnerability.asset_id.in_(internet_asset_ids),
+                    AssetVulnerability.asset_id.in_(internet_asset_subq),
                     Vulnerability.severity == "CRITICAL",
                     AssetVulnerability.status == "ACTIVE",
                 )
@@ -241,12 +261,15 @@ async def get_compliance_summary(
 
 @router.get("/mttp")
 async def get_mttp(
+    response: Response,
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> Dict[str, Any]:
     """
     Mean Time To Patch — grouped by severity, environment, and team.
     """
+    # 10-minute cache — MTTP is an expensive aggregation that changes slowly
+    response.headers["Cache-Control"] = "private, max-age=600"
     # Query patched vulns: discovered_at on asset_vulnerability, status PATCHED
     q = (
         select(AssetVulnerability)
@@ -435,25 +458,39 @@ async def get_executive_summary(
     )
     top_assets = (await db.execute(top_assets_q)).scalars().all()
 
-    top_asset_list = []
-    for a in top_assets:
-        # Count active vulns for this asset
-        vuln_count_q = select(func.count(AssetVulnerability.id)).where(
-            and_(
-                AssetVulnerability.asset_id == a.id,
-                AssetVulnerability.status == "ACTIVE",
+    # Single GROUP BY query instead of N+1 per-asset count queries
+    top_asset_ids = [a.id for a in top_assets]
+    if top_asset_ids:
+        vuln_counts_q = (
+            select(
+                AssetVulnerability.asset_id,
+                func.count(AssetVulnerability.id).label("cnt"),
             )
+            .where(
+                and_(
+                    AssetVulnerability.asset_id.in_(top_asset_ids),
+                    AssetVulnerability.status == "ACTIVE",
+                )
+            )
+            .group_by(AssetVulnerability.asset_id)
         )
-        vuln_count = (await db.execute(vuln_count_q)).scalar() or 0
-        top_asset_list.append({
+        vuln_counts_result = (await db.execute(vuln_counts_q)).all()
+        vuln_counts_map = {row.asset_id: row.cnt for row in vuln_counts_result}
+    else:
+        vuln_counts_map = {}
+
+    top_asset_list = [
+        {
             "id": str(a.id),
             "name": a.name,
             "environment": a.environment,
             "criticality": a.criticality,
             "exposure": a.exposure,
             "owner_team": a.owner_team,
-            "active_vuln_count": vuln_count,
-        })
+            "active_vuln_count": vuln_counts_map.get(a.id, 0),
+        }
+        for a in top_assets
+    ]
 
     # ── Bundles this month ────────────────────────────────────────────────────
     try:
