@@ -4,8 +4,8 @@ BundleItem model for individual patches within a bundle.
 Each item represents a specific vulnerability-asset pair to be patched.
 """
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
+from typing import Dict, Any
+from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Integer, Float,

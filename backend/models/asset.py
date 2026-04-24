@@ -5,12 +5,11 @@ Tracks servers, containers, applications, databases, and other infrastructure.
 Includes criticality scoring and exposure assessment for prioritization.
 """
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, Integer, DateTime, ForeignKey, 
-    Index, JSON, Float, Boolean, Text
+    Index, JSON
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship

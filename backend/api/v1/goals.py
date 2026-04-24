@@ -655,8 +655,6 @@ async def recommend_plans(
         raise HTTPException(400, "Cannot generate recommendations for inactive goal")
     
     # Get current state metrics
-    from sqlalchemy.orm import selectinload
-    
     metrics = await optimization_service.calculate_goal_metrics(db, goal)
     asset_vulns = metrics["asset_vulns"]
     

@@ -4,11 +4,11 @@ Bundle API endpoints.
 Manages patch bundles created by the optimization engine.
 """
 from datetime import datetime, timezone
-from typing import Optional, List, Any, Dict
+from typing import Optional, Any, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,7 +18,6 @@ from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.models.vulnerability import Vulnerability
 from backend.models.asset import Asset
-from backend.models.user import User
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.deployment_service import deployment_service
 from backend.services.rule_engine import rule_engine
@@ -370,8 +369,6 @@ async def assign_bundle_to_window(
     current_bundles = [b for b in window.bundles if b.id != bundle_id]
     total_duration = sum(b.estimated_duration_minutes or 0 for b in current_bundles)
     total_assets = sum(b.assets_affected_count or 0 for b in current_bundles)
-    max_risk = max((b.risk_score or 0 for b in current_bundles), default=0)
-    
     # Check capacity constraints
     window_duration_minutes = window.duration_hours * 60
     new_total_duration = total_duration + (bundle.estimated_duration_minutes or 0)

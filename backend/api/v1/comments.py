@@ -3,7 +3,7 @@ Comment API endpoints.
 
 Manages comments, mentions, and reactions on entities.
 """
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -39,7 +39,7 @@ class ReactionCreate(BaseModel):
     emoji: str = Field(..., min_length=1, max_length=20)
 
 
-@router.post("/")
+@router.post("/", status_code=201)
 async def add_comment(
     comment_data: CommentCreate,
     db: AsyncSession = Depends(get_db),
@@ -219,7 +219,7 @@ async def delete_comment(
     try:
         is_admin = user.role == UserRole.ADMIN
         
-        comment = await collab_service.delete_comment(
+        await collab_service.delete_comment(
             db=db,
             comment_id=comment_id,
             user_id=user.id,

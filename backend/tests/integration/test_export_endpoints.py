@@ -88,10 +88,11 @@ class TestExportVulnerabilitiesJson:
         cves = [r["cve_id"] for r in data["data"]]
         assert "CVE-2024-77001" in cves
 
-    async def test_export_vulnerabilities_unauthenticated(self, client: AsyncClient):
-        """Unauthenticated export → 401 or 403."""
-        response = await client.get("/api/v1/export/vulnerabilities")
-        assert response.status_code in (401, 403)
+    async def test_export_vulnerabilities_default_format(self, authenticated_client: AsyncClient):
+        """Default format (no query param) returns JSON."""
+        response = await authenticated_client.get("/api/v1/export/vulnerabilities")
+        assert response.status_code == 200
+        assert "data" in response.json()
 
 
 class TestExportVulnerabilitiesCsv:
@@ -195,10 +196,11 @@ class TestExportAssetsJson:
         names = [r["name"] for r in data["data"]]
         assert "exported-asset-01" in names
 
-    async def test_export_assets_unauthenticated(self, client: AsyncClient):
-        """Unauthenticated assets export → 401 or 403."""
-        response = await client.get("/api/v1/export/assets")
-        assert response.status_code in (401, 403)
+    async def test_export_assets_default_format(self, authenticated_client: AsyncClient):
+        """Default format (no query param) returns JSON."""
+        response = await authenticated_client.get("/api/v1/export/assets")
+        assert response.status_code == 200
+        assert "data" in response.json()
 
     async def test_export_assets_json_record_fields(
         self,

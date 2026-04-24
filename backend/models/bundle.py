@@ -5,8 +5,8 @@ Represents a collection of vulnerabilities to be patched together
 in a maintenance window.
 """
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
+from typing import Dict, Any
+from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Integer, Float,

@@ -647,7 +647,7 @@ async def get_discovery_history(
     """
     Get history of discovery scans from the database.
     """
-    from sqlalchemy import select, func, and_
+    from sqlalchemy import select, func
     
     # Get total count
     count_result = await db.execute(
