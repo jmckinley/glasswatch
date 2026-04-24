@@ -38,6 +38,13 @@ const SETTINGS_SECTIONS = [
     name: "Security",
     description: "Approval policies and bundle configuration",
   },
+  {
+    id: "alerts",
+    href: "/settings/alerts",
+    icon: "⚡",
+    name: "Alert Rules",
+    description: "Configure which events trigger Slack, email, and in-app alerts",
+  },
 ];
 
 export default function SettingsPage() {

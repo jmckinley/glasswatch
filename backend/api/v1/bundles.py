@@ -772,6 +772,27 @@ async def approve_bundle(
 
     await db.commit()
     await db.refresh(bundle)
+
+    # Notify that the bundle is approved and ready for execution
+    try:
+        from backend.services.notifications import NotificationType
+        await notification_service.send_notification(
+            tenant=tenant,
+            notification_type=NotificationType.APPROVAL_NEEDED,
+            title=f"\u2705 Bundle approved: {bundle.name}",
+            message=f"{bundle.name} has been approved and is ready to execute.",
+            data={
+                "bundle_id": str(bundle.id),
+                "link": f"/bundles/{bundle.id}",
+                "action_url": f"/bundles/{bundle.id}",
+                "action_text": "View Bundle",
+            },
+            priority="normal",
+        )
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to send approval notification: {e}")
+
     return bundle.to_dict()
 
 

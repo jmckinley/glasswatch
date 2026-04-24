@@ -34,9 +34,16 @@ class NotificationResponse(BaseModel):
     read: bool
     read_at: Optional[str]
     created_at: str
-    
+
     class Config:
         from_attributes = True
+
+
+class NotificationsListResponse(BaseModel):
+    """Paginated notifications list response."""
+    items: List[NotificationResponse]
+    total: int
+    unread_count: int
 
 
 class UnreadCountResponse(BaseModel):
@@ -44,144 +51,94 @@ class UnreadCountResponse(BaseModel):
     count: int
 
 
-@router.get("/notifications", response_model=List[NotificationResponse])
+def _to_response(n: Notification) -> NotificationResponse:
+    return NotificationResponse(
+        id=str(n.id),
+        tenant_id=str(n.tenant_id),
+        user_id=str(n.user_id) if n.user_id else None,
+        title=n.title,
+        message=n.message,
+        data=n.data,
+        priority=n.priority,
+        channel=n.channel,
+        read=n.read,
+        read_at=n.read_at.isoformat() if n.read_at else None,
+        created_at=n.created_at.isoformat(),
+    )
+
+
+def _base_query(current_user: User):
+    """Base query for notifications visible to this user."""
+    from sqlalchemy import or_
+    return (
+        select(Notification)
+        .where(
+            Notification.tenant_id == current_user.tenant_id,
+            or_(
+                Notification.user_id == current_user.id,
+                Notification.user_id == None,  # noqa: E711
+            ),
+        )
+    )
+
+
+@router.get("/notifications", response_model=NotificationsListResponse)
 async def list_notifications(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    unread: Optional[bool] = Query(None),
     unread_only: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     List notifications for current user.
-    
+
     Returns notifications targeted at the user or broadcast to all users in the tenant.
     Ordered by unread first, then by creation date descending.
+    Accepts ``unread=true`` (frontend-friendly) or legacy ``unread_only=true``.
     """
-    # Build query for user-specific and broadcast notifications
-    query = select(Notification).where(
+    base = _base_query(current_user)
+
+    # Support both ?unread=true and legacy ?unread_only=true
+    filter_unread = unread is True or unread_only
+
+    # Count total & unread before pagination
+    count_q = select(func.count(Notification.id)).where(
         Notification.tenant_id == current_user.tenant_id,
-        (
-            (Notification.user_id == current_user.id) | 
-            (Notification.user_id == None)  # Broadcast notifications
+    )
+    from sqlalchemy import or_
+    count_q = count_q.where(
+        or_(
+            Notification.user_id == current_user.id,
+            Notification.user_id == None,  # noqa: E711
         )
     )
-    
-    # Filter by read status if requested
-    if unread_only:
-        query = query.where(Notification.read == False)
-    
-    # Order by unread first, then by creation date descending
-    query = query.order_by(
+    total_result = await db.execute(count_q)
+    total = total_result.scalar() or 0
+
+    unread_q = count_q.where(Notification.read == False)  # noqa: E712
+    unread_result = await db.execute(unread_q)
+    unread_count = unread_result.scalar() or 0
+
+    # Apply unread filter on main query
+    if filter_unread:
+        base = base.where(Notification.read == False)  # noqa: E712
+
+    # Order: unread first, then newest
+    base = base.order_by(
         Notification.read.asc(),
-        Notification.created_at.desc()
-    )
-    
-    # Apply pagination
-    query = query.offset(skip).limit(limit)
-    
-    # Execute query
-    result = await db.execute(query)
+        Notification.created_at.desc(),
+    ).offset(skip).limit(limit)
+
+    result = await db.execute(base)
     notifications = result.scalars().all()
-    
-    # Convert to response models
-    return [
-        NotificationResponse(
-            id=str(n.id),
-            tenant_id=str(n.tenant_id),
-            user_id=str(n.user_id) if n.user_id else None,
-            title=n.title,
-            message=n.message,
-            data=n.data,
-            priority=n.priority,
-            channel=n.channel,
-            read=n.read,
-            read_at=n.read_at.isoformat() if n.read_at else None,
-            created_at=n.created_at.isoformat(),
-        )
-        for n in notifications
-    ]
 
-
-@router.patch("/notifications/{notification_id}/read")
-async def mark_notification_read(
-    notification_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Mark a notification as read.
-    
-    Only the target user can mark their notification as read.
-    """
-    # Find the notification
-    result = await db.execute(
-        select(Notification).where(
-            Notification.id == notification_id,
-            Notification.tenant_id == current_user.tenant_id,
-            (
-                (Notification.user_id == current_user.id) |
-                (Notification.user_id == None)  # Broadcast notifications
-            )
-        )
+    return NotificationsListResponse(
+        items=[_to_response(n) for n in notifications],
+        total=total,
+        unread_count=unread_count,
     )
-    notification = result.scalar_one_or_none()
-    
-    if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    
-    # Mark as read
-    notification.read = True
-    notification.read_at = datetime.now(timezone.utc)
-    
-    await db.commit()
-    await db.refresh(notification)
-    
-    return NotificationResponse(
-        id=str(notification.id),
-        tenant_id=str(notification.tenant_id),
-        user_id=str(notification.user_id) if notification.user_id else None,
-        title=notification.title,
-        message=notification.message,
-        data=notification.data,
-        priority=notification.priority,
-        channel=notification.channel,
-        read=notification.read,
-        read_at=notification.read_at.isoformat() if notification.read_at else None,
-        created_at=notification.created_at.isoformat(),
-    )
-
-
-@router.post("/notifications/read-all")
-async def mark_all_notifications_read(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Mark all notifications as read for the current user.
-    
-    Marks both user-specific and broadcast notifications.
-    """
-    # Update all unread notifications for this user
-    await db.execute(
-        update(Notification)
-        .where(
-            Notification.tenant_id == current_user.tenant_id,
-            (
-                (Notification.user_id == current_user.id) |
-                (Notification.user_id == None)  # Broadcast notifications
-            ),
-            Notification.read == False
-        )
-        .values(
-            read=True,
-            read_at=datetime.now(timezone.utc)
-        )
-    )
-    
-    await db.commit()
-    
-    return {"message": "All notifications marked as read"}
 
 
 @router.get("/notifications/unread-count", response_model=UnreadCountResponse)
@@ -191,20 +148,107 @@ async def get_unread_count(
 ):
     """
     Get count of unread notifications for the current user.
-    
+
     Includes both user-specific and broadcast notifications.
     """
-    # Count unread notifications
+    from sqlalchemy import or_
     result = await db.execute(
         select(func.count(Notification.id)).where(
             Notification.tenant_id == current_user.tenant_id,
-            (
-                (Notification.user_id == current_user.id) |
-                (Notification.user_id == None)  # Broadcast notifications
+            or_(
+                Notification.user_id == current_user.id,
+                Notification.user_id == None,  # noqa: E711
             ),
-            Notification.read == False
+            Notification.read == False,  # noqa: E712
         )
     )
     count = result.scalar()
-    
     return UnreadCountResponse(count=count or 0)
+
+
+# ── Mark single notification read (POST + PATCH both supported) ───────────────
+
+async def _mark_one_read(
+    notification_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> NotificationResponse:
+    from sqlalchemy import or_
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.tenant_id == current_user.tenant_id,
+            or_(
+                Notification.user_id == current_user.id,
+                Notification.user_id == None,  # noqa: E711
+            ),
+        )
+    )
+    notification = result.scalar_one_or_none()
+
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    notification.read = True
+    notification.read_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(notification)
+    return _to_response(notification)
+
+
+@router.post("/notifications/{notification_id}/read")
+async def mark_notification_read_post(
+    notification_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a notification as read (POST)."""
+    return await _mark_one_read(notification_id, current_user, db)
+
+
+@router.patch("/notifications/{notification_id}/read")
+async def mark_notification_read_patch(
+    notification_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a notification as read (PATCH — legacy alias)."""
+    return await _mark_one_read(notification_id, current_user, db)
+
+
+# ── Mark all read (POST /mark-all-read + legacy /read-all) ───────────────────
+
+async def _mark_all_read(current_user: User, db: AsyncSession):
+    from sqlalchemy import or_
+    await db.execute(
+        update(Notification)
+        .where(
+            Notification.tenant_id == current_user.tenant_id,
+            or_(
+                Notification.user_id == current_user.id,
+                Notification.user_id == None,  # noqa: E711
+            ),
+            Notification.read == False,  # noqa: E712
+        )
+        .values(read=True, read_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+    return {"message": "All notifications marked as read"}
+
+
+@router.post("/notifications/mark-all-read")
+async def mark_all_notifications_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark all notifications as read for the current user."""
+    return await _mark_all_read(current_user, db)
+
+
+@router.post("/notifications/read-all")
+async def mark_all_notifications_read_legacy(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark all notifications as read (legacy endpoint alias)."""
+    return await _mark_all_read(current_user, db)

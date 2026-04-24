@@ -355,22 +355,58 @@ class DeploymentService:
     ) -> None:
         """
         Send notifications about deployment completion.
-        
-        In production, this would integrate with:
-        - Email
-        - Slack
-        - PagerDuty
-        - Custom webhooks
-        
-        Args:
-            db: Database session
-            bundle: Completed bundle
-            success_count: Number of successful deployments
-            failure_count: Number of failed deployments
+
+        Fires PATCH_COMPLETE or PATCH_FAILED notification via notification_service,
+        which routes to Slack, Teams, email, and in-app based on tenant settings.
         """
-        # Placeholder for notification logic
-        # In production, would check notification preferences and send alerts
-        pass
+        try:
+            from backend.services.notifications import notification_service, NotificationType
+            from backend.models.tenant import Tenant
+            from sqlalchemy import select as _select
+
+            # Load tenant for notification routing config
+            result = await db.execute(
+                _select(Tenant).where(Tenant.id == bundle.tenant_id)
+            )
+            tenant = result.scalar_one_or_none()
+            if not tenant:
+                return
+
+            if bundle.status in ("completed", "failed"):
+                total = success_count + failure_count
+                if bundle.status == "completed":
+                    notif_type = NotificationType.PATCH_SUCCESS
+                    title = f"✅ Bundle complete: {bundle.name}"
+                    priority = "normal" if failure_count == 0 else "high"
+                else:
+                    notif_type = NotificationType.PATCH_FAILED
+                    title = f"❌ Bundle failed: {bundle.name}"
+                    priority = "high"
+
+                message = (
+                    f"{bundle.name}: {success_count}/{total} patches applied"
+                    + (f", {failure_count} failed" if failure_count else "")
+                    + "."
+                )
+
+                data = {
+                    "bundle_id": str(bundle.id),
+                    "link": f"/bundles/{bundle.id}",
+                    "action_url": f"/bundles/{bundle.id}",
+                    "action_text": "View Bundle",
+                }
+
+                await notification_service.send_notification(
+                    tenant=tenant,
+                    notification_type=notif_type,
+                    title=title,
+                    message=message,
+                    data=data,
+                    priority=priority,
+                )
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to send bundle completion notification: {e}")
 
 
 # Global service instance

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -12,6 +13,7 @@ const navLinks = [
   { href: "/schedule", label: "Schedule" },
   { href: "/approvals", label: "Approvals" },
   { href: "/rules", label: "Rules" },
+  { href: "/compliance", label: "Compliance" },
   { href: "/settings", label: "Settings" },
   { href: "/help", label: "Help" },
 ];
@@ -47,6 +49,9 @@ export default function Navigation() {
                 </Link>
               ))}
             </nav>
+          </div>
+          <div className="flex items-center">
+            <NotificationBell />
           </div>
         </div>
       </div>

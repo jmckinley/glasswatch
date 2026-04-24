@@ -463,4 +463,20 @@ export const authApi = {
     apiCall<any>('/auth/register', { method: 'POST', body: data }),
 };
 
+// Reporting & Compliance API
+export const reportingApi = {
+  getComplianceSummary: () => apiCall<any>('/reporting/compliance-summary'),
+  getMttp: () => apiCall<any>('/reporting/mttp'),
+  getSlaTracking: (params?: { severity?: string; status?: string; skip?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) query.append(key, String(value));
+      });
+    }
+    return apiCall<any>(`/reporting/sla-tracking${query.toString() ? '?' + query.toString() : ''}`);
+  },
+  getExecutiveSummary: () => apiCall<any>('/reporting/executive-summary'),
+};
+
 export { apiCall };

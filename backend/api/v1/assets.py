@@ -3,15 +3,15 @@ Asset API endpoints.
 
 Provides CRUD operations for infrastructure assets and bulk import capabilities.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any, Dict
-from uuid import UUID
+from uuid import UUID, uuid4
 import json
 import csv
 from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,6 +19,9 @@ from sqlalchemy.orm import selectinload
 from backend.db.session import get_db
 from backend.models.asset import Asset
 from backend.models.asset_vulnerability import AssetVulnerability
+from backend.models.vulnerability import Vulnerability
+from backend.models.bundle import Bundle
+from backend.models.bundle_item import BundleItem
 from backend.models.tenant import Tenant
 from backend.core.auth_compat import get_current_tenant_compat as get_current_tenant
 from backend.services.scoring import scoring_service
@@ -462,16 +465,245 @@ async def bulk_import_assets(
     }
 
 
+@router.get("/stale")
+async def get_stale_assets(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    days: int = Query(30, ge=1, description="Assets not scanned in this many days are considered stale"),
+) -> Dict[str, Any]:
+    """
+    Return assets with last_scanned_at older than `days` days (or never scanned).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    query = select(Asset).where(
+        and_(
+            Asset.tenant_id == tenant.id,
+            or_(
+                Asset.last_scanned_at < cutoff,
+                Asset.last_scanned_at.is_(None),
+            ),
+        )
+    ).order_by(Asset.last_scanned_at.asc().nullsfirst(), Asset.name)
+
+    result = await db.execute(query)
+    assets = result.scalars().all()
+
+    def days_since(dt):
+        if dt is None:
+            return None
+        return (datetime.now(timezone.utc) - dt).days
+
+    return {
+        "assets": [
+            {
+                "id": str(a.id),
+                "name": a.name,
+                "identifier": a.identifier,
+                "type": a.type,
+                "environment": a.environment,
+                "criticality": a.criticality,
+                "risk_score": a.risk_score,
+                "last_scanned_at": a.last_scanned_at.isoformat() if a.last_scanned_at else None,
+                "days_since_scan": days_since(a.last_scanned_at),
+            }
+            for a in assets
+        ],
+        "total": len(assets),
+        "stale_days_threshold": days,
+    }
+
+
+@router.get("/groups")
+async def get_asset_groups(
+    group_by: str = Query("environment", description="Group by: environment, owner_team, criticality, patch_group"),
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Return assets grouped by a dimension with aggregate stats.
+    """
+    valid_groups = {"environment", "owner_team", "criticality", "patch_group"}
+    if group_by not in valid_groups:
+        raise HTTPException(status_code=400, detail=f"group_by must be one of {valid_groups}")
+
+    # Fetch all assets for the tenant
+    result = await db.execute(
+        select(Asset).where(Asset.tenant_id == tenant.id)
+    )
+    assets = result.scalars().all()
+
+    # Get vuln counts per asset
+    asset_ids = [a.id for a in assets]
+    patched_query = (
+        select(
+            AssetVulnerability.asset_id,
+            func.count(AssetVulnerability.id).label("total"),
+            func.sum(
+                func.cast(AssetVulnerability.status == "PATCHED", Integer_type := None)
+            ).label("patched"),
+        )
+        .where(AssetVulnerability.asset_id.in_(asset_ids))
+        .group_by(AssetVulnerability.asset_id)
+    ) if asset_ids else None
+
+    vuln_totals: Dict[Any, int] = {}
+    vuln_patched: Dict[Any, int] = {}
+    if asset_ids:
+        pr = await db.execute(
+            select(
+                AssetVulnerability.asset_id,
+                func.count(AssetVulnerability.id).label("total"),
+            )
+            .where(AssetVulnerability.asset_id.in_(asset_ids))
+            .group_by(AssetVulnerability.asset_id)
+        )
+        for row in pr.all():
+            vuln_totals[row[0]] = row[1]
+
+        pp = await db.execute(
+            select(
+                AssetVulnerability.asset_id,
+                func.count(AssetVulnerability.id).label("patched"),
+            )
+            .where(
+                and_(
+                    AssetVulnerability.asset_id.in_(asset_ids),
+                    AssetVulnerability.status == "PATCHED",
+                )
+            )
+            .group_by(AssetVulnerability.asset_id)
+        )
+        for row in pp.all():
+            vuln_patched[row[0]] = row[1]
+
+    # Group assets
+    groups: Dict[str, Any] = {}
+    for asset in assets:
+        key = getattr(asset, group_by)
+        if key is None:
+            key = "(unset)"
+        key = str(key)
+        if key not in groups:
+            groups[key] = {"count": 0, "risk_score_sum": 0.0, "total_vulns": 0, "patched_vulns": 0, "asset_ids": []}
+        g = groups[key]
+        g["count"] += 1
+        g["risk_score_sum"] += asset.risk_score
+        g["total_vulns"] += vuln_totals.get(asset.id, 0)
+        g["patched_vulns"] += vuln_patched.get(asset.id, 0)
+        g["asset_ids"].append(str(asset.id))
+
+    result_groups = []
+    for name, g in sorted(groups.items()):
+        avg_risk = round(g["risk_score_sum"] / g["count"], 1) if g["count"] else 0
+        pct_patched = round(g["patched_vulns"] / g["total_vulns"] * 100, 1) if g["total_vulns"] else 0
+        result_groups.append({
+            "name": name,
+            "count": g["count"],
+            "avg_risk_score": avg_risk,
+            "total_vulns": g["total_vulns"],
+            "patched_vulns": g["patched_vulns"],
+            "pct_patched": pct_patched,
+            "asset_ids": g["asset_ids"],
+        })
+
+    return {"groups": result_groups, "group_by": group_by}
+
+
+@router.get("/coverage")
+async def get_patch_coverage(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    limit: int = Query(50, le=200),
+) -> Dict[str, Any]:
+    """
+    Return patch coverage by CVE — how many assets are affected, patched, and unpatched.
+    """
+    # Get all asset IDs for this tenant
+    asset_ids_result = await db.execute(
+        select(Asset.id).where(Asset.tenant_id == tenant.id)
+    )
+    asset_ids = [r[0] for r in asset_ids_result.all()]
+
+    if not asset_ids:
+        return {"coverage": [], "total": 0}
+
+    # Aggregate vuln coverage
+    total_q = await db.execute(
+        select(
+            AssetVulnerability.vulnerability_id,
+            func.count(AssetVulnerability.id).label("total"),
+        )
+        .where(AssetVulnerability.asset_id.in_(asset_ids))
+        .group_by(AssetVulnerability.vulnerability_id)
+        .order_by(func.count(AssetVulnerability.id).desc())
+        .limit(limit)
+    )
+    total_rows = total_q.all()
+
+    if not total_rows:
+        return {"coverage": [], "total": 0}
+
+    vuln_ids = [r[0] for r in total_rows]
+    total_map = {r[0]: r[1] for r in total_rows}
+
+    patched_q = await db.execute(
+        select(
+            AssetVulnerability.vulnerability_id,
+            func.count(AssetVulnerability.id).label("patched"),
+        )
+        .where(
+            and_(
+                AssetVulnerability.asset_id.in_(asset_ids),
+                AssetVulnerability.vulnerability_id.in_(vuln_ids),
+                AssetVulnerability.status == "PATCHED",
+            )
+        )
+        .group_by(AssetVulnerability.vulnerability_id)
+    )
+    patched_map = {r[0]: r[1] for r in patched_q.all()}
+
+    # Fetch vuln details
+    vuln_details_q = await db.execute(
+        select(Vulnerability).where(Vulnerability.id.in_(vuln_ids))
+    )
+    vuln_details = {v.id: v for v in vuln_details_q.scalars().all()}
+
+    coverage = []
+    for vid in vuln_ids:
+        v = vuln_details.get(vid)
+        if not v:
+            continue
+        total = total_map.get(vid, 0)
+        patched = patched_map.get(vid, 0)
+        unpatched = total - patched
+        pct = round(patched / total * 100, 1) if total else 0
+        coverage.append({
+            "vulnerability_id": str(vid),
+            "identifier": v.identifier,
+            "severity": v.severity,
+            "cvss_score": v.cvss_score,
+            "kev_listed": v.kev_listed,
+            "patch_available": v.patch_available,
+            "total_assets": total,
+            "patched_assets": patched,
+            "unpatched_assets": unpatched,
+            "coverage_pct": pct,
+        })
+
+    return {"coverage": coverage, "total": len(coverage)}
+
+
 @router.get("/{asset_id}/vulnerabilities")
 async def get_asset_vulnerabilities(
     asset_id: UUID,
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
     status: Optional[str] = Query("ACTIVE", description="Filter by status"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
     min_score: Optional[int] = Query(None, ge=0, le=100, description="Minimum risk score"),
 ) -> Dict[str, Any]:
     """
-    Get all vulnerabilities for a specific asset.
+    Get all vulnerabilities for a specific asset with full details.
     """
     # Verify asset belongs to tenant
     asset_query = select(Asset).where(
@@ -482,30 +714,52 @@ async def get_asset_vulnerabilities(
     )
     asset_result = await db.execute(asset_query)
     asset = asset_result.scalar_one_or_none()
-    
+
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    
-    # Get vulnerabilities
+
+    # Get vulnerabilities with full vuln data
     query = (
         select(AssetVulnerability)
         .options(selectinload(AssetVulnerability.vulnerability))
         .where(AssetVulnerability.asset_id == asset_id)
     )
-    
-    # Apply filters
+
     if status:
         query = query.where(AssetVulnerability.status == status)
-    
+    if severity:
+        query = query.where(AssetVulnerability.vulnerability.has(Vulnerability.severity == severity.upper()))
     if min_score is not None:
         query = query.where(AssetVulnerability.risk_score >= min_score)
-    
-    # Order by risk score
+
     query = query.order_by(AssetVulnerability.risk_score.desc())
-    
+
     result = await db.execute(query)
     vulnerabilities = result.scalars().all()
-    
+
+    # Get which bundles include each vuln for this asset (via BundleItem)
+    av_ids = [av.vulnerability_id for av in vulnerabilities]
+    bundle_map: Dict[Any, Dict] = {}
+    if av_ids:
+        bi_q = await db.execute(
+            select(BundleItem, Bundle)
+            .join(Bundle, BundleItem.bundle_id == Bundle.id)
+            .where(
+                and_(
+                    BundleItem.asset_id == asset_id,
+                    BundleItem.vulnerability_id.in_(av_ids),
+                )
+            )
+        )
+        for bi, bundle in bi_q.all():
+            bundle_map[bi.vulnerability_id] = {
+                "bundle_id": str(bundle.id),
+                "bundle_name": bundle.name,
+                "bundle_status": bundle.status,
+            }
+
+    now = datetime.now(timezone.utc)
+
     return {
         "asset": {
             "id": str(asset.id),
@@ -519,6 +773,11 @@ async def get_asset_vulnerabilities(
                 "identifier": av.vulnerability.identifier,
                 "title": av.vulnerability.title,
                 "severity": av.vulnerability.severity,
+                "cvss_score": av.vulnerability.cvss_score,
+                "epss_score": av.vulnerability.epss_score,
+                "kev_listed": av.vulnerability.kev_listed,
+                "exploit_available": av.vulnerability.exploit_available,
+                "patch_available": av.patch_available if av.patch_available is not None else av.vulnerability.patch_available,
                 "risk_score": av.risk_score,
                 "score_factors": av.score_factors,
                 "status": av.status,
@@ -526,10 +785,11 @@ async def get_asset_vulnerabilities(
                 "library_loaded": av.library_loaded,
                 "execution_frequency": av.execution_frequency,
                 "recommended_action": av.recommended_action,
-                "patch_available": av.patch_available,
                 "mitigation_applied": av.mitigation_applied,
-                "discovered_at": av.discovered_at.isoformat(),
+                "days_open": (now - av.discovered_at).days if av.discovered_at else None,
+                "discovered_at": av.discovered_at.isoformat() if av.discovered_at else None,
                 "last_reviewed_at": av.last_reviewed_at.isoformat() if av.last_reviewed_at else None,
+                "bundle": bundle_map.get(av.vulnerability_id),
             }
             for av in vulnerabilities
         ],
@@ -862,3 +1122,211 @@ async def export_assets(
         }
         for asset in assets
     ]
+
+@router.get("/{asset_id}/risk-breakdown")
+async def get_asset_risk_breakdown(
+    asset_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Compute risk drivers for this asset: KEV count, severity counts, exposure, uptime.
+    """
+    asset_query = select(Asset).where(
+        and_(Asset.id == asset_id, Asset.tenant_id == tenant.id)
+    )
+    result = await db.execute(asset_query)
+    asset = result.scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Get active vulnerabilities with full vuln data
+    av_q = await db.execute(
+        select(AssetVulnerability)
+        .options(selectinload(AssetVulnerability.vulnerability))
+        .where(
+            and_(
+                AssetVulnerability.asset_id == asset_id,
+                or_(AssetVulnerability.status == "ACTIVE", AssetVulnerability.status.is_(None)),
+            )
+        )
+    )
+    avs = av_q.scalars().all()
+
+    kev_count = sum(1 for av in avs if av.vulnerability and av.vulnerability.kev_listed)
+    critical_count = sum(1 for av in avs if av.vulnerability and av.vulnerability.severity == "CRITICAL")
+    high_count = sum(1 for av in avs if av.vulnerability and av.vulnerability.severity == "HIGH")
+    exploit_count = sum(1 for av in avs if av.vulnerability and av.vulnerability.exploit_available)
+
+    internet_exposed = asset.is_internet_facing
+    uptime_days = asset.uptime_days
+
+    # Build top risk drivers
+    drivers = []
+    if kev_count:
+        drivers.append((kev_count * 30, f"{kev_count} Known Exploited Vulnerabilit{'y' if kev_count == 1 else 'ies'} (CISA KEV)"))
+    if internet_exposed:
+        drivers.append((25, "Asset is internet-exposed"))
+    if critical_count:
+        drivers.append((critical_count * 5, f"{critical_count} critical-severity vulnerabilit{'y' if critical_count == 1 else 'ies'}"))
+    if exploit_count:
+        drivers.append((exploit_count * 4, f"{exploit_count} vulnerabilit{'y' if exploit_count == 1 else 'ies'} with known exploits"))
+    if asset.criticality >= 4:
+        drivers.append((asset.criticality * 3, f"High-criticality asset (score {asset.criticality}/5)"))
+    if uptime_days and uptime_days > 365:
+        drivers.append((10, f"Long uptime ({uptime_days} days) increases patch debt"))
+    if high_count:
+        drivers.append((high_count * 2, f"{high_count} high-severity vulnerabilit{'y' if high_count == 1 else 'ies'}"))
+    if asset.environment and asset.environment.lower() == "production":
+        drivers.append((10, "Production environment asset"))
+
+    drivers.sort(reverse=True, key=lambda x: x[0])
+    top_drivers = [d[1] for d in drivers[:5]]
+
+    return {
+        "asset_id": str(asset.id),
+        "risk_score": asset.risk_score,
+        "kev_count": kev_count,
+        "critical_count": critical_count,
+        "high_count": high_count,
+        "exploit_count": exploit_count,
+        "total_active_vulns": len(avs),
+        "internet_exposed": internet_exposed,
+        "uptime_days": uptime_days,
+        "top_risk_drivers": top_drivers,
+    }
+
+
+@router.get("/{asset_id}/patch-history")
+async def get_asset_patch_history(
+    asset_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Return chronological patch history for an asset from bundle_items.
+    """
+    asset_query = select(Asset).where(
+        and_(Asset.id == asset_id, Asset.tenant_id == tenant.id)
+    )
+    result = await db.execute(asset_query)
+    asset = result.scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Query bundle_items for this asset (excluding pending)
+    bi_q = await db.execute(
+        select(BundleItem, Bundle, Vulnerability)
+        .join(Bundle, BundleItem.bundle_id == Bundle.id)
+        .join(Vulnerability, BundleItem.vulnerability_id == Vulnerability.id)
+        .where(
+            and_(
+                BundleItem.asset_id == asset_id,
+                Bundle.tenant_id == tenant.id,
+                BundleItem.status != "pending",
+            )
+        )
+        .order_by(BundleItem.completed_at.desc().nullslast(), BundleItem.created_at.desc())
+    )
+    rows = bi_q.all()
+
+    history = []
+    for bi, bundle, vuln in rows:
+        history.append({
+            "id": str(bi.id),
+            "date": (bi.completed_at or bi.updated_at or bi.created_at).isoformat(),
+            "vulnerability_id": str(vuln.id),
+            "cve_identifier": vuln.identifier,
+            "vulnerability_title": vuln.title,
+            "severity": vuln.severity,
+            "status": bi.status,
+            "bundle_id": str(bundle.id),
+            "bundle_name": bundle.name,
+            "bundle_status": bundle.status,
+            "patch_identifier": bi.patch_identifier,
+            "duration_seconds": bi.duration_seconds,
+            "error_message": bi.error_message if bi.status == "failed" else None,
+            "completed_at": bi.completed_at.isoformat() if bi.completed_at else None,
+        })
+
+    return {
+        "asset_id": str(asset.id),
+        "asset_name": asset.name,
+        "history": history,
+        "total": len(history),
+    }
+
+
+@router.post("/{asset_id}/create-patch-bundle")
+async def create_asset_patch_bundle(
+    asset_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Create a draft bundle containing all open (ACTIVE) vulnerabilities for this asset.
+    If a draft bundle already contains all of them, return the existing one.
+    """
+    asset_query = select(Asset).where(
+        and_(Asset.id == asset_id, Asset.tenant_id == tenant.id)
+    )
+    result = await db.execute(asset_query)
+    asset = result.scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Get open (ACTIVE) vulns for this asset
+    av_q = await db.execute(
+        select(AssetVulnerability)
+        .options(selectinload(AssetVulnerability.vulnerability))
+        .where(
+            and_(
+                AssetVulnerability.asset_id == asset_id,
+                or_(AssetVulnerability.status == "ACTIVE", AssetVulnerability.status.is_(None)),
+            )
+        )
+        .order_by(AssetVulnerability.risk_score.desc())
+    )
+    open_avs = av_q.scalars().all()
+
+    if not open_avs:
+        raise HTTPException(status_code=400, detail="No open vulnerabilities found for this asset")
+
+    # Create new bundle
+    bundle_name = f"Asset Patch: {asset.name} – {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+    bundle = Bundle(
+        id=uuid4(),
+        tenant_id=tenant.id,
+        name=bundle_name,
+        description=f"Auto-generated patch bundle for asset {asset.name} ({asset.identifier})",
+        status="draft",
+        risk_score=float(max(av.risk_score for av in open_avs)),
+        risk_level="HIGH" if any(av.risk_score >= 70 for av in open_avs) else "MEDIUM",
+        assets_affected_count=1,
+        approval_required=asset.environment.lower() == "production" if asset.environment else False,
+    )
+    db.add(bundle)
+    await db.flush()
+
+    # Create bundle items
+    for av in open_avs:
+        item = BundleItem(
+            id=uuid4(),
+            bundle_id=bundle.id,
+            vulnerability_id=av.vulnerability_id,
+            asset_id=asset_id,
+            status="pending",
+            risk_score=float(av.risk_score),
+            patch_identifier=av.patch_id,
+        )
+        db.add(item)
+
+    await db.commit()
+    await db.refresh(bundle)
+
+    return {
+        "bundle_id": str(bundle.id),
+        "bundle_name": bundle.name,
+        "vuln_count": len(open_avs),
+        "status": bundle.status,
+    }
