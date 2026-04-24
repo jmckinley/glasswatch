@@ -236,6 +236,75 @@ async def create_maintenance_window(
     return window.to_dict()
 
 
+@router.get("/grouped")
+async def get_windows_grouped(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    group_by: str = Query("environment", description="Group by field", pattern="^(environment|datacenter|geography|type)$"),
+    active_only: bool = Query(True, description="Only show active windows"),
+) -> Dict[str, Any]:
+    """
+    Return maintenance windows grouped by a dimension (environment, datacenter, geography, type).
+    Useful for visual analysis of many windows at once.
+    [Moved before /{window_id} to avoid route shadowing]
+    """
+    # Forward to the implementation defined later in the file
+    from sqlalchemy.orm import selectinload as _selectinload
+    query = (
+        select(MaintenanceWindow)
+        .where(MaintenanceWindow.tenant_id == tenant.id)
+        .options(_selectinload(MaintenanceWindow.bundles))
+        .order_by(MaintenanceWindow.start_time)
+    )
+    if active_only:
+        query = query.where(MaintenanceWindow.active == True)
+
+    result = await db.execute(query)
+    windows = result.scalars().all()
+
+    groups: Dict[str, list] = {}
+    now = datetime.now(timezone.utc)
+
+    for window in windows:
+        key = getattr(window, group_by, None) or "unspecified"
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(window)
+
+    def _is_future(w, _now):
+        """Safe future check that handles both tz-aware and tz-naive datetimes."""
+        st = w.start_time
+        if st is None:
+            return False
+        if st.tzinfo is None:
+            return st > _now.replace(tzinfo=None)
+        return st > _now
+
+    group_list = []
+    for key, group_windows in sorted(groups.items()):
+        future_windows = [w for w in group_windows if _is_future(w, now)]
+        next_window = None
+        if future_windows:
+            next_window = min(future_windows, key=lambda w: w.start_time)
+
+        windows_list = []
+        for w in group_windows:
+            w_dict = w.to_dict()
+            w_dict["bundles_count"] = len(w.bundles)
+            w_dict["next_occurrence"] = w.start_time.isoformat() if _is_future(w, now) else None
+            windows_list.append(w_dict)
+
+        group_list.append({
+            "key": key,
+            "label": key.replace("_", " ").title() if key != "unspecified" else "Unspecified",
+            "count": len(group_windows),
+            "windows": windows_list,
+            "next_window": next_window.to_dict() if next_window else None,
+        })
+
+    return {"groups": group_list, "group_by": group_by, "total": len(windows)}
+
+
 @router.get("/{window_id}")
 async def get_maintenance_window(
     window_id: UUID,
@@ -538,67 +607,4 @@ async def list_asset_groups(
     
     return {"asset_groups": sorted(asset_groups)}
 
-@router.get("/grouped")
-async def get_windows_grouped(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-    group_by: str = Query("environment", description="Group by field", pattern="^(environment|datacenter|geography|type)$"),
-    active_only: bool = Query(True, description="Only show active windows"),
-) -> Dict[str, Any]:
-    """
-    Return maintenance windows grouped by a dimension (environment, datacenter, geography, type).
-    Useful for visual analysis of many windows at once.
-    """
-    query = (
-        select(MaintenanceWindow)
-        .where(MaintenanceWindow.tenant_id == tenant.id)
-        .options(selectinload(MaintenanceWindow.bundles))
-        .order_by(MaintenanceWindow.start_time)
-    )
-    if active_only:
-        query = query.where(MaintenanceWindow.active == True)
-
-    result = await db.execute(query)
-    windows = result.scalars().all()
-
-    # Group windows
-    groups: Dict[str, list] = {}
-    now = datetime.now(timezone.utc)
-
-    for window in windows:
-        key = getattr(window, group_by, None) or "unspecified"
-        if key not in groups:
-            groups[key] = []
-        groups[key].append(window)
-
-    # Build response
-    group_list = []
-    for key, group_windows in sorted(groups.items()):
-        # Find next upcoming window in this group
-        future_windows = [
-            w for w in group_windows
-            if w.start_time > now or (w.start_time.tzinfo is None and w.start_time > now.replace(tzinfo=None))
-        ]
-        next_window = None
-        if future_windows:
-            next_window = min(future_windows, key=lambda w: w.start_time)
-
-        windows_list = []
-        for w in group_windows:
-            w_dict = w.to_dict()
-            w_dict["bundles_count"] = len(w.bundles)
-            # Next occurrence (for recurring: approximate using recurrence_rule if present)
-            w_dict["next_occurrence"] = None
-            if w.start_time > now:
-                w_dict["next_occurrence"] = w.start_time.isoformat()
-            windows_list.append(w_dict)
-
-        group_list.append({
-            "key": key,
-            "label": key.replace("_", " ").title() if key != "unspecified" else "Unspecified",
-            "count": len(group_windows),
-            "windows": windows_list,
-            "next_window": next_window.to_dict() if next_window else None,
-        })
-
-    return {"groups": group_list, "group_by": group_by, "total": len(windows)}
+# get_windows_grouped is now registered earlier (before /{window_id}) to avoid route shadowing

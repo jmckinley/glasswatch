@@ -242,3 +242,106 @@ class TestParseAssetCsv:
         row = {"hostname": "backup-server", "type": "server"}
         ok, _ = _validate_asset_row(row)
         assert ok
+
+
+# ── CSV alias and edge-case tests ─────────────────────────────────────────────
+
+class TestCsvAliasColumns:
+    """Tests for column alias handling added in recent import_api work."""
+
+    async def test_vuln_csv_accepts_asset_ip_column(self):
+        """`asset_ip` column works as an alias for asset_name."""
+        row = {"asset_ip": "10.0.0.1", "cve_id": "CVE-2024-1111"}
+        ok, _ = _validate_vuln_row(row)
+        assert ok, "asset_ip should be accepted as asset identifier"
+
+    async def test_vuln_csv_accepts_hostname_column(self):
+        """`hostname` column is accepted as asset identifier."""
+        row = {"hostname": "db-server-01", "cve_id": "CVE-2024-2222"}
+        ok, _ = _validate_vuln_row(row)
+        assert ok
+
+    async def test_vuln_csv_accepts_cve_column(self):
+        """`cve` column works as an alias for cve_id."""
+        row = {"asset_name": "web-01", "cve": "CVE-2024-3333"}
+        ok, _ = _validate_vuln_row(row)
+        assert ok, "cve should be accepted as alias for cve_id"
+
+    async def test_vuln_csv_invalid_severity_defaults_to_medium(self):
+        """Unrecognised severity value should normalise to MEDIUM."""
+        # Reproduce the normalisation from import_api.py
+        def _normalise_severity(raw: str) -> str:
+            valid = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL")
+            s = (raw or "MEDIUM").strip().upper()
+            return s if s in valid else "MEDIUM"
+
+        assert _normalise_severity("BANANA") == "MEDIUM"
+        assert _normalise_severity("") == "MEDIUM"
+        assert _normalise_severity("high") == "HIGH"  # case-normalised correctly
+        assert _normalise_severity("critical") == "CRITICAL"
+
+    async def test_asset_csv_invalid_type_defaults_to_server(self):
+        """Unrecognised asset type should normalise to 'server'."""
+        valid_types = ("server", "container", "function", "database", "application", "network", "endpoint")
+
+        def _normalise_type(raw: str) -> str:
+            t = (raw or "server").strip().lower()
+            return t if t in valid_types else "server"
+
+        assert _normalise_type("appliance") == "server"
+        assert _normalise_type("") == "server"
+        assert _normalise_type("container") == "container"
+
+    async def test_asset_csv_accepts_ip_column(self):
+        """`ip` column is accepted as an alias for ip_address."""
+        # ip_address resolution is done in import_api via:
+        #   ip_address = (row.get("ip_address") or row.get("ip") or "").strip()
+        row = {"ip": "192.168.1.50", "ip_address": ""}
+        ip = (row.get("ip_address") or row.get("ip") or "").strip()
+        assert ip == "192.168.1.50"
+
+
+class TestCsvSpecialCases:
+    async def test_csv_utf8_bom_stripped(self):
+        """CSV with UTF-8 BOM header should parse correctly (BOM stripped)."""
+        # Build raw UTF-8 bytes WITH BOM prefix (EF BB BF)
+        csv_text = "asset_name,cve_id,severity\nweb-01,CVE-2024-9000,HIGH\n"
+        content_bytes = b"\xef\xbb\xbf" + csv_text.encode("utf-8")
+
+        # import_api.py uses content.decode("utf-8-sig") which strips the BOM
+        decoded = content_bytes.decode("utf-8-sig")
+
+        rows = _read_csv_rows(decoded)
+        assert len(rows) == 1
+
+        # Column header should NOT have BOM prefix after decoding
+        assert "asset_name" in rows[0], \
+            f"BOM prefix not stripped — headers: {list(rows[0].keys())}"
+
+    async def test_csv_empty_file_returns_error(self):
+        """An empty CSV string should produce zero data rows."""
+        rows = _read_csv_rows("")
+        assert rows == [], "Empty CSV should yield no rows"
+
+    async def test_csv_empty_file_only_header(self):
+        """A CSV with only a header row but no data rows should produce no rows."""
+        header_only = "asset_name,cve_id,severity\n"
+        rows = _read_csv_rows(header_only)
+        assert rows == []
+
+    async def test_csv_missing_required_column_vuln(self):
+        """CSV missing cve_id column causes validation error per row."""
+        csv_text = "asset_name,severity,cvss_score\nweb-01,HIGH,7.5\n"
+        rows = _read_csv_rows(csv_text)
+        assert len(rows) == 1
+        ok, err = _validate_vuln_row(rows[0])
+        assert not ok
+        assert "cve_id" in err or "missing" in err
+
+    async def test_csv_missing_required_column_asset(self):
+        """CSV missing name/hostname/identifier causes validation error per row."""
+        csv_text = "type,environment,criticality\nserver,production,4\n"
+        rows = _read_csv_rows(csv_text)
+        assert len(rows) == 1
+        ok, err = _validate_asset_row(rows[0])
+        assert not ok

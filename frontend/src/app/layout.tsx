@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Glasswatch - Intelligent Patch Optimization",
   description: "AI-powered patch management that understands your business goals",
+  openGraph: {
+    title: "Glasswatch",
+    description: "AI-driven patch management for enterprise security teams.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
