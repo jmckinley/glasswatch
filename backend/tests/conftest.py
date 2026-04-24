@@ -114,7 +114,7 @@ async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None
     
     app.dependency_overrides[get_db] = override_get_db
     
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(app=app, base_url="http://localhost") as ac:
         yield ac
     
     app.dependency_overrides.clear()
@@ -344,7 +344,7 @@ async def viewer_user(create_test_user, test_tenant: Tenant) -> User:
 @pytest_asyncio.fixture
 async def authenticated_client(client: AsyncClient, test_user: User) -> AsyncClient:
     """Create an authenticated client (engineer role)."""
-    token = create_access_token({"sub": str(test_user.id)})
+    token = await create_access_token(user_id=str(test_user.id), tenant_id=str(test_user.tenant_id))
     client.headers["Authorization"] = f"Bearer {token}"
     return client
 
@@ -352,7 +352,7 @@ async def authenticated_client(client: AsyncClient, test_user: User) -> AsyncCli
 @pytest_asyncio.fixture
 async def admin_client(client: AsyncClient, admin_user: User) -> AsyncClient:
     """Create an authenticated admin client."""
-    token = create_access_token({"sub": str(admin_user.id)})
+    token = await create_access_token(user_id=str(admin_user.id), tenant_id=str(admin_user.tenant_id))
     client.headers["Authorization"] = f"Bearer {token}"
     return client
 
@@ -360,6 +360,6 @@ async def admin_client(client: AsyncClient, admin_user: User) -> AsyncClient:
 @pytest_asyncio.fixture
 async def viewer_client(client: AsyncClient, viewer_user: User) -> AsyncClient:
     """Create an authenticated viewer client."""
-    token = create_access_token({"sub": str(viewer_user.id)})
+    token = await create_access_token(user_id=str(viewer_user.id), tenant_id=str(viewer_user.tenant_id))
     client.headers["Authorization"] = f"Bearer {token}"
     return client

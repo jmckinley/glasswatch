@@ -534,18 +534,6 @@ async def get_asset_groups(
 
     # Get vuln counts per asset
     asset_ids = [a.id for a in assets]
-    patched_query = (
-        select(
-            AssetVulnerability.asset_id,
-            func.count(AssetVulnerability.id).label("total"),
-            func.sum(
-                func.cast(AssetVulnerability.status == "PATCHED", Integer_type := None)
-            ).label("patched"),
-        )
-        .where(AssetVulnerability.asset_id.in_(asset_ids))
-        .group_by(AssetVulnerability.asset_id)
-    ) if asset_ids else None
-
     vuln_totals: Dict[Any, int] = {}
     vuln_patched: Dict[Any, int] = {}
     if asset_ids:

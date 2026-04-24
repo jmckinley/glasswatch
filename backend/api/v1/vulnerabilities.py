@@ -126,9 +126,11 @@ async def get_vulnerability_stats(
     patch_count = await db.scalar(
         select(func.count(Vulnerability.id)).where(Vulnerability.patch_available == True)
     )
+    from datetime import timedelta
+    seven_days_ago = datetime.now() - timedelta(days=7)
     recent_count = await db.scalar(
         select(func.count(Vulnerability.id))
-        .where(Vulnerability.published_at >= func.now() - text("interval '7 days'"))
+        .where(Vulnerability.published_at >= seven_days_ago)
     )
 
     return {

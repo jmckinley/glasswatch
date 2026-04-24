@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { assetsApi } from "@/lib/api";
 import TagAutocomplete from "@/components/TagAutocomplete";
@@ -64,12 +64,38 @@ const CRITICALITY_COLORS: Record<number, string> = {
   1: "text-gray-400",
 };
 
+interface CoverageRow {
+  vulnerability_id: string;
+  identifier: string;
+  severity: string;
+  cvss_score: number | null;
+  kev_listed: boolean;
+  patch_available: boolean;
+  total_assets: number;
+  patched_assets: number;
+  unpatched_assets: number;
+  coverage_pct: number;
+}
+
+const SEVERITY_BADGE: Record<string, string> = {
+  CRITICAL: "bg-red-500/20 text-red-300",
+  HIGH: "bg-orange-500/20 text-orange-300",
+  MEDIUM: "bg-yellow-500/20 text-yellow-300",
+  LOW: "bg-blue-500/20 text-blue-300",
+};
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [staleAssets, setStaleAssets] = useState<Set<string>>(new Set());
+  const [staleDays, setStaleDays] = useState<Record<string, number | null>>({});
+  const [coverage, setCoverage] = useState<CoverageRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coverageLoading, setCoverageLoading] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<"assets" | "coverage">("assets");
+  const [staleOnly, setStaleOnly] = useState(false);
   const [filters, setFilters] = useState({
     search: "",
     environment: "",
@@ -90,7 +116,33 @@ export default function AssetsPage() {
   useEffect(() => {
     fetchAssets();
     fetchTags();
-  }, [filters, pagination.skip]);
+  }, [filters, pagination.skip, staleOnly]);
+
+  const fetchCoverage = useCallback(async () => {
+    if (coverage.length > 0) return; // already loaded
+    setCoverageLoading(true);
+    try {
+      const data = await assetsApi.coverage(100);
+      setCoverage(data.coverage || []);
+    } catch (err) {
+      console.error("Failed to fetch coverage:", err);
+    } finally {
+      setCoverageLoading(false);
+    }
+  }, [coverage.length]);
+
+  const fetchStaleInfo = async () => {
+    try {
+      const data = await assetsApi.stale(30);
+      const staleSet = new Set<string>((data.assets || []).map((a: any) => a.id as string));
+      const daysMap: Record<string, number | null> = {};
+      (data.assets || []).forEach((a: any) => { daysMap[a.id] = a.days_since_scan; });
+      setStaleAssets(staleSet);
+      setStaleDays(daysMap);
+    } catch (err) {
+      // stale check is best-effort
+    }
+  };
 
   const fetchAssets = async () => {
     try {
@@ -109,9 +161,24 @@ export default function AssetsPage() {
       if (filters.tag) params.tag = filters.tag;
       if (filters.sort_by) params.sort_by = filters.sort_by;
 
-      const data = await assetsApi.list(params);
-      setAssets(data.assets || data.items || []);
-      setPagination(prev => ({ ...prev, total: data.total || 0 }));
+      if (staleOnly) {
+        // Use stale endpoint and display those assets
+        const staleData = await assetsApi.stale(30);
+        const staleList = staleData.assets || [];
+        setAssets(staleList.map((a: any) => ({ ...a, vulnerability_count: 0, is_internet_facing: false })));
+        setPagination(prev => ({ ...prev, total: staleList.length }));
+        const staleSet = new Set<string>(staleList.map((a: any) => a.id as string));
+        const daysMap: Record<string, number | null> = {};
+        staleList.forEach((a: any) => { daysMap[a.id] = a.days_since_scan; });
+        setStaleAssets(staleSet);
+        setStaleDays(daysMap);
+      } else {
+        const data = await assetsApi.list(params);
+        setAssets(data.assets || data.items || []);
+        setPagination(prev => ({ ...prev, total: data.total || 0 }));
+        // Also fetch stale info in background to show badges
+        fetchStaleInfo();
+      }
     } catch (error) {
       console.error("Failed to fetch assets:", error);
     } finally {
@@ -245,6 +312,127 @@ export default function AssetsPage() {
 
   return (
     <>
+      {/* Page-level Tabs + Links */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-1 border-b border-gray-700">
+          {(["assets", "coverage"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveMainTab(tab);
+                if (tab === "coverage") fetchCoverage();
+              }}
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeMainTab === tab
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-gray-400 hover:text-gray-300"
+              }`}
+            >
+              {tab === "assets" ? "Assets" : "Patch Coverage"}
+            </button>
+          ))}
+        </div>
+        <Link
+          href="/assets/groups"
+          className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+        >
+          📊 Asset Groups
+        </Link>
+      </div>
+
+      {/* ── Coverage Tab ── */}
+      {activeMainTab === "coverage" && (
+        <div className="space-y-4">
+          {coverageLoading ? (
+            <div className="text-center py-16 text-gray-400 animate-pulse">Loading coverage…</div>
+          ) : coverage.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">No coverage data found</div>
+          ) : (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+              <div className="p-4 border-b border-gray-700">
+                <h2 className="text-sm font-medium text-gray-300">Patch Coverage by CVE — {coverage.length} vulnerabilities</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-900 text-gray-400">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-medium">CVE ID</th>
+                      <th className="text-left px-4 py-3 font-medium">Severity</th>
+                      <th className="text-left px-4 py-3 font-medium">CVSS</th>
+                      <th className="text-left px-4 py-3 font-medium">KEV</th>
+                      <th className="text-left px-4 py-3 font-medium"># Affected</th>
+                      <th className="text-left px-4 py-3 font-medium"># Patched</th>
+                      <th className="text-left px-4 py-3 font-medium"># Unpatched</th>
+                      <th className="text-left px-4 py-3 font-medium">Coverage</th>
+                      <th className="text-left px-4 py-3 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.map(row => (
+                      <tr key={row.vulnerability_id} className="border-t border-gray-700 hover:bg-gray-700/30">
+                        <td className="px-4 py-3 font-mono text-blue-400 text-xs">{row.identifier}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 text-xs rounded ${SEVERITY_BADGE[row.severity] || SEVERITY_BADGE.LOW}`}>
+                            {row.severity}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-300 text-xs font-mono">
+                          {row.cvss_score != null ? row.cvss_score.toFixed(1) : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.kev_listed ? (
+                            <span className="px-1.5 py-0.5 text-xs rounded bg-red-600/30 text-red-300 font-semibold">KEV</span>
+                          ) : <span className="text-gray-600 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-gray-300 text-xs">{row.total_assets}</td>
+                        <td className="px-4 py-3 text-green-400 text-xs">{row.patched_assets}</td>
+                        <td className="px-4 py-3 text-xs">
+                          <span className={row.unpatched_assets > 0 ? "text-red-400" : "text-gray-500"}>
+                            {row.unpatched_assets}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  row.coverage_pct >= 80 ? "bg-green-500" :
+                                  row.coverage_pct >= 50 ? "bg-orange-500" : "bg-red-500"
+                                }`}
+                                style={{ width: `${row.coverage_pct}%` }}
+                              />
+                            </div>
+                            <span className={`text-xs font-medium ${
+                              row.coverage_pct >= 80 ? "text-green-400" :
+                              row.coverage_pct >= 50 ? "text-orange-400" : "text-red-400"
+                            }`}>
+                              {row.coverage_pct.toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.unpatched_assets > 0 && (
+                            <Link
+                              href={`/vulnerabilities/${row.vulnerability_id}`}
+                              className="px-2 py-1 text-xs bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors"
+                            >
+                              View Unpatched
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Assets Tab ── */}
+      {activeMainTab !== "assets" ? null : (
+      <>
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div className="bg-gray-800 rounded-lg p-4">
@@ -369,6 +557,25 @@ export default function AssetsPage() {
             <option value="vulnerability_count">Sort: Vuln Count</option>
           </select>
         </div>
+        {/* Stale filter */}
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-700">
+          <button
+            onClick={() => {
+              setStaleOnly(v => !v);
+              setPagination(prev => ({ ...prev, skip: 0 }));
+            }}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              staleOnly
+                ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-300"
+                : "bg-gray-700 border-gray-600 text-gray-400 hover:text-gray-300"
+            }`}
+          >
+            ⚠️ Stale Assets ({staleAssets.size > 0 ? staleAssets.size : "not scanned in 30+ days"})
+          </button>
+          {staleOnly && (
+            <span className="text-xs text-yellow-400">Showing assets not scanned in 30+ days</span>
+          )}
+        </div>
       </div>
 
       {/* Tag Cloud */}
@@ -480,6 +687,8 @@ export default function AssetsPage() {
                   onRemoveTag={(tag) => handleRemoveTag(asset.id, tag)}
                   onAddTag={(tag) => handleAddTag(asset.id, tag)}
                   availableTags={allTags.map(t => t.name)}
+                  isStale={staleAssets.has(asset.id)}
+                  daysSinceScan={staleDays[asset.id]}
                 />
               ))
             )}
@@ -534,6 +743,8 @@ export default function AssetsPage() {
           availableTags={allTags.map(t => t.name)}
         />
       )}
+      </> /* end assets tab */
+      )}
     </>
   );
 }
@@ -545,6 +756,8 @@ function AssetRow({
   onRemoveTag,
   onAddTag,
   availableTags,
+  isStale,
+  daysSinceScan,
 }: {
   asset: Asset;
   selected: boolean;
@@ -552,6 +765,8 @@ function AssetRow({
   onRemoveTag: (tag: string) => void;
   onAddTag: (tag: string) => void;
   availableTags: string[];
+  isStale?: boolean;
+  daysSinceScan?: number | null;
 }) {
   const [showTagPopover, setShowTagPopover] = useState(false);
   const [tagSearchInput, setTagSearchInput] = useState("");
@@ -743,7 +958,14 @@ function AssetRow({
           <div className="text-xs text-gray-400 mt-1">{asset.risk_score.toFixed(0)}</div>
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-gray-400">{lastScanned}</td>
+      <td className="px-4 py-3 text-sm">
+        <div className="text-gray-400">{lastScanned}</div>
+        {isStale && (
+          <div className="text-xs text-yellow-400 mt-0.5">
+            ⚠️ {daysSinceScan != null ? `Not scanned in ${daysSinceScan}d` : 'Never scanned'}
+          </div>
+        )}
+      </td>
     </tr>
   );
 }
