@@ -154,7 +154,7 @@ export default function CompliancePage() {
         <button
           onClick={handleExportPdf}
           disabled={exportLoading || loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors shadow-lg"
         >
           {exportLoading ? (
             <>
@@ -169,7 +169,7 @@ export default function CompliancePage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Export PDF
+              Export Audit Report
             </>
           )}
         </button>
@@ -184,6 +184,11 @@ export default function CompliancePage() {
       {/* ── Framework Cards ── */}
       <section>
         <h2 className="text-lg font-semibold text-white mb-4">Framework Status</h2>
+        {!loading && Object.keys(frameworks).length === 0 && (
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-8 text-center">
+            <p className="text-gray-400 text-sm">Connect a vulnerability scanner to start tracking compliance posture.</p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* BOD 22-01 */}
           <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
@@ -206,10 +211,20 @@ export default function CompliancePage() {
                   </div>
                   <StatusBadge status={bod?.status || "COMPLIANT"} />
                 </div>
-                <p className="text-2xl font-bold text-white">
-                  {bod?.kev_patched ?? 0} / {bod?.kev_total ?? 0}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">KEV vulnerabilities patched</p>
+                {/* Large % metric */}
+                {(() => {
+                  const pct = bod?.patch_rate_pct ?? 100;
+                  const color = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-amber-400" : "text-red-400";
+                  const arrow = pct >= 90 ? "↑" : pct >= 70 ? "→" : "↓";
+                  const arrowColor = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-gray-400" : "text-red-400";
+                  return (
+                    <div className="flex items-end gap-2 mb-1">
+                      <span className={`text-5xl font-bold ${color}`}>{pct}%</span>
+                      <span className={`text-xl mb-1 ${arrowColor}`}>{arrow}</span>
+                    </div>
+                  );
+                })()}
+                <p className="text-xs text-gray-400 mt-1">KEV patch rate · {bod?.kev_patched ?? 0} / {bod?.kev_total ?? 0} patched</p>
                 <ProgressBar pct={bod?.patch_rate_pct ?? 100} />
                 <p className="text-xs text-gray-400 mt-2">{bod?.patch_rate_pct ?? 100}% patch rate</p>
                 {(bod?.unpatched_items?.length ?? 0) > 0 && (
@@ -248,6 +263,19 @@ export default function CompliancePage() {
                   </div>
                   <StatusBadge status={soc2?.status || "COMPLIANT"} />
                 </div>
+                {/* Large % metric */}
+                {(() => {
+                  const pct = soc2?.critical_patched_within_30d_pct ?? 100;
+                  const color = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-amber-400" : "text-red-400";
+                  const arrow = pct >= 90 ? "↑" : pct >= 70 ? "→" : "↓";
+                  const arrowColor = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-gray-400" : "text-red-400";
+                  return (
+                    <div className="flex items-end gap-2 mb-3">
+                      <span className={`text-5xl font-bold ${color}`}>{pct}%</span>
+                      <span className={`text-xl mb-1 ${arrowColor}`}>{arrow}</span>
+                    </div>
+                  );
+                })()}
                 <div className="space-y-3">
                   <div>
                     <div className="flex justify-between text-xs text-gray-400 mb-1">
@@ -287,9 +315,19 @@ export default function CompliancePage() {
                   </div>
                   <StatusBadge status={pci?.status || "COMPLIANT"} />
                 </div>
-                <p className="text-2xl font-bold text-white">
-                  {pci?.clean_pct ?? 100}%
-                </p>
+                {/* Large % metric */}
+                {(() => {
+                  const pct = pci?.clean_pct ?? 100;
+                  const color = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-amber-400" : "text-red-400";
+                  const arrow = pct >= 90 ? "↑" : pct >= 70 ? "→" : "↓";
+                  const arrowColor = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-gray-400" : "text-red-400";
+                  return (
+                    <div className="flex items-end gap-2 mb-1">
+                      <span className={`text-5xl font-bold ${color}`}>{pct}%</span>
+                      <span className={`text-xl mb-1 ${arrowColor}`}>{arrow}</span>
+                    </div>
+                  );
+                })()}
                 <p className="text-xs text-gray-400 mt-1">of internet-facing assets with no critical vulns</p>
                 <ProgressBar pct={pci?.clean_pct ?? 100} />
                 <p className="text-xs text-gray-400 mt-2">
@@ -309,7 +347,7 @@ export default function CompliancePage() {
       {/* ── MTTP Metrics ── */}
       <section>
         <h2 className="text-lg font-semibold text-white mb-1">Mean Time To Patch (MTTP)</h2>
-        <p className="text-sm text-gray-400 mb-4">Average days from vulnerability discovery to remediation, broken down by severity, environment, and team.</p>
+        <p className="text-sm text-gray-400 mb-4">Mean Time To Patch (MTTP) — average days from vulnerability discovery to confirmed remediation</p>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
@@ -372,14 +410,21 @@ export default function CompliancePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700">
-                      {mttp.by_team.map((t: any) => (
-                        <tr key={t.team}>
-                          <td className="py-1.5 text-gray-300 text-xs">{t.team}</td>
-                          <td className="py-1.5 text-white text-right font-medium text-xs">
-                            {t.avg_days != null ? `${t.avg_days}d` : "—"}
-                          </td>
-                        </tr>
-                      ))}
+                      {mttp.by_team.map((t: any) => {
+                        const improving = t.target_days != null && t.avg_days != null && t.avg_days < t.target_days;
+                        const worsening = t.target_days != null && t.avg_days != null && t.avg_days > t.target_days;
+                        return (
+                          <tr key={t.team}>
+                            <td className="py-1.5 text-gray-300 text-xs">{t.team}</td>
+                            <td className="py-1.5 text-right font-medium text-xs">
+                              <span className="text-white">{t.avg_days != null ? `${t.avg_days}d` : "—"}</span>
+                              {improving && <span className="ml-1 text-emerald-400">↓</span>}
+                              {worsening && <span className="ml-1 text-red-400">↑</span>}
+                              {!improving && !worsening && t.avg_days != null && <span className="ml-1 text-gray-500">→</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

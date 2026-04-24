@@ -396,15 +396,24 @@ export default function OnboardingPage() {
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            {STEPS.map((step, idx) => (
-              <div key={step.id} className={`flex-1 ${idx > 0 ? "ml-2" : ""}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-white">
+              Step {currentStep} of {STEPS.length} — {STEPS[currentStep - 1]?.name}
+            </span>
+            <span className="text-sm text-gray-400">{Math.round(((currentStep - 1) / STEPS.length) * 100)}% complete</span>
+          </div>
+          <div className="flex gap-1">
+            {STEPS.map((step) => (
+              <div key={step.id} className="flex-1">
                 <div
                   className={`h-2 rounded-full transition-all ${
-                    step.id <= currentStep ? "bg-blue-500" : "bg-gray-700"
+                    step.id < currentStep
+                      ? "bg-indigo-600"
+                      : step.id === currentStep
+                      ? "bg-indigo-400"
+                      : "bg-gray-700"
                   }`}
                 />
-                <div className="text-xs text-gray-400 mt-1 text-center">{step.name}</div>
               </div>
             ))}
           </div>
@@ -415,8 +424,9 @@ export default function OnboardingPage() {
           {/* Step 1: Organization */}
           {currentStep === 1 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Organization Setup</h2>
-              <p className="text-gray-400 mb-6">Tell us about your organization</p>
+              <h2 className="text-2xl font-bold text-white mb-1">1. Organization Setup</h2>
+              <p className="text-indigo-300 text-sm mb-1">So we can personalize compliance recommendations and risk thresholds to your context.</p>
+              <p className="text-gray-500 text-sm mb-6">Tell us about your organization</p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Organization Name</label>
@@ -465,8 +475,9 @@ export default function OnboardingPage() {
           {/* Step 2: Connect Tools */}
           {currentStep === 2 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Connect Your Tools</h2>
-              <p className="text-gray-400 mb-6">Select the cloud providers and tools you use</p>
+              <h2 className="text-2xl font-bold text-white mb-1">2. Connect Your Tools</h2>
+              <p className="text-indigo-300 text-sm mb-1">So Glasswatch can automatically discover your assets and pull live vulnerability data.</p>
+              <p className="text-gray-500 text-sm mb-6">Select the cloud providers and tools you use</p>
               <div className="grid grid-cols-2 gap-4">
                 {PROVIDER_CARDS.map((provider) => {
                   const isSelected = selectedProviders.includes(provider.id);
@@ -552,8 +563,9 @@ export default function OnboardingPage() {
           {/* Step 3: Asset Discovery */}
           {currentStep === 3 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Asset Discovery</h2>
-              <p className="text-gray-400 mb-6">Import your infrastructure assets</p>
+              <h2 className="text-2xl font-bold text-white mb-1">3. Asset Discovery</h2>
+              <p className="text-indigo-300 text-sm mb-1">So we know exactly what your environment looks like and what needs protecting.</p>
+              <p className="text-gray-500 text-sm mb-6">Import your infrastructure assets</p>
 
               {discoveryStatus === "idle" && (
                 <div className="text-center py-12">
@@ -561,7 +573,7 @@ export default function OnboardingPage() {
                   <p className="text-gray-400 mb-6">Ready to discover your assets</p>
                   <button
                     onClick={runDiscovery}
-                    className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
                   >
                     Run Discovery
                   </button>
@@ -604,8 +616,9 @@ export default function OnboardingPage() {
           {/* Step 4: Create Goal */}
           {currentStep === 4 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Create Your First Goal</h2>
-              <p className="text-gray-400 mb-6">Choose a template or create custom</p>
+              <h2 className="text-2xl font-bold text-white mb-1">4. Create Your First Goal</h2>
+              <p className="text-indigo-300 text-sm mb-1">Goals keep your team focused and give you a clear metric to track patching progress.</p>
+              <p className="text-gray-500 text-sm mb-6">Choose a template or create a custom goal</p>
               <div className="grid grid-cols-2 gap-4 mb-6">
                 {GOAL_TEMPLATES.map((template) => (
                   <button
@@ -621,7 +634,7 @@ export default function OnboardingPage() {
                     }}
                     className={`p-6 rounded-lg border-2 text-left transition-all ${
                       selectedGoal === template.id
-                        ? "border-blue-500 bg-blue-500/10"
+                        ? "border-indigo-500 bg-indigo-500/10"
                         : "border-gray-600 hover:border-gray-500"
                     }`}
                   >
@@ -662,12 +675,13 @@ export default function OnboardingPage() {
           {/* Step 5: Schedule */}
           {currentStep === 5 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Configure Maintenance Windows</h2>
-              <p className="text-gray-400 mb-6">When can patches be deployed? You can add more windows later.</p>
+              <h2 className="text-2xl font-bold text-white mb-1">5. Configure Maintenance Windows</h2>
+              <p className="text-indigo-300 text-sm mb-1">So patches deploy at times that minimize disruption to your business.</p>
+              <p className="text-gray-500 text-sm mb-6">When can patches be deployed? You can add more windows later.</p>
               <div className="space-y-4">
                 {/* Weekly window */}
                 <div className={`p-4 bg-gray-700 rounded-lg border-2 transition-colors ${
-                  scheduleData.weekly_enabled ? "border-blue-500" : "border-transparent"
+                  scheduleData.weekly_enabled ? "border-indigo-500" : "border-transparent"
                 }`}>
                   <label className="flex items-center justify-between mb-3 cursor-pointer">
                     <div className="font-medium text-white">📅 Weekly Maintenance Window</div>
@@ -773,8 +787,9 @@ export default function OnboardingPage() {
           {/* Step 6: Review */}
           {currentStep === 6 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Review &amp; Launch</h2>
-              <p className="text-gray-400 mb-6">Your workspace is ready to go!</p>
+              <h2 className="text-2xl font-bold text-white mb-1">6. Review &amp; Launch</h2>
+              <p className="text-indigo-300 text-sm mb-1">Double-check your setup before we initialize your workspace.</p>
+              <p className="text-gray-500 text-sm mb-6">Your workspace is ready to go!</p>
               <div className="space-y-4 text-center py-8">
                 {isCompleting ? (
                   <>
@@ -845,7 +860,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleNext}
                 disabled={isSaving}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving..." : "Continue →"}
               </button>
@@ -853,9 +868,9 @@ export default function OnboardingPage() {
               <button
                 onClick={handleComplete}
                 disabled={isSaving || isCompleting}
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCompleting ? "Setting up..." : "Go to Dashboard"}
+                {isCompleting ? "Setting up..." : "Launch Glasswatch →"}
               </button>
             )}
           </div>

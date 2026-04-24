@@ -144,7 +144,7 @@ export default function DashboardPage() {
             onClick={() => setModeAndSave("focus")}
             className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
               mode === "focus"
-                ? "bg-blue-600 text-white shadow"
+                ? "bg-indigo-600 text-white shadow"
                 : "text-gray-400 hover:text-white"
             }`}
           >
@@ -154,7 +154,7 @@ export default function DashboardPage() {
             onClick={() => setModeAndSave("full")}
             className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
               mode === "full"
-                ? "bg-blue-600 text-white shadow"
+                ? "bg-indigo-600 text-white shadow"
                 : "text-gray-400 hover:text-white"
             }`}
           >
@@ -177,14 +177,25 @@ export default function DashboardPage() {
 function FocusDashboard({ stats }: { stats: DashboardStats }) {
   const kevInternetFacing = Math.min(stats.vulnerabilities.kev_listed, stats.assets.internet_exposed);
   const nextWindow = stats.windows[0];
+  const [showMore, setShowMore] = useState(false);
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Panel 1: Right Now */}
+      {/* Panel 1: Right Now — THE single priority card */}
       <RightNowPanel stats={stats} kevInternetFacing={kevInternetFacing} />
 
-      {/* Panel 2: Active Goals */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+      {/* Expand toggle */}
+      {!showMore && (
+        <button
+          onClick={() => setShowMore(true)}
+          className="w-full py-2 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+        >
+          Show goals &amp; schedule ↓
+        </button>
+      )}
+
+      {/* Panel 2: Active Goals — shown when expanded */}
+      {showMore && <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Active Goals</h3>
         {stats.goals.length === 0 ? (
           <div className="text-gray-400 text-sm">
@@ -247,8 +258,8 @@ function FocusDashboard({ stats }: { stats: DashboardStats }) {
         )}
       </div>
 
-      {/* Panel 3: Next Window */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+      {/* Panel 3: Next Window — shown when expanded */}
+      {showMore && <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Next Maintenance Window</h3>
         {nextWindow ? (
           <div className="flex items-center justify-between">
@@ -294,7 +305,17 @@ function FocusDashboard({ stats }: { stats: DashboardStats }) {
             </Link>
           </div>
         )}
-      </div>
+      </div>}
+
+      {/* Collapse button */}
+      {showMore && (
+        <button
+          onClick={() => setShowMore(false)}
+          className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          Show less ↑
+        </button>
+      )}
     </div>
   );
 }
@@ -371,22 +392,22 @@ function RightNowPanel({
     );
   }
 
-  // Zero vulnerabilities — fresh account or all patched
+  // Zero vulnerabilities — clean environment or fresh account
   if (stats.vulnerabilities.total === 0) {
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+      <div className="bg-green-950/50 border border-green-700/40 rounded-xl p-6">
         <div className="flex items-start gap-4">
-          <div className="text-3xl">🔌</div>
+          <div className="text-3xl">🎉</div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-white mb-1">No vulnerabilities yet</h3>
-            <p className="text-gray-300 text-base">Connect a scanner to start tracking your exposure.</p>
+            <h3 className="text-lg font-bold text-green-300 mb-1">No critical vulnerabilities — you&apos;re on track!</h3>
+            <p className="text-gray-300 text-base">Your environment looks clean. Keep it that way.</p>
             <p className="text-gray-400 text-sm mt-1">
-              Import a CSV or link Tenable, Qualys, or Rapid7 from Settings.
+              Connect a scanner or import a CSV to keep your data current.
             </p>
             <div className="mt-4 flex gap-3">
               <Link
                 href="/settings/connections"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Connect Scanner →
               </Link>

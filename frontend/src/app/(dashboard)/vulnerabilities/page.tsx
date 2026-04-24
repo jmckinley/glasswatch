@@ -61,6 +61,7 @@ export default function VulnerabilitiesPage() {
   const [filters, setFilters] = useState(() => ({
     severity: searchParams.get("severity") || "",
     kev_listed: searchParams.get("filter") === "kev",
+    patch_available: searchParams.get("filter") === "patch",
     search: searchParams.get("search") || "",
   }));
   const [pagination, setPagination] = useState({
@@ -86,6 +87,7 @@ export default function VulnerabilitiesPage() {
       };
       if (filters.severity) params.severity = filters.severity;
       if (filters.kev_listed) params.kev_listed = true;
+      if (filters.patch_available) params.patch_available = true;
       if (filters.search) params.search = filters.search;
 
       const data = await vulnerabilitiesApi.list(params);
@@ -111,8 +113,36 @@ export default function VulnerabilitiesPage() {
   const totalPages = Math.ceil(pagination.total / pagination.limit);
   const currentPage = Math.floor(pagination.skip / pagination.limit) + 1;
 
+  const activeFilterCount = [filters.severity, filters.kev_listed, filters.patch_available].filter(Boolean).length;
+
   return (
     <>
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Vulnerabilities</h1>
+          {stats && (
+            <p className="text-sm text-neutral-400 mt-0.5">
+              {stats.total.toLocaleString()} total · {stats.by_severity.CRITICAL} critical · {stats.kev_listed} in KEV
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/import"
+            className="px-4 py-2 border border-neutral-600 hover:border-neutral-400 text-neutral-300 hover:text-white rounded-lg text-sm transition-colors"
+          >
+            Import CSV
+          </Link>
+          <Link
+            href="/bundles"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-colors"
+          >
+            Create Bundle
+          </Link>
+        </div>
+      </div>
+
       {/* Error banner */}
       {error && (
         <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6 text-red-400 flex items-center gap-3">

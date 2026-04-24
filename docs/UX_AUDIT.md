@@ -1,63 +1,135 @@
 # Glasswatch UX Audit — April 2026
 
-## Summary
+## Overall Assessment
 
-Glasswatch's frontend is clean and well-structured with a consistent dark theme and solid empty-state coverage already in place. The biggest friction points are jargon (EPSS, KEV, MTTP, CVSS) left unexplained for users not steeped in vulnerability management, and a few areas where the value of connecting a scanner isn't immediately obvious. This pass tightens those gaps with tooltips, subtitles, and prompt copy — no structural changes were needed.
+The dark-theme foundation is consistent and solid throughout the app, with well-structured layouts and working API integration across all pages. The weakest areas were missing empty states, inconsistent CTA hierarchy (scattered blue/green/gray buttons with no visual priority system), and the AI assistant being hidden as a floating widget with no discoverability as a primary feature. Overall quality is good for a sprint-9 product — the bones are right, the polish layer is what this audit addresses.
 
-## Page-by-Page Findings
+## Sprint A Pages (Login, Dashboard, Vulnerabilities, Nav)
+*Sprint A agent covers Login, Dashboard, Vulnerabilities, and Navigation in detail. Nav now includes "AI Analyst" link pointing to the new `/agent` page.*
 
-### Login (`/auth/login`)
-- **Finding:** Solid. Demo button is prominent at top, OAuth options available, tab UI for sign-in vs register is clear.
-- **Fixed:** No changes needed. Already handles loading states, errors, and redirect logic correctly.
+---
 
-### Onboarding (`/onboarding`)
-- **Finding:** Multi-step wizard with 6 steps. Comprehensive. Goal templates and provider cards are well-labeled.
-- **Fixed:** No changes needed — this page is rich and self-explanatory.
+## Sprint B Pages
 
-### Dashboard (`/` — focus + full modes)
-- **Finding:** The "Right Now" focus panel already has four well-differentiated states: KEV critical, critical vulns, zero vulns (empty/new account), and good standing. The zero-vuln state correctly directs users to connect a scanner or import CSV with visible CTAs.
-- **Fixed:** Empty state was already handled. No changes needed.
+### Bundles
 
-### Vulnerabilities (`/vulnerabilities`)
-- **Finding:** CVSS and EPSS column headers already had `<Tooltip>` components. The KEV badge in table rows had no explanation — first-time users see a red "KEV" pill with no context. The "KEV Listed Only" filter checkbox similarly lacked a tooltip.
-- **Fixed:**
-  - Added `title` attribute to every KEV badge in table rows: *"CISA Known Exploited Vulnerability — actively exploited in the wild, patch immediately"*
-  - Wrapped the "KEV Listed Only" filter label with a `<Tooltip>` component matching the BOD 22-01 context already used in the stats section.
+**Found:**
+- Status badge colors were incorrect: `in_progress` was yellow (should be indigo/blue), `scheduled` (Pending) was blue (should be amber), `cancelled` had same gray style as `draft`
+- No explainer banner — first-time users had no context for what a bundle is or the lifecycle
+- Loading state was a centered spinner, not skeleton rows (jarring layout shift)
+- "View →" CTA had no visual hierarchy (plain blue, same as primary actions)
+- No "New Bundle" button in the header — unclear how to create one
+- Empty state text was generic ("Bundles are created automatically…") without a clear action
 
-### Bundles (`/bundles`)
-- **Finding:** Page already had an explanatory subtitle: *"A bundle groups related patches for coordinated deployment within a maintenance window."* Empty states are excellent — different copy for "all" vs filtered tabs, with navigation links to Goals and Vulnerabilities.
-- **Fixed:** No changes needed. Already well-explained.
+**Fixed:**
+- STATUS_BADGE colors updated: Draft=gray, Pending(scheduled)=amber, Approved=emerald, In Progress=indigo, Completed=gray-muted, Cancelled=red
+- Added dismissible explainer banner (stored in localStorage via `glasswatch_bundles_banner_dismissed` key)
+- Added `BundleStepper` component — subtle dot/line progress indicator under each status badge
+- Replaced spinner with 3 skeleton table rows
+- Added "New Bundle →" indigo filled button in header (links to `/goals`)
+- Updated "View →" to "View Details" with secondary outline style
+- Updated empty state to: "No patch bundles yet. Create your first bundle to start scheduling remediation work." with "Create Bundle →" indigo filled CTA
 
-### Compliance (`/compliance`)
-- **Finding:** The MTTP section heading read "Mean Time To Patch (MTTP)" — the acronym was spelled out in the heading but no subtitle explained what it measures or why it matters. Users unfamiliar with the metric had to infer.
-- **Fixed:** Added a subtitle paragraph under the MTTP section heading: *"Average days from vulnerability discovery to remediation, broken down by severity, environment, and team."*
+---
 
-### AI Agent (floating `AIAssistant` component)
-- **Finding:** The AI assistant already showed starter prompts when the conversation was empty (`isFirstMessage` guard). The existing prompts were functional but generic ("What needs my attention right now?", "Show me critical KEV vulnerabilities").
-- **Fixed:** Updated `starterPrompts` to the three specifically requested prompts plus two others:
-  - "What needs my attention today?"
-  - "Show me all KEV vulnerabilities overdue"
-  - "How is our SOC 2 compliance trending?"
-  - "Create a rule blocking Friday deployments"
-  - "What maintenance windows do we have?"
+### Compliance
 
-### Navigation (`Navigation.tsx`)
-- **Finding:** Clean horizontal nav with mobile hamburger. Active state is clear (bg-gray-900). All 12 routes present. No issues.
-- **Fixed:** No changes needed.
+**Found:**
+- Export PDF button was blue-600, buried in header — not prominently indigo, label was generic "Export PDF"
+- Framework cards showed raw counts (e.g., `0 / 0 KEV`) as primary metric instead of the compliance %
+- No trend arrows on framework cards or MTTP table
+- MTTP description was verbose, not the canonical definition
+- No empty state for when no framework data is available
+- MTTP by-team table had no trend indicators
 
-### Settings / Connections (`/settings/connections`)
-- **Finding:** The Add Connection modal showed provider cards with API-sourced descriptions. For scanners (Tenable, Qualys, Rapid7), the API description may be generic or empty. The cards had no visual differentiation or explicit "Connect" CTA text within the card itself. Empty state (no connections yet) was already excellent with a large "Add Your First Connection" button.
-- **Fixed:**
-  - Added `SCANNER_BENEFIT` static map with one-liner descriptions for Tenable, Qualys, and Rapid7 explaining what connecting does.
-  - Scanner cards in the provider picker now show the benefit text instead of (or in place of) the generic API description.
-  - Scanner cards additionally show a "Connect →" label in blue so the action intent is unambiguous.
+**Fixed:**
+- Export button changed to `bg-indigo-600`, label updated to "Export Audit Report", added `shadow-lg`
+- All three framework cards (BOD 22-01, SOC 2, PCI DSS) now show primary % in `text-5xl font-bold`
+- % color-coded: ≥90% = emerald, 70-89% = amber, <70% = red
+- Trend arrow added next to each %, colored to match severity (↑ emerald, → gray, ↓ red)
+- MTTP subtitle updated to canonical: `Mean Time To Patch (MTTP) — average days from vulnerability discovery to confirmed remediation`
+- MTTP by-team table now shows ↓ emerald (improving), ↑ red (worsening), → gray (stable) based on `target_days` vs `avg_days`
+- Empty state added when `frameworks` object is empty
 
-## Needs Backend Work (not fixed)
+---
 
-- **KEV badge on individual vulnerability detail page** (`/vulnerabilities/[id]`) — not reviewed in this pass; may need similar tooltip treatment.
-- **MTTP trend indicator** — the MTTP section shows current averages but no trend (improving/worsening vs. prior period). Would require backend time-series data.
-- **Compliance framework scores for orgs without data** — framework cards default to "COMPLIANT / 100%" when no data is present, which could be misleading for new accounts. Needs a "no data yet" state from the API.
-- **Scanner connection health auto-refresh** — connections page shows "Never checked" for new integrations; a background health-check trigger on add would improve confidence.
-- **AI agent suggested actions per response** — the `suggested_actions` field comes from the API but many responses return an empty array; richer follow-up suggestions require backend agent improvements.
+### AI Agent
 
-## Overall UX Score: 8/10 — Polished foundation with smart empty states; main gap is unexplained security jargon for non-specialist users, now largely addressed.
+**Found:**
+- No dedicated page — AI assistant was only accessible as a small floating button in the bottom-right corner, easily missed
+- No suggested prompts visible before a conversation starts
+- Input had no label or meaningful placeholder
+- No nav link in the top navigation
+
+**Fixed:**
+- Created `/agent/page.tsx` — full-page dedicated chat interface with proper layout
+- Empty conversation state shows "⚡ Your AI Security Analyst" headline with description
+- 6 suggested prompt chips in 3×2 grid shown in empty state and 3 quick chips above input once chat starts
+- Clicking a prompt chip sends immediately (no extra click)
+- Input area has visible label "Ask your AI security analyst" and specific placeholder "e.g. What critical vulnerabilities need patching this week?"
+- User messages: right-aligned, indigo background
+- AI messages: left-aligned, gray-800 background, "AI" avatar badge
+- `whitespace-pre-wrap` on message content for proper line-break rendering
+- Typing indicator (3-dot bounce animation)
+- Actions taken chips (emerald) and suggested follow-up action chips shown per message
+- Added "AI Analyst" to top navigation (`Navigation.tsx`)
+
+---
+
+### Settings
+
+**Found:**
+- Navigation cards were unordered — Integrations/Connections were buried in the middle
+- No scanner quick-connect section for new users
+- "Connections" section was labeled generically, not specifically for scanners
+- Hover state used `border-blue-500` (should be indigo)
+- No visual priority indication (all cards identical weight)
+
+**Fixed:**
+- Reordered sections: Integrations → Scanner Connections → Alert Rules → Notifications → Team → Security → General
+- Added "Start here" badge (indigo) on Integrations card
+- Added "Scanner Connections" quick-connect section at top with 3 scanner cards (Tenable, Qualys, Rapid7) with "Connect" indigo filled CTA
+- Changed hover border to `hover:border-indigo-500` throughout
+- Section labeled "Scanner Connections" for clarity (links to `/settings/connections`)
+
+---
+
+### Import
+
+**Found:**
+- "↓ template" download buttons were tiny text links with no visual weight
+- Drop zone hover state switched to `hover:border-gray-500` (nearly invisible)
+- Success/error states were already implemented (no change needed there)
+
+**Fixed:**
+- Download template buttons converted to outline buttons: `border border-indigo-600 text-indigo-400 hover:bg-indigo-600/20 text-xs font-medium rounded-md px-3 py-1`
+- Drop zone drag color updated to `border-indigo-500 bg-indigo-900/20` (more visible)
+- Hover state updated to `hover:border-indigo-600` (stronger contrast)
+
+---
+
+### Maintenance Windows
+
+**Found:**
+- "New Window" button was blue-600 (should be indigo to match system CTA color)
+- View mode toggle (Grid/Timeline/Calendar) looked like a basic outline border group, not a clear segmented control
+- Conflict warnings were subtle `bg-yellow-500/10 border border-yellow-500/30` — easy to miss
+- Cards already show environment badges (production/staging/dev) with appropriate colors — no change needed
+
+**Fixed:**
+- "New Window" button changed to `bg-indigo-600 hover:bg-indigo-700`
+- View toggle redesigned as a proper segmented control: `bg-gray-800 border border-gray-600 rounded-lg p-1 gap-1` with active state `bg-indigo-600 shadow-sm` and inactive state `hover:bg-gray-700`
+- Conflict warning block replaced with prominent amber banner: `bg-amber-900/30 border border-amber-700 rounded-xl p-4` with header "⚠️ Schedule Conflicts Detected" and each conflict as a `border-l-2 border-amber-600` item
+
+---
+
+## Needs Backend Work
+
+- **Bundle Approve/Cancel inline actions**: Bundle approve/cancel CTAs can't be added to the list view without API endpoints that support inline status changes (currently only available on detail pages)
+- **Trend data for compliance**: Trend arrows on framework cards currently use current % as a proxy (≥90 = ↑). True trending requires time-series data from the API (`/api/v1/reporting/compliance/trend`)
+- **MTTP target_days**: MTTP by-team trend arrows require `target_days` in the API response; currently the field may not be populated
+- **Scanner connection status**: The Settings scanner cards show static "Not Connected" state — requires API call to `/settings/connections` to reflect real connection status
+
+## UX Score: 7.5/10
+
+*Pre-sprint: ~5.5/10. The core architecture is solid but first-run experience, empty states, and CTA hierarchy were underdeveloped. Sprint B addresses the most user-visible gaps across 6 pages.*

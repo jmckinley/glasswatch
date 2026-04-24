@@ -170,28 +170,29 @@ function LoginContent() {
         </div>
 
         <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8">
-          {/* Demo Login — prominent blue at top */}
+          {/* Demo Login — hero CTA */}
           <button
             onClick={handleDemoLogin}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 mb-6"
+            className="w-full py-4 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-lg font-bold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 mb-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {isLoading ? "Loading..." : "Try Demo — No signup required"}
+            {isLoading ? "Loading..." : "Try Demo"}
           </button>
+          <p className="text-center text-gray-400 text-sm mb-6">No account required — explore with live demo data</p>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-600" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-800 text-gray-400">Or continue with</span>
+              <span className="px-2 bg-gray-800 text-gray-400">— or sign in with email —</span>
             </div>
           </div>
 
-          {/* Sign In / Create Account tabs */}
+          {/* Sign In / Create Account tabs — secondary */}
           <div className="flex mb-6 bg-gray-700 rounded-lg p-1">
             <button
               onClick={() => { setActiveTab("signin"); setError(null); }}
@@ -249,7 +250,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </button>
@@ -307,7 +308,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
               >
                 {isLoading ? "Creating account..." : "Create Account"}
               </button>

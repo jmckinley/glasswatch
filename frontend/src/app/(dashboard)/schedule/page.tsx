@@ -247,7 +247,7 @@ export default function SchedulePage() {
         </div>
         <button
           onClick={() => { setEditingWindow(null); setDialogOpen(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 font-medium"
         >
           + New Window
         </button>
@@ -255,10 +255,13 @@ export default function SchedulePage() {
 
       {/* ── Conflict Warnings ── */}
       {conflicts.length > 0 && (
-        <div className="space-y-2 mb-6">
+        <div className="mb-6 bg-amber-900/30 border border-amber-700 rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-amber-400 text-lg">⚠️</span>
+            <span className="text-amber-300 font-semibold text-sm">Schedule Conflicts Detected</span>
+          </div>
           {conflicts.map((c, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-300 text-sm">
-              <span className="text-base">⚠</span>
+            <div key={i} className="flex items-start gap-2 text-amber-200 text-sm pl-2 border-l-2 border-amber-600">
               <span>{c.message}</span>
             </div>
           ))}
@@ -267,16 +270,16 @@ export default function SchedulePage() {
 
       {/* ── Controls Bar ── */}
       <div className="flex flex-wrap gap-3 items-center mb-6">
-        {/* View Toggle */}
-        <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+        {/* View Toggle — segmented control */}
+        <div className="inline-flex rounded-lg border border-gray-600 bg-gray-800 p-1 gap-1">
           {(["grid", "timeline", "calendar"] as const).map((v) => (
             <button
               key={v}
               onClick={() => setViewMode(v)}
-              className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
                 viewMode === v
-                  ? "bg-blue-600 text-white"
-                  : "bg-neutral-800 text-neutral-400 hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-gray-400 hover:text-white hover:bg-gray-700"
               }`}
             >
               {v === "grid" ? "⊞ Grid" : v === "timeline" ? "📅 Timeline" : "🗓 Calendar"}

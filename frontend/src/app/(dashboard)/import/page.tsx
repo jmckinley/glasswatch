@@ -152,8 +152,8 @@ export default function ImportPage() {
           onClick={() => inputRef.current?.click()}
           className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
             dragging
-              ? "border-blue-500 bg-blue-900/20"
-              : "border-gray-600 hover:border-gray-500 hover:bg-gray-800/50"
+              ? "border-indigo-500 bg-indigo-900/20"
+              : "border-gray-600 hover:border-indigo-600 hover:bg-gray-800/50"
           }`}
         >
           <div className="text-4xl mb-3">📂</div>
@@ -345,9 +345,9 @@ export default function ImportPage() {
                   a.download = "vulnerabilities_template.csv";
                   a.click();
                 }}
-                className="text-indigo-400 hover:text-indigo-300"
+                className="flex items-center gap-1 px-3 py-1 border border-indigo-600 text-indigo-400 hover:bg-indigo-600/20 hover:text-indigo-300 text-xs font-medium rounded-md transition-colors"
               >
-                ↓ template
+                ↓ Download Template
               </button>
             </div>
             <div className="bg-gray-900 rounded p-3 space-y-1 font-mono">
@@ -370,9 +370,9 @@ export default function ImportPage() {
                   a.download = "assets_template.csv";
                   a.click();
                 }}
-                className="text-indigo-400 hover:text-indigo-300"
+                className="flex items-center gap-1 px-3 py-1 border border-indigo-600 text-indigo-400 hover:bg-indigo-600/20 hover:text-indigo-300 text-xs font-medium rounded-md transition-colors"
               >
-                ↓ template
+                ↓ Download Template
               </button>
             </div>
             <div className="bg-gray-900 rounded p-3 space-y-1 font-mono">
