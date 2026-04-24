@@ -36,6 +36,13 @@ const PROVIDER_ICONS: Record<string, string> = {
   rapid7: "⚡",
 };
 
+// One-liner CTAs shown in the provider picker for scanners
+const SCANNER_BENEFIT: Record<string, string> = {
+  tenable: "Sync Tenable.io findings to keep your vulnerability list current automatically.",
+  qualys: "Pull Qualys VMDR scan results directly into Glasswatch for unified prioritization.",
+  rapid7: "Import Rapid7 InsightVM data so every finding lands in your risk-scoring engine.",
+};
+
 const STATUS_CONFIG: Record<string, { dot: string; label: string; text: string }> = {
   active: { dot: "bg-green-500", label: "Connected", text: "text-green-400" },
   pending: { dot: "bg-yellow-500", label: "Pending", text: "text-yellow-400" },
@@ -351,7 +358,14 @@ export default function ConnectionsPage() {
                     >
                       <div className="text-3xl mb-2">{PROVIDER_ICONS[prov.name] ?? "🔗"}</div>
                       <h3 className="text-white font-medium text-sm mb-1">{prov.display_name}</h3>
-                      <p className="text-gray-400 text-xs">{prov.description}</p>
+                      <p className="text-gray-400 text-xs">
+                        {SCANNER_BENEFIT[prov.name] ?? prov.description}
+                      </p>
+                      {SCANNER_BENEFIT[prov.name] && (
+                        <span className="mt-2 inline-block text-xs font-semibold text-blue-400">
+                          Connect →
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>

@@ -111,7 +111,21 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) return <DashboardSkeleton />;
-  if (!stats) return <div className="text-center text-neutral-400 p-8">Error loading dashboard</div>;
+  if (!stats) return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="text-5xl mb-4">⚠️</div>
+      <h3 className="text-xl font-semibold text-white mb-2">Couldn&apos;t load dashboard</h3>
+      <p className="text-neutral-400 mb-6 max-w-sm">
+        The API may be unavailable. Check your connection or try refreshing.
+      </p>
+      <button
+        onClick={() => window.location.reload()}
+        className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
+      >
+        Refresh Page
+      </button>
+    </div>
+  );
 
   return (
     <>
@@ -349,6 +363,38 @@ function RightNowPanel({
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors"
               >
                 Review Criticals →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Zero vulnerabilities — fresh account or all patched
+  if (stats.vulnerabilities.total === 0) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="text-3xl">🔌</div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-white mb-1">No vulnerabilities yet</h3>
+            <p className="text-gray-300 text-base">Connect a scanner to start tracking your exposure.</p>
+            <p className="text-gray-400 text-sm mt-1">
+              Import a CSV or link Tenable, Qualys, or Rapid7 from Settings.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <Link
+                href="/settings/connections"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Connect Scanner →
+              </Link>
+              <Link
+                href="/import"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+              >
+                Import CSV
               </Link>
             </div>
           </div>

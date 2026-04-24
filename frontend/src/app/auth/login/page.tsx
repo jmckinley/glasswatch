@@ -27,7 +27,7 @@ function LoginContent() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/dashboard");
+      router.push("/");
     }
   }, [isAuthenticated, router]);
 
@@ -64,7 +64,7 @@ function LoginContent() {
       if (data.access_token) {
         localStorage.setItem("glasswatch-token", data.access_token);
         await login(data.access_token);
-        router.push("/dashboard");
+        router.push("/");
       }
     } catch {
       setError("Demo login failed. Please try again.");
@@ -91,7 +91,7 @@ function LoginContent() {
       if (data.access_token) {
         localStorage.setItem("glasswatch-token", data.access_token);
         await login(data.access_token);
-        router.push("/dashboard");
+        router.push("/");
       }
     } catch (err: any) {
       setError(err.message || "Sign in failed. Please try again.");

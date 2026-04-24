@@ -377,7 +377,10 @@ export default function OnboardingPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading onboarding...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Loading your workspace…</p>
+        </div>
       </div>
     );
   }
@@ -830,10 +833,10 @@ export default function OnboardingPage() {
             <div />
           )}
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <button
               onClick={handleSkip}
-              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              className="px-4 py-2 text-gray-500 hover:text-gray-300 text-sm transition-colors underline underline-offset-2"
             >
               Skip Setup →
             </button>

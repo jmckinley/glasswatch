@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { vulnerabilitiesApi } from "@/lib/api";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface Vulnerability {
   id: string;
@@ -124,33 +125,44 @@ export default function VulnerabilitiesPage() {
         </div>
       )}
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <div className="card p-4">
-            <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
-            <div className="text-sm text-neutral-400">Total Vulnerabilities</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold status-critical">
-              {stats.by_severity.CRITICAL}
+      {/* Stats Cards — skeleton while loading, real data once ready */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        {loading && !stats ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card p-4 animate-pulse">
+              <div className="h-7 bg-neutral-700 rounded w-16 mb-2" />
+              <div className="h-4 bg-neutral-800 rounded w-24" />
             </div>
-            <div className="text-sm text-neutral-400">Critical</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold status-high">{stats.by_severity.HIGH}</div>
-            <div className="text-sm text-neutral-400">High</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-destructive">{stats.kev_listed}</div>
-            <div className="text-sm text-neutral-400">In KEV Catalog</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-success">{stats.patches_available}</div>
-            <div className="text-sm text-neutral-400">Patches Available</div>
-          </div>
-        </div>
-      )}
+          ))
+        ) : stats ? (
+          <>
+            <div className="card p-4">
+              <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
+              <div className="text-sm text-neutral-400">Total Vulnerabilities</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold status-critical">{stats.by_severity.CRITICAL}</div>
+              <div className="text-sm text-neutral-400">Critical</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold status-high">{stats.by_severity.HIGH}</div>
+              <div className="text-sm text-neutral-400">High</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-destructive">{stats.kev_listed}</div>
+              <div className="text-sm text-neutral-400">
+                <Tooltip content="CISA Known Exploited Vulnerabilities (️KEV) — bugs actively exploited in the wild. CISA BOD 22-01 mandates federal agencies patch these promptly.">
+                  <span>In KEV Catalog ⓘ</span>
+                </Tooltip>
+              </div>
+            </div>
+            <div className="card p-4">
+              <div className="text-2xl font-bold text-success">{stats.patches_available}</div>
+              <div className="text-sm text-neutral-400">Patches Available</div>
+            </div>
+          </>
+        ) : null}
+      </div>
 
       {/* Active filter banner */}
       {(filters.kev_listed || filters.severity) && (
@@ -206,7 +218,9 @@ export default function VulnerabilitiesPage() {
                 onChange={(e) => setFilters({ ...filters, kev_listed: e.target.checked })}
                 className="rounded"
               />
-              <span className="text-sm">KEV Listed Only</span>
+              <Tooltip content="CISA Known Exploited Vulnerability — actively exploited in the wild. CISA BOD 22-01 mandates federal agencies patch these immediately.">
+                <span className="text-sm">KEV Listed Only ⓘ</span>
+              </Tooltip>
             </label>
           </div>
         </div>
@@ -224,10 +238,14 @@ export default function VulnerabilitiesPage() {
                 Severity
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
-                CVSS
+                <Tooltip content="Common Vulnerability Scoring System (CVSS) — a 0–10 severity score based on exploitability and impact.">
+                  <span>CVSS ⓘ</span>
+                </Tooltip>
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
-                EPSS
+                <Tooltip content="Exploit Prediction Scoring System (EPSS) — probability this CVE will be exploited in the wild in the next 30 days.">
+                  <span>EPSS ⓘ</span>
+                </Tooltip>
               </th>
               <th className="text-left px-6 py-3 text-sm font-medium text-neutral-400">
                 Status
@@ -333,7 +351,10 @@ function VulnerabilityRow({ vulnerability }: { vulnerability: Vulnerability }) {
             {vuln.identifier}
           </Link>
           {vuln.kev_listed && (
-            <span className="ml-2 text-xs px-2 py-0.5 bg-destructive/20 text-destructive rounded">
+            <span
+              title="CISA Known Exploited Vulnerability — actively exploited in the wild, patch immediately"
+              className="ml-2 text-xs px-2 py-0.5 bg-destructive/20 text-destructive rounded cursor-help"
+            >
               KEV
             </span>
           )}

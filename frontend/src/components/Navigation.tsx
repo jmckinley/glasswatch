@@ -38,7 +38,7 @@ export default function Navigation() {
             <Link href="/" className="text-2xl font-bold text-white shrink-0">
               Glasswatch
             </Link>
-            <nav className="hidden md:flex space-x-1">
+            <nav className="hidden lg:flex space-x-1 overflow-x-auto">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -58,9 +58,9 @@ export default function Navigation() {
           {/* Right side */}
           <div className="flex items-center gap-2">
             <NotificationBell />
-            {/* Hamburger – mobile only */}
+            {/* Hamburger – shown below lg breakpoint */}
             <button
-              className="md:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
@@ -79,9 +79,9 @@ export default function Navigation() {
         </div>
       </div>
 
-      {/* Mobile dropdown menu */}
+      {/* Mobile / tablet dropdown menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-gray-700 bg-gray-800">
+        <div className="lg:hidden border-t border-gray-700 bg-gray-800">
           <nav className="flex flex-col py-2 px-4 space-y-1">
             {navLinks.map((link) => (
               <Link

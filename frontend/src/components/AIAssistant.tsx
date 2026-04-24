@@ -21,11 +21,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const REAL_API_ENDPOINT = `${API_BASE_URL}/api/v1/agent/chat`;
 
 const starterPrompts = [
-  "What needs my attention right now?",
-  "Show me critical KEV vulnerabilities",
+  "What needs my attention today?",
+  "Show me all KEV vulnerabilities overdue",
+  "How is our SOC 2 compliance trending?",
   "Create a rule blocking Friday deployments",
   "What maintenance windows do we have?",
-  "How are we doing on our goals?",
 ];
 
 export function AIAssistant({ onSendMessage, apiEndpoint }: AIAssistantProps) {

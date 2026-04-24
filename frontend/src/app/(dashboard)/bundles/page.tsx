@@ -78,7 +78,9 @@ export default function BundlesPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-white mb-2">Patch Bundles</h1>
-        <p className="text-gray-400">Track and manage all patch deployment bundles</p>
+        <p className="text-gray-400">
+          A bundle groups related patches for coordinated deployment within a maintenance window.
+        </p>
       </div>
 
       {/* Filter Tabs */}
@@ -107,8 +109,32 @@ export default function BundlesPage() {
           <p className="mt-4 text-gray-400">Loading bundles…</p>
         </div>
       ) : bundles.length === 0 ? (
-        <div className="text-center py-16 bg-gray-800 rounded-lg border border-gray-700">
-          <p className="text-gray-400 text-lg">No bundles found</p>
+        <div className="text-center py-20 bg-gray-800 rounded-lg border border-gray-700">
+          <div className="text-5xl mb-4">📦</div>
+          <h3 className="text-xl font-semibold text-white mb-2">
+            {activeTab === "all" ? "No bundles yet" : `No ${TAB_LABELS[activeTab].toLowerCase()} bundles`}
+          </h3>
+          <p className="text-gray-400 text-sm max-w-sm mx-auto">
+            {activeTab === "all"
+              ? "Bundles are created automatically when you schedule patches or recommend fixes from a Goal."
+              : "Try switching to \"All\" to see every bundle regardless of status."}
+          </p>
+          {activeTab === "all" && (
+            <div className="mt-6 flex justify-center gap-3">
+              <a
+                href="/goals"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                View Goals →
+              </a>
+              <a
+                href="/vulnerabilities"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+              >
+                Browse Vulnerabilities
+              </a>
+            </div>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-700">
@@ -120,7 +146,7 @@ export default function BundlesPage() {
                 <th className="px-4 py-3 text-left">Risk</th>
                 <th className="px-4 py-3 text-left">Items</th>
                 <th className="px-4 py-3 text-left">Scheduled For</th>
-                <th className="px-4 py-3 text-left">Goal</th>
+                <th className="px-4 py-3 text-left">Linked Goal</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -155,7 +181,13 @@ export default function BundlesPage() {
                     {formatDate(bundle.scheduled_for)}
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">
-                    {bundle.goal_id ? bundle.goal_id.slice(0, 8) + "…" : "—"}
+                    {bundle.goal_name ? (
+                      <span className="text-gray-300">{bundle.goal_name}</span>
+                    ) : bundle.goal_id ? (
+                      <span className="text-gray-500">Goal linked</span>
+                    ) : (
+                      <span>—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link

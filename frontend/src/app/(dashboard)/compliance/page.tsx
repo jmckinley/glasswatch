@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { reportingApi } from "@/lib/api";
 import { PrintReport } from "@/components/PrintReport";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -196,7 +197,11 @@ export default function CompliancePage() {
               <>
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">CISA BOD 22-01</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      <Tooltip content="CISA Binding Operational Directive 22-01 requires federal agencies to patch all Known Exploited Vulnerabilities (KEV) within specific deadlines. Use as a best-practice benchmark even outside federal scope.">
+                        <span>CISA BOD 22-01 ⓘ</span>
+                      </Tooltip>
+                    </p>
                     <p className="text-sm text-gray-300 mt-0.5">Known Exploited Vulnerabilities</p>
                   </div>
                   <StatusBadge status={bod?.status || "COMPLIANT"} />
@@ -303,7 +308,8 @@ export default function CompliancePage() {
 
       {/* ── MTTP Metrics ── */}
       <section>
-        <h2 className="text-lg font-semibold text-white mb-4">Mean Time To Patch (MTTP)</h2>
+        <h2 className="text-lg font-semibold text-white mb-1">Mean Time To Patch (MTTP)</h2>
+        <p className="text-sm text-gray-400 mb-4">Average days from vulnerability discovery to remediation, broken down by severity, environment, and team.</p>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
