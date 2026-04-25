@@ -658,3 +658,59 @@ async def handle_github_callback_endpoint(
             status_code=400,
             detail=f"GitHub OAuth callback failed: {str(e)}"
         )
+
+@router.post("/register-debug", include_in_schema=False)
+async def register_debug(
+    request: Request,
+    body: "EmailRegisterRequest",
+    db: AsyncSession = Depends(get_db),
+):
+    """Debug endpoint to expose real register errors."""
+    import traceback
+    try:
+        # Call the real register logic
+        from passlib.context import CryptContext
+        from backend.models.tenant import Tenant
+        from sqlalchemy import select
+        import uuid
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        result = await db.execute(select(User).where(User.email == body.email))
+        existing = result.scalar_one_or_none()
+        if existing:
+            return {"error": "Email already registered"}
+        
+        tenant = Tenant(
+            name=body.company_name,
+            email=body.email,
+            region="us-east-1",
+            tier="trial",
+            is_active=True,
+            encryption_key_id=f"key-{uuid.uuid4().hex[:8]}",
+            settings={},
+        )
+        db.add(tenant)
+        await db.flush()
+        
+        user = User(
+            tenant_id=tenant.id,
+            email=body.email,
+            name=body.name,
+            is_active=True,
+            role=UserRole.ADMIN,
+            password_hash=pwd_context.hash(body.password),
+            permissions={},
+            preferences={},
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        access_token = await create_access_token(
+            user_id=str(user.id),
+            tenant_id=str(tenant.id),
+        )
+        return {"success": True, "token_prefix": access_token[:20]}
+        
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__, "traceback": traceback.format_exc()[-1000:]}
