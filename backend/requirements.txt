@@ -20,6 +20,7 @@ pydantic-settings==2.3.4
 httpx==0.27.0  # For async HTTP requests
 python-jose[cryptography]==3.3.0  # JWT tokens
 passlib[bcrypt]==1.7.4  # Password hashing
+bcrypt==4.0.1  # Direct bcrypt (passlib 1.7.4 + bcrypt 4.x compat)
 workos==4.6.0  # WorkOS SSO integration
 
 # Redis for caching and rate limiting
