@@ -14,7 +14,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from passlib.context import CryptContext
+from backend.core.password import hash_password, verify_password
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,6 @@ from backend.services.audit_service import AuditService
 
 router = APIRouter()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 VALID_ROLES = {"viewer", "analyst", "operator", "admin"}
 
@@ -297,7 +296,7 @@ async def accept_invite(
     user_role = role_map.get(invite.role.lower(), UserRole.VIEWER)
 
     # Hash the password
-    password_hash = pwd_context.hash(body.password)
+    password_hash = hash_password(body.password)
 
     # Create user
     user = User(

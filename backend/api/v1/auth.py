@@ -112,11 +112,9 @@ async def register_with_email(
     Register a new user with email/password.
     Creates a new Tenant and admin User.
     """
-    from passlib.context import CryptContext
+    from backend.core.password import hash_password, verify_password
     from backend.models.tenant import Tenant
     from sqlalchemy import select
-
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     # Check if email already exists
     result = await db.execute(select(User).where(User.email == body.email))
@@ -145,7 +143,7 @@ async def register_with_email(
         name=body.name,
         is_active=True,
         role=UserRole.ADMIN,
-        password_hash=pwd_context.hash(body.password),
+        password_hash=hash_password(body.password),
         permissions={},
         preferences={},
     )
@@ -185,10 +183,8 @@ async def login_with_email(
     """
     Login with email/password credentials.
     """
-    from passlib.context import CryptContext
+    from backend.core.password import hash_password, verify_password
     from sqlalchemy import select
-
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
@@ -196,7 +192,7 @@ async def login_with_email(
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not pwd_context.verify(body.password, user.password_hash):
+    if not verify_password(body.password, user.password_hash):
         # Log failed login — we have a tenant_id from the found user
         try:
             await AuditService.log(
@@ -698,7 +694,7 @@ async def register_debug(
             name=body.name,
             is_active=True,
             role=UserRole.ADMIN,
-            password_hash=pwd_context.hash(body.password),
+            password_hash=hash_password(body.password),
             permissions={},
             preferences={},
         )
