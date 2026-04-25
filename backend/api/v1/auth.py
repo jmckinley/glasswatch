@@ -217,17 +217,20 @@ async def login_with_email(
 
     user.last_login = datetime.now(timezone.utc)
     # Log successful login
-    await AuditService.log(
-        db=db,
-        tenant_id=user.tenant_id,
-        user_id=user.id,
-        action="user.login",
-        resource_type="user",
-        resource_id=str(user.id),
-        resource_name=user.email,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-    )
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            action="user.login",
+            resource_type="user",
+            resource_id=str(user.id),
+            resource_name=user.email,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+    except Exception:
+        pass
     await db.commit()
 
     access_token = await create_access_token(
@@ -382,18 +385,21 @@ async def demo_login(
     
     # Update last login
     user.last_login = datetime.now(timezone.utc)
-    await AuditService.log(
-        db=db,
-        tenant_id=user.tenant_id,
-        user_id=user.id,
-        action="user.login",
-        resource_type="user",
-        resource_id=str(user.id),
-        resource_name=user.email,
-        details={"provider": "demo"},
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-    )
+    try:
+        await AuditService.log(
+            db=db,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            action="user.login",
+            resource_type="user",
+            resource_id=str(user.id),
+            resource_name=user.email,
+            details={"provider": "demo"},
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+    except Exception:
+        pass
     await db.commit()
 
     # Create access token
