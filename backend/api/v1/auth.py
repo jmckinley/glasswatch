@@ -662,20 +662,18 @@ async def register_debug(
     db: AsyncSession = Depends(get_db),
 ):
     """Debug endpoint to expose real register errors."""
-    import traceback
+    import traceback as tb
     try:
-        # Call the real register logic
-        from passlib.context import CryptContext
+        from backend.core.password import hash_password
         from backend.models.tenant import Tenant
         from sqlalchemy import select
         import uuid
-        
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
         result = await db.execute(select(User).where(User.email == body.email))
         existing = result.scalar_one_or_none()
         if existing:
             return {"error": "Email already registered"}
-        
+
         tenant = Tenant(
             name=body.company_name,
             email=body.email,
@@ -687,7 +685,7 @@ async def register_debug(
         )
         db.add(tenant)
         await db.flush()
-        
+
         user = User(
             tenant_id=tenant.id,
             email=body.email,
@@ -701,12 +699,13 @@ async def register_debug(
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        
+
         access_token = await create_access_token(
             user_id=str(user.id),
             tenant_id=str(tenant.id),
         )
-        return {"success": True, "token_prefix": access_token[:20]}
-        
+        return {"success": True, "email": user.email, "token_prefix": access_token[:20]}
+
     except Exception as e:
-        return {"error": str(e), "type": type(e).__name__, "traceback": traceback.format_exc()[-1000:]}
+        return {"error": str(e), "type": type(e).__name__, "traceback": tb.format_exc()[-1500:]}
+
