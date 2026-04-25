@@ -24,6 +24,16 @@ function LoginContent() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerCompany, setRegisterCompany] = useState("");
 
+  // Available OAuth providers from backend
+  const [availableProviders, setAvailableProviders] = useState<{ google?: boolean; github?: boolean; workos?: boolean }>({});
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/v1/auth/providers`)
+      .then((r) => r.json())
+      .then((d) => setAvailableProviders(d))
+      .catch(() => {}); // silently ignore — buttons stay hidden
+  }, []);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -314,7 +324,8 @@ function LoginContent() {
             </form>
           )}
 
-          {/* OAuth buttons row */}
+          {/* OAuth buttons row — only shown when providers are configured */}
+          {(availableProviders.google || availableProviders.github) && (
           <div className="mt-6">
             <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
@@ -350,6 +361,7 @@ function LoginContent() {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         <div className="mt-6 text-center text-sm text-gray-500">
