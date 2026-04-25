@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision = '015_add_window_location_fields'
-down_revision = None  # Set to previous revision if needed
+down_revision = '013_add_invites'
 branch_labels = None
 depends_on = None
 
