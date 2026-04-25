@@ -176,6 +176,47 @@ Manual rescore is available from the vulnerability detail page.
 
 ---
 
+**Q: What's new in Sprint 10?**
+
+Sprint 10 delivered:
+- **Audit Log** — every action in Glasswatch is now recorded with full details (user, resource, IP, timestamp). Accessible via sidebar nav and exportable to CSV for compliance.
+- **External API Simulators** — 11 simulated systems (Tenable, Qualys, Rapid7, and more) that let you test integrations without real credentials. Enable with `SIMULATOR_MODE=true`.
+- **UX overhaul** — improved navigation, sidebar audit log access, and refined data tables across all major views.
+- **516 automated tests** — 479 backend + 37 frontend, covering audit log hooks, simulator endpoints, and all existing features.
+
+---
+
+**Q: How does the audit log work?**
+
+Every action taken in Glasswatch — creating a goal, approving a bundle, changing a user's role, editing a rule — is written to an immutable audit log entry. Each entry records: who did it (user + IP address), what they did (action + resource), when it happened, and whether it succeeded. Access the audit log via **Audit Log** in the sidebar. You can filter by user, action type, resource type, or date range, and export to CSV for compliance reporting. Audit log data is scoped per tenant.
+
+---
+
+**Q: Can I test integrations without real scanner credentials?**
+
+Yes. Set `SIMULATOR_MODE=true` in your environment and Glasswatch will start the External API Simulators on port 8099. The simulators mimic the real Tenable, Qualys, and Rapid7 webhook APIs and can push synthetic scan payloads into Glasswatch without any external accounts or credentials. This is designed for development and integration testing. See [docs/SIMULATORS.md](SIMULATORS.md) for the full list of simulated systems and usage.
+
+---
+
+**Q: What authentication methods are supported?**
+
+Glasswatch supports:
+- **Email/password** — standard login with a Glasswatch account
+- **Demo login** — one-click access to a shared demo tenant (no credentials needed; available when WorkOS is not configured)
+- **Google OAuth** — built in, requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` env vars to activate
+- **GitHub OAuth** — built in, requires `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` env vars to activate
+- **WorkOS SSO** — enterprise SAML/OIDC via WorkOS; requires `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` env vars; activates automatically when set
+
+Demo login is disabled when WorkOS is configured.
+
+---
+
+**Q: How many automated tests does Glasswatch have?**
+
+516 total: 479 backend (Python/pytest) and 37 frontend (React Testing Library). Backend tests cover unit tests for scoring, approval, simulation, audit, and integration tests for all API endpoints. Frontend tests cover key UI flows including login, vulnerability list, bundle workflow, and the audit log view.
+
+---
+
 **Q: What's on the roadmap?**
 
 Near-term priorities:

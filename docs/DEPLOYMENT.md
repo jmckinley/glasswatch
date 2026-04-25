@@ -17,6 +17,44 @@ Comprehensive guide for deploying Glasswatch to production.
 
 ---
 
+## Railway Deployment (Managed Hosting)
+
+Glasswatch runs in production on [Railway](https://railway.app). This is the fastest path to a hosted deployment.
+
+### Services
+
+| Service | URL |
+|---|---|
+| Backend | `https://glasswatch-production.up.railway.app` |
+| Frontend | `https://frontend-production-ef3e.up.railway.app` |
+| PostgreSQL | Managed by Railway |
+| Redis | Managed by Railway |
+
+### Deploy to Railway
+
+1. Fork the repository
+2. Create a new Railway project and connect your fork
+3. Add the following services: **Backend** (Dockerfile.prod), **Frontend** (Dockerfile.frontend), **PostgreSQL**, **Redis**
+4. Set required environment variables (see [Environment Variables Reference](#5-environment-variables-reference))
+5. Railway will build and deploy automatically on push to `main`
+6. Run database migrations after first deploy:
+   ```bash
+   railway run --service backend alembic upgrade head
+   ```
+
+### Required Railway Env Vars
+
+```bash
+DATABASE_URL=<Railway PostgreSQL connection string>
+REDIS_URL=<Railway Redis connection string>
+SECRET_KEY=<random hex string>
+BACKEND_CORS_ORIGINS=https://frontend-production-ef3e.up.railway.app
+```
+
+Optional (SSO, simulators, etc.) — see full reference below.
+
+---
+
 ## 1. Prerequisites
 
 ### Infrastructure Requirements
@@ -478,6 +516,9 @@ docker-compose -f docker-compose.prod.yml exec backup python3 scripts/backup_cli
 | `BACKUP_DIR` | `/var/backups/glasswatch` | Local backup directory |
 | `PATCH_WEATHER_ENABLED` | `true` | Enable patch weather feature |
 | `OPTIMIZATION_MAX_TIME_SECONDS` | `30` | Max time for optimization |
+| `SIMULATOR_MODE` | `false` | Enable External API Simulators on port 8099 (dev/testing only — **do not enable in production**) |
+| `WORKOS_API_KEY` | - | WorkOS API key (activates enterprise SSO; disables demo login) |
+| `WORKOS_CLIENT_ID` | - | WorkOS client ID (required when `WORKOS_API_KEY` is set) |
 
 ---
 

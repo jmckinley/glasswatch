@@ -1239,6 +1239,10 @@ Cancel or delete a scan.
 
 Patch impact prediction and dry-run simulation.
 
+> **Note on External API Simulators:** There are two distinct simulator concepts in Glasswatch:
+> 1. **Patch Impact Simulator** (this section) — production API endpoints for predicting the risk and downtime impact of applying a bundle. Available in all environments.
+> 2. **External API Simulators** — dev/testing-only mock servers that mimic Tenable, Qualys, Rapid7, and other external APIs. Enabled via `SIMULATOR_MODE=true`; runs on port 8099. These are **not** production API endpoints. See [docs/SIMULATORS.md](SIMULATORS.md).
+
 ### POST /simulator/predict
 
 Predict patch impact for a bundle.
@@ -1389,22 +1393,22 @@ WebSocket endpoint for real-time activity stream.
 
 ## Audit Logs
 
-Comprehensive audit logging for compliance.
+Comprehensive audit logging for compliance. Every action taken in Glasswatch is recorded — goal creation, bundle approvals, user role changes, rule edits, and more.
 
-### GET /audit/logs
+### GET /api/v1/audit-log
 
 Query audit logs.
 
 **Auth Required**: Yes (Admin role)
 
 **Query Parameters**:
-- `user_id`: Filter by user
-- `action`: Filter by action type
-- `resource_type`: Filter by resource type
-- `resource_id`: Filter by specific resource
-- `start_date`: Start of time range
-- `end_date`: End of time range
-- `skip`, `limit`: Pagination
+- `action` (string): Filter by action type (e.g., `bundle.approved`, `goal.created`)
+- `resource_type` (string): Filter by resource type (e.g., `bundle`, `goal`, `user`)
+- `user_id` (UUID): Filter by user
+- `since` (datetime): Start of time range (ISO 8601)
+- `until` (datetime): End of time range (ISO 8601)
+- `limit` (integer): Max results (default: 100)
+- `offset` (integer): Pagination offset (default: 0)
 
 **Response** (200 OK):
 ```json
@@ -1412,39 +1416,56 @@ Query audit logs.
   "logs": [
     {
       "id": "ee0e8400-e29b-41d4-a716-446655440000",
-      "tenant_id": "770e8400-e29b-41d4-a716-446655440000",
-      "user_id": "660e8400-e29b-41d4-a716-446655440000",
-      "user_email": "alice@acme.com",
       "action": "bundle.approved",
       "resource_type": "bundle",
       "resource_id": "aa0e8400-e29b-41d4-a716-446655440000",
-      "ip_address": "203.0.113.42",
-      "user_agent": "Mozilla/5.0...",
-      "metadata": {
-        "bundle_name": "Bundle 1 - Production Critical",
+      "resource_name": "Bundle 1 - Production Critical",
+      "details": {
         "approval_comment": "Approved for Saturday maintenance"
       },
-      "timestamp": "2024-04-20T14:00:00Z"
+      "ip_address": "203.0.113.42",
+      "success": true,
+      "error_message": null,
+      "created_at": "2024-04-20T14:00:00Z",
+      "user": {
+        "id": "660e8400-e29b-41d4-a716-446655440000",
+        "email": "alice@acme.com",
+        "name": "Alice Smith"
+      }
     }
   ],
   "total": 52847,
-  "skip": 0,
-  "limit": 100
+  "limit": 100,
+  "offset": 0
 }
 ```
 
+**Log entry fields**:
+- `id` — unique log entry UUID
+- `action` — dot-notation action string (e.g., `bundle.approved`, `user.role_changed`)
+- `resource_type` — type of resource affected
+- `resource_id` — UUID of the affected resource
+- `resource_name` — human-readable name of the resource at time of action
+- `details` — action-specific metadata object
+- `ip_address` — originating IP address
+- `success` — whether the action completed successfully
+- `error_message` — error detail if `success` is false, otherwise null
+- `created_at` — ISO 8601 timestamp
+- `user` — `{id, email, name}` of the acting user, or null for system actions
+
 ---
 
-### GET /audit/export
+### GET /api/v1/audit-log/export
 
-Export audit logs (CSV or JSON).
+Export audit logs as a CSV download.
 
 **Auth Required**: Yes (Admin role)
 
-**Query Parameters**: Same as `/audit/logs` plus:
-- `format`: Export format (`csv` or `json`)
+**Query Parameters**: Same as `GET /api/v1/audit-log` (`action`, `resource_type`, `user_id`, `since`, `until`, `limit`, `offset`)
 
-**Response**: File download
+**Response**: CSV file download (`Content-Disposition: attachment; filename="audit-log.csv"`)
+
+**Use case**: Compliance reporting, SOC 2 audits, external log archival.
 
 ---
 

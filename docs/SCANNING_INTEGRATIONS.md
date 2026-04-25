@@ -1,8 +1,12 @@
-# PatchGuide.ai - Scanning & Inventory Integrations
+# Glasswatch — Scanning & Inventory Integrations
 
-**Domain**: patchguide.ai (owned)
+Glasswatch integrates with external scanners and inventory systems to ingest vulnerability and asset data. The three primary scanner integrations (Tenable, Qualys, Rapid7) are production-ready via inbound webhooks. Additional integrations below are planned.
 
-Based on industry best practices and popular open-source tools, here are the scanning and inventory capabilities we should integrate:
+> **Testing without real credentials?** Simulators are available for Tenable, Qualys, and Rapid7 (and 8 additional systems). Set `SIMULATOR_MODE=true` in your environment to enable mock API servers on port 8099. See [docs/SIMULATORS.md](SIMULATORS.md) for full usage.
+
+---
+
+Based on industry best practices and popular open-source tools, here are the scanning and inventory capabilities integrated or planned:
 
 ## 1. Container & Image Scanning
 
@@ -172,12 +176,33 @@ class UnifiedAsset:
     last_scanned: datetime
 ```
 
-## External APIs to Integrate
+## Production Scanner Integrations (Current)
 
-1. **NVD API** - CVE details
-2. **EPSS API** - Exploit prediction scores
-3. **CISA KEV** - Known exploited vulnerabilities
-4. **GitHub Security Advisories** - OSS vulnerability data
-5. **Cloud provider APIs** - AWS Inspector, Azure Security Center, GCP Security Command Center
+These integrations are fully implemented and production-ready:
 
-This comprehensive scanning strategy will make PatchGuide.ai the most thorough patch optimization platform available.
+| Scanner | Method | Webhook Path |
+|---|---|---|
+| Tenable (Nessus / Tenable.io) | Inbound webhook | `POST /api/v1/webhooks/scanner/tenable` |
+| Qualys | Inbound webhook | `POST /api/v1/webhooks/scanner/qualys` |
+| Rapid7 InsightVM | Inbound webhook | `POST /api/v1/webhooks/scanner/rapid7` |
+| Any scanner | CSV import | **Vulnerabilities → Import** in the UI |
+
+All webhooks require `Authorization: Bearer <api-key>` header. Glasswatch normalizes incoming data to its unified vulnerability and asset schema.
+
+**CSV import** supports custom column mappings for scanners not listed above. Scanner-specific column presets are available for Tenable, Qualys, and Rapid7.
+
+---
+
+## External APIs Integrated (Current)
+
+1. **NVD API** — CVE details and enrichment
+2. **EPSS API** — Exploit prediction scores (daily refresh)
+3. **CISA KEV** — Known exploited vulnerabilities catalog
+4. **GitHub Security Advisories** — OSS vulnerability data
+5. **Cloud provider APIs** — AWS Inspector, Azure Security Center, GCP Security Command Center
+
+---
+
+## Planned Scanner Integrations
+
+These tools are on the roadmap but not yet in production:

@@ -184,6 +184,40 @@ Tokens are issued at `/api/v1/auth/login` and `/api/v1/auth/demo`.
 
 ---
 
+## External API Simulators (Dev/Testing)
+
+For development and integration testing without real scanner credentials, Glasswatch includes a set of mock servers that replicate the APIs of external systems.
+
+| Detail | Value |
+|---|---|
+| Enabled by | `SIMULATOR_MODE=true` (env var) |
+| Port | 8099 |
+| Systems simulated | Tenable, Qualys, Rapid7, and 8 additional systems (11 total) |
+| Purpose | Push synthetic scan payloads into Glasswatch without external accounts |
+
+The simulators are **not** part of the production API surface. They start alongside the backend when `SIMULATOR_MODE=true` and are intended for local development and CI environments only. See [docs/SIMULATORS.md](SIMULATORS.md) for the full list of supported systems and usage.
+
+---
+
+## Testing
+
+| Suite | Count | Runner |
+|---|---|---|
+| Backend unit + integration tests | 479 | pytest |
+| Frontend component tests | 37 | React Testing Library |
+| **Total** | **516** | |
+
+Key test files:
+- `backend/tests/unit/test_scoring.py` — 8-factor scoring algorithm
+- `backend/tests/unit/test_audit_service.py` — audit log service
+- `backend/tests/unit/test_external_api_simulators.py` — simulator endpoints (89 tests)
+- `backend/tests/integration/test_audit_log_api.py` — audit log API endpoints
+- `backend/tests/integration/test_audit_hooks.py` — audit hook integration
+
+See [docs/TEST_PLAN.md](TEST_PLAN.md) for full coverage details.
+
+---
+
 ## Not Yet Implemented (Planned)
 
 - Message queue (Celery + Redis or similar) — currently synchronous

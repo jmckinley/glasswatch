@@ -1,9 +1,10 @@
 # Glasswatch Test Plan — April 2026
 
 ## Overview
-- **Total backend tests:** 363 passing (4 xfailed, 2 xpassed)
-- **Frontend tests:** TBD (React component tests — see Track 2)
-- **Last run:** 2026-04-24
+- **Total tests:** 516 (479 backend + 37 frontend)
+- **Backend:** 479 passing (includes 4 xfailed, 2 xpassed)
+- **Frontend:** 37 passing (React Testing Library)
+- **Last run:** 2026-04-25
 - **CI:** GitHub Actions docker-build.yml on push to main
 
 ---
@@ -13,10 +14,12 @@
 ### Unit Tests (`tests/unit/`)
 
 - `test_approval_service.py` — approval request creation, approval/rejection, risk assessment, policy matching, expiration handling
+- `test_audit_service.py` — audit log entry creation, filtering, export, hook triggering, tenant isolation
 - `test_auth_rate_limiting.py` — Redis-backed sliding-window rate limiter (mocked Redis, pure logic)
 - `test_bundle_state_machine.py` — VALID_TRANSITIONS map, status change guards via PATCH/POST
 - `test_collaboration_service.py` — comments, @mentions, threading, reactions, activity feed
 - `test_digest.py` — weekly digest HTML content builder, template rendering logic
+- `test_external_api_simulators.py` — 89 tests covering all 11 simulated external API systems (Tenable, Qualys, Rapid7, and more)
 - `test_import.py` — CSV parse helpers, row validation logic (no DB required)
 - `test_invites.py` — invite token uniqueness, expiry, acceptance, revocation
 - `test_maintenance_windows_enhanced.py` — MaintenanceWindow model: datacenter/geography fields, enhanced schedule logic
@@ -32,6 +35,8 @@
 - `test_api_assets.py` — assets endpoints: list, get, create, update, delete (identifier/name fields)
 - `test_api_auth.py` — auth endpoints: demo login, /me profile, API key generation, JWT tokens, tenant isolation
 - `test_api_vulnerabilities.py` — vulnerabilities endpoints: list, search, filtering, GET by ID
+- `test_audit_hooks.py` — audit hook integration: verifies actions on bundles, goals, users, rules trigger correct audit log entries
+- `test_audit_log_api.py` — audit log API: query filtering (action, resource_type, user_id, since/until), pagination, CSV export
 - `test_bundle_state_machine.py` — state machine guards via HTTP: valid transitions succeed, invalid ones return 409
 - `test_core_loop.py` — end-to-end core loop: auth → data endpoints → bundle workflow → agent → webhooks → reporting
 - `test_export_endpoints.py` — export API: JSON/CSV vulnerability export, filter params, field presence
@@ -94,12 +99,16 @@
 
 ---
 
-## Frontend Testing (Planned)
+## Frontend Testing
 
-React component tests are being added as a parallel Track 2 effort. The plan includes:
-- Component unit tests with React Testing Library
-- Key flows: login, vulnerability list, bundle workflow, patch simulation
-- Integration: API mocking via MSW (Mock Service Worker)
+37 React component tests using React Testing Library and MSW (Mock Service Worker) for API mocking.
+
+Covered flows:
+- Login (email/password and demo login)
+- Vulnerability list and filtering
+- Bundle workflow (create, review, approve)
+- Patch simulation UI
+- Audit log view and export
 
 ---
 
@@ -124,6 +133,12 @@ cd backend && python3 -m pytest tests/ --cov=api --cov=services --cov=models --c
 
 ---
 
+## Seed Scripts
+
+- `backend/scripts/seed_audit_log.py` — populates the audit log with realistic sample entries for demo/testing
+
+---
+
 ## Sprint History
 
 | Sprint | Tests Added | Total |
@@ -132,4 +147,5 @@ cd backend && python3 -m pytest tests/ --cov=api --cov=services --cov=models --c
 | Sprints 20–23 | +70 | 169 |
 | Code quality pass | +112 | 281 |
 | UX/security/maintenance | +82 | 363 |
-| Track 1 pass (2026-04-24) | +0 (all passing) | 363 |
+| Sprint 10 (audit log, simulators, frontend) | +153 | 516 |
+| **Current (2026-04-25)** | — | **516** (479 backend + 37 frontend) |

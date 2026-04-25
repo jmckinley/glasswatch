@@ -250,6 +250,16 @@ FEATURE_ADVANCED_REPORTING=true
 FEATURE_SNAPPER_INTEGRATION=true
 ```
 
+#### External API Simulators (Dev/Testing Only)
+
+```bash
+# Enable mock servers for scanner APIs (Tenable, Qualys, Rapid7, etc.)
+# DO NOT enable in production
+SIMULATOR_MODE=true  # default: false
+```
+
+When `SIMULATOR_MODE=true`, Glasswatch starts mock API servers on port 8099 that simulate inbound scanner webhooks and other external systems. This allows full integration testing without real credentials. See [docs/SIMULATORS.md](SIMULATORS.md) for details.
+
 ---
 
 ## User Management
@@ -1022,15 +1032,39 @@ ufw enable
 
 ## Audit Log Review
 
+Glasswatch records every action to an immutable audit trail. This supports SOC 2, compliance audits, and forensic investigation.
+
+### What Is Captured
+
+Every user action that modifies state is logged, including:
+- Goal creation, modification, deletion
+- Bundle approval, rejection, execution
+- User role changes and invitations
+- Rule creation and modification
+- Asset and vulnerability changes
+- Authentication events (login, logout, failed attempts)
+- Settings and configuration changes
+
+Each entry records: acting user (ID, email, name), IP address, action type, affected resource, details/metadata, success/failure, and timestamp.
+
 ### Accessing Audit Logs
 
-1. Navigate to **Settings** > **Audit Logs**
+1. Navigate to **Audit Log** in the sidebar (or **Settings** > **Audit Logs**)
 2. Filter by:
    - User
    - Action type
    - Resource type
    - Date range
-3. Export for compliance reporting
+3. Export to CSV for compliance reporting
+
+**Via API:**
+```bash
+# Query logs
+GET /api/v1/audit-log?action=bundle.approved&since=2026-01-01T00:00:00Z
+
+# Export CSV
+GET /api/v1/audit-log/export?since=2026-01-01T00:00:00Z
+```
 
 ### Common Audit Queries
 

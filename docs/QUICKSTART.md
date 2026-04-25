@@ -1,169 +1,74 @@
 # Glasswatch Quick Start
 
-**Get up and running with Glasswatch in 5 minutes.**
+**Get up and running with Glasswatch in under 5 minutes.**
 
 ---
 
-## Prerequisites
+## Option A: Try the Demo (No Signup)
 
-- Docker 20.10+ and Docker Compose 2.0+
-- 8GB+ RAM
-- 10GB+ free disk space
+The fastest way to see Glasswatch:
+
+**Live Demo:** https://frontend-production-ef3e.up.railway.app
+
+Click **"Demo Login"** — no account needed. The demo tenant is pre-loaded with synthetic assets, vulnerabilities, and goals. All features work: create goals, approve bundles, run the AI assistant, check the audit log. Demo data resets periodically.
 
 ---
 
-## 1. Clone and Setup
+## Option B: Self-Hosted
+
+Install Glasswatch on your own server (requires Docker 20.10+ and Docker Compose 2.0+):
 
 ```bash
-# Clone repository
-git clone https://github.com/glasswatch/glasswatch.git
-cd glasswatch
-
-# Create environment file
-cp .env.example .env
-
-# (Optional) Edit configuration
-nano .env
+curl -fsSL https://raw.githubusercontent.com/jmckinley/glasswatch/main/install.sh | bash
 ```
+
+The script handles environment setup, pulls images, and starts all services.
+
+Once running:
+- **Frontend:** http://localhost:3000
+- **API:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs (interactive Swagger UI)
+
+Click **"Demo Login"** on the login page to access a pre-configured demo account.
 
 ---
 
-## 2. Start Services
+## 1. Connect Your Scanner
+
+Glasswatch accepts vulnerability data from Tenable, Qualys, or Rapid7 via webhook, or from any scanner via CSV import.
+
+### Webhook (Tenable / Qualys / Rapid7)
+
+Configure your scanner to POST findings to:
+
+```
+POST https://<your-host>/api/v1/webhooks/scanner/tenable
+POST https://<your-host>/api/v1/webhooks/scanner/qualys
+POST https://<your-host>/api/v1/webhooks/scanner/rapid7
+Authorization: Bearer <your-api-key>
+```
+
+See [SCANNING_INTEGRATIONS.md](SCANNING_INTEGRATIONS.md) and [SIMULATORS.md](SIMULATORS.md) for full setup details.
+
+**Testing without real credentials?** Use the built-in API Simulators — they mimic real scanner payloads without any external accounts:
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# Verify all services are running
-docker-compose ps
-
-# Expected output:
-# NAME                STATUS
-# glasswatch-backend  Up
-# glasswatch-frontend Up
-# glasswatch-postgres Up
-# glasswatch-redis    Up
+# Add to .env
+SIMULATOR_MODE=true
 ```
 
----
+With `SIMULATOR_MODE=true`, the simulators run on port 8099 and can push synthetic scan results directly into Glasswatch. See [SIMULATORS.md](SIMULATORS.md) for all supported systems.
 
-## 3. Access Demo Mode
+### CSV Import
 
-Open your browser and navigate to:
-
-**Frontend:** http://localhost:3000
-
-Click **"Demo Login"** to access with a pre-configured demo account.
-
-**API Documentation:** http://localhost:8000/docs
+1. Navigate to **Vulnerabilities** → **Import**
+2. Upload a CSV with your vulnerability and asset data
+3. Map columns to Glasswatch fields (scanner column mappings are pre-configured for common formats)
+4. Click **Import**
 
 ---
 
-## 4. Add Your First Vulnerability
-
-### Via UI:
-
-1. Navigate to **Vulnerabilities** → **Add Vulnerability**
-2. Enter CVE identifier: `CVE-2024-1234`
-3. Fill in details (or let it auto-populate from NVD):
-   - Title: "Remote Code Execution in Apache Commons"
-   - Severity: CRITICAL
-   - CVSS Score: 9.8
-4. Click **Save**
-
-### Via API:
-
-```bash
-# Get demo access token
-TOKEN=$(curl -s http://localhost:8000/api/v1/auth/demo-login | jq -r '.access_token')
-
-# Add vulnerability
-curl -X POST http://localhost:8000/api/v1/vulnerabilities \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "identifier": "CVE-2024-1234",
-    "source": "nvd",
-    "title": "Remote Code Execution in Apache Commons",
-    "severity": "CRITICAL",
-    "cvss_score": 9.8
-  }'
-```
-
----
-
-## 5. Add Your First Asset
-
-### Via UI:
-
-1. Navigate to **Assets** → **Add Asset**
-2. Fill in:
-   - **Identifier:** `prod-web-01`
-   - **Name:** Production Web Server 01
-   - **Type:** Server
-   - **Platform:** Linux
-   - **Environment:** Production
-   - **Criticality:** 5 (Critical)
-   - **Exposure:** Internet
-3. Click **Save**
-
-### Via API:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/assets \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "identifier": "prod-web-01",
-    "name": "Production Web Server 01",
-    "type": "server",
-    "platform": "linux",
-    "environment": "production",
-    "criticality": 5,
-    "exposure": "internet"
-  }'
-```
-
----
-
-## 6. Run Discovery Scan
-
-Automatically discover assets and vulnerabilities:
-
-### Via UI:
-
-1. Navigate to **Discovery** → **Scans**
-2. Click **New Scan**
-3. Configure:
-   - **Name:** "Initial Network Scan"
-   - **Type:** Network Scan
-   - **Targets:** `192.168.1.0/24` (adjust to your network)
-   - Enable: Port scan, Service detection, Vulnerability detection
-4. Click **Run Scan**
-5. Monitor progress
-6. Review discovered assets and vulnerabilities
-
-### Via API:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/discovery/scans \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Initial Network Scan",
-    "scan_type": "network",
-    "targets": ["192.168.1.0/24"],
-    "scan_config": {
-      "port_scan": true,
-      "service_detection": true,
-      "vulnerability_detection": true
-    }
-  }'
-```
-
----
-
-## 7. Create Your First Goal
+## 2. Create Your First Goal
 
 Convert a business objective into an optimized patch schedule:
 
@@ -174,7 +79,7 @@ Convert a business objective into an optimized patch schedule:
    - **Name:** "Eliminate Critical Production Vulnerabilities"
    - **Type:** Zero Critical
    - **Description:** "Zero critical vulnerabilities on production servers by end of quarter"
-   - **Target Date:** 2024-06-30
+   - **Target Date:** (pick a date)
    - **Risk Tolerance:** Balanced
    - **Max Vulnerabilities per Window:** 10
    - **Max Downtime:** 4 hours
@@ -191,6 +96,9 @@ Convert a business objective into an optimized patch schedule:
 ### Via API:
 
 ```bash
+# Get demo access token
+TOKEN=$(curl -s http://localhost:8000/api/v1/auth/demo-login | jq -r '.access_token')
+
 curl -X POST http://localhost:8000/api/v1/goals \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -198,7 +106,7 @@ curl -X POST http://localhost:8000/api/v1/goals \
     "name": "Eliminate Critical Production Vulnerabilities",
     "type": "zero_critical",
     "description": "Zero critical vulnerabilities on production servers",
-    "target_date": "2024-06-30T23:59:59Z",
+    "target_date": "2025-06-30T23:59:59Z",
     "risk_tolerance": "balanced",
     "max_vulns_per_window": 10,
     "max_downtime_hours": 4.0,
@@ -218,20 +126,20 @@ curl -X POST "http://localhost:8000/api/v1/goals/$GOAL_ID/optimize" \
   -H "Content-Type: application/json" \
   -d '{
     "maintenance_window_count": 12,
-    "start_date": "2024-05-01T00:00:00Z"
+    "start_date": "2025-05-01T00:00:00Z"
   }'
 ```
 
 ---
 
-## 8. View Optimization Results
+## 3. Review Generated Bundles
 
 ### Via UI:
 
 1. Navigate to **Bundles**
 2. See generated patch bundles:
-   - Bundle 1 - Production Critical (Scheduled: 2024-05-04 02:00)
-   - Bundle 2 - Production High (Scheduled: 2024-05-11 02:00)
+   - Bundle 1 - Production Critical (Scheduled: next maintenance window)
+   - Bundle 2 - Production High (Scheduled: following window)
    - ...
 3. Click a bundle to view:
    - Affected assets
@@ -255,7 +163,7 @@ curl -X GET "http://localhost:8000/api/v1/bundles/$BUNDLE_ID" \
 
 ---
 
-## 9. Simulate Patch Impact
+## 4. Simulate Patch Impact
 
 Before approving a bundle, simulate its impact:
 
@@ -293,7 +201,7 @@ curl -X POST http://localhost:8000/api/v1/simulator/dry-run \
 
 ---
 
-## 10. Approve and Execute
+## 5. Approve and Execute
 
 ### Via UI:
 
@@ -315,7 +223,7 @@ curl -X POST http://localhost:8000/api/v1/approvals/requests \
   -d "{
     \"bundle_id\": \"$BUNDLE_ID\",
     \"title\": \"Approve Production Critical Patches\",
-    \"description\": \"8 critical vulnerabilities on production servers\",
+    \"description\": \"Critical vulnerabilities on production servers\",
     \"risk_level\": \"high\"
   }"
 
@@ -333,15 +241,40 @@ curl -X POST "http://localhost:8000/api/v1/bundles/$BUNDLE_ID/execute" \
 
 ---
 
+## 6. Check the Audit Log
+
+Every action in Glasswatch is recorded in the audit log — goal creation, bundle approvals, user changes, everything. This supports compliance reviews and forensic investigation.
+
+### Via UI:
+
+1. Navigate to **Audit Log** in the sidebar
+2. Filter by action type, user, or date range
+3. Verify the actions you just took are recorded (goal created, bundle approved, etc.)
+4. Export to CSV for compliance reporting
+
+### Via API:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/audit-log?limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Export as CSV
+curl -X GET "http://localhost:8000/api/v1/audit-log/export" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o audit-log.csv
+```
+
+---
+
 ## What's Next?
 
 ### Explore Key Features:
 
 - **🎯 Goals:** Create more complex goals (compliance deadlines, risk reduction targets)
 - **📊 Dashboard:** View real-time vulnerability and asset health metrics
-- **🔍 Discovery:** Set up scheduled scans for continuous monitoring
 - **👥 Team Collaboration:** Add team members and use comments/@mentions
-- **📝 Audit Logs:** Review complete audit trail for compliance
+- **🤖 AI Assistant:** Ask "What needs my attention?" or "Create a rule blocking Friday deployments"
+- **📋 Compliance Dashboard:** Track BOD 22-01, SLA status, and MTTP
 - **⚙️ Settings:** Configure maintenance windows, approval policies, integrations
 
 ### Read Full Documentation:
@@ -350,27 +283,13 @@ curl -X POST "http://localhost:8000/api/v1/bundles/$BUNDLE_ID/execute" \
 - **Admin Guide:** `docs/ADMIN_GUIDE.md`
 - **API Reference:** `docs/API.md`
 - **Architecture:** `docs/ARCHITECTURE.md`
+- **Scanner Integrations:** `docs/SCANNING_INTEGRATIONS.md`
+- **API Simulators:** `docs/SIMULATORS.md`
 
 ### Get Help:
 
 - **API Docs:** http://localhost:8000/docs (interactive Swagger UI)
 - **Support:** support@glasswatch.ai
-- **Documentation:** https://docs.glasswatch.ai
-
----
-
-## Stopping Services
-
-```bash
-# Stop all services
-docker-compose stop
-
-# Stop and remove containers
-docker-compose down
-
-# Stop and remove everything (including volumes)
-docker-compose down -v
-```
 
 ---
 
@@ -397,10 +316,6 @@ docker-compose up -d --build
 # Verify PostgreSQL is running
 docker-compose ps postgres
 
-# Check connection
-docker-compose exec backend python -c \
-  "from backend.db.session import engine; print(engine)"
-
 # Reset database
 docker-compose down -v
 docker-compose up -d
@@ -412,10 +327,7 @@ docker-compose up -d
 # Verify backend is running
 curl http://localhost:8000/health
 
-# Check environment variables
-docker-compose exec backend env | grep WORKOS
-
-# If WORKOS_API_KEY is set, demo mode is disabled
+# If WORKOS_API_KEY is set, SSO mode is active — demo login requires it to be unset
 # Comment out WORKOS_API_KEY in .env for demo mode
 ```
 
