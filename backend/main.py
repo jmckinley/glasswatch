@@ -201,6 +201,18 @@ async def not_found_handler(request, exc):
 @app.exception_handler(500)
 async def server_error_handler(request, exc):
     """Handle 500 errors."""
+    import logging
+    logging.getLogger("glasswatch").error(f"500 error on {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle all unhandled exceptions with logging."""
+    import logging
+    logging.getLogger("glasswatch").error(f"Unhandled exception on {request.url}: {type(exc).__name__}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"}

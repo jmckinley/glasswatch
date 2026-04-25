@@ -29,6 +29,8 @@ from backend.core.config import settings
 from backend.db.session import get_db
 from backend.models.audit_log import AuditLog
 from backend.services.audit_service import AuditService
+import logging
+logger = logging.getLogger(__name__)
 from backend.models.user import User, UserRole
 from backend.services.rate_limiter import get_rate_limiter
 
@@ -151,10 +153,14 @@ async def register_with_email(
     await db.commit()
     await db.refresh(user)
 
-    access_token = await create_access_token(
-        user_id=str(user.id),
-        tenant_id=str(tenant.id),
-    )
+    try:
+        access_token = await create_access_token(
+            user_id=str(user.id),
+            tenant_id=str(tenant.id),
+        )
+    except Exception as e:
+        logger.error(f"create_access_token failed in register: {e}", exc_info=True)
+        raise
 
     return CallbackResponse(
         access_token=access_token,
