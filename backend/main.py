@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from backend.api.v1 import api_router
 from backend.core.config import settings
+import backend.models  # Register all SQLAlchemy models to resolve relationship string references
 from backend.core.security_config import get_security_config
 from backend.middleware.security import SecurityHeadersMiddleware, get_security_headers_config
 from backend.middleware.request_validation import RequestValidationMiddleware, get_request_validation_config
