@@ -14,7 +14,7 @@ function CallbackContent() {
     if (token) {
       localStorage.setItem("glasswatch-token", token);
       login(token)
-        .then(() => router.push("/dashboard"))
+        .then(() => router.push("/"))
         .catch(() => router.push("/auth/login?error=callback_failed"));
     } else {
       router.push("/auth/login?error=no_token");

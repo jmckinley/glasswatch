@@ -42,7 +42,7 @@ class StepResponse(BaseModel):
 class CompleteResponse(BaseModel):
     success: bool
     message: str
-    redirect_to: str = "/dashboard"
+    redirect_to: str = "/"
 
 
 @router.get("/status", response_model=OnboardingStatus)
@@ -246,7 +246,7 @@ async def complete_onboarding(
     return CompleteResponse(
         success=True,
         message="Onboarding completed successfully",
-        redirect_to="/dashboard",
+        redirect_to="/",
     )
 
 
@@ -279,5 +279,5 @@ async def skip_onboarding(
     return CompleteResponse(
         success=True,
         message="Onboarding skipped",
-        redirect_to="/dashboard",
+        redirect_to="/",
     )

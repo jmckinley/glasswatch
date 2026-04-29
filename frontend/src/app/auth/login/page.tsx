@@ -54,7 +54,7 @@ function LoginContent() {
       setIsLoading(true);
       localStorage.setItem("glasswatch-token", token);
       await login(token);
-      router.push("/dashboard");
+      router.push("/");
     } catch {
       setError("Authentication failed. Please try again.");
     } finally {

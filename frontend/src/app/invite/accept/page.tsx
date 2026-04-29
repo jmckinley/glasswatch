@@ -54,7 +54,7 @@ function AcceptInviteContent() {
         localStorage.setItem("glasswatch_token", data.access_token);
       }
 
-      router.push("/dashboard");
+      router.push("/");
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {

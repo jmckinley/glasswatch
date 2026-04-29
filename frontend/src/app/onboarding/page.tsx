@@ -116,7 +116,7 @@ export default function OnboardingPage() {
     try {
       const status = await apiCall<any>("/onboarding/status");
       if (status.onboarding_completed) {
-        router.push("/dashboard");
+        router.push("/");
         return;
       }
       if (status.onboarding_step > 0) {
@@ -343,7 +343,7 @@ export default function OnboardingPage() {
     try {
       await saveStep(6, { confirmed: true });
       await apiCall("/onboarding/complete", { method: "POST" });
-      router.push("/dashboard");
+      router.push("/");
     } catch (error) {
       console.error("Failed to complete onboarding:", error);
       setIsCompleting(false);
@@ -353,7 +353,7 @@ export default function OnboardingPage() {
   const handleSkip = async () => {
     try {
       await apiCall("/onboarding/skip", { method: "POST" });
-      router.push("/dashboard");
+      router.push("/");
     } catch (error) {
       console.error("Failed to skip onboarding:", error);
     }

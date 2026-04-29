@@ -64,7 +64,7 @@ class LoginResponse(BaseModel):
 class CallbackResponse(BaseModel):
     access_token: str
     user: dict
-    redirect_to: str = "/dashboard"
+    redirect_to: str = "/"
 
 
 class UserProfile(BaseModel):
@@ -249,7 +249,7 @@ async def login_with_email(
             "role": user.role,
             "avatar_url": user.avatar_url,
         },
-        redirect_to="/dashboard",
+        redirect_to="/",
     )
 
 
@@ -310,7 +310,7 @@ async def handle_callback(
                 "role": user.role,
                 "avatar_url": user.avatar_url,
             },
-            redirect_to="/dashboard",
+            redirect_to="/",
         )
     except Exception as e:
         raise HTTPException(
@@ -419,7 +419,7 @@ async def demo_login(
             "role": user.role,
             "avatar_url": user.avatar_url,
         },
-        redirect_to="/dashboard",
+        redirect_to="/",
     )
 
 
@@ -591,7 +591,7 @@ async def handle_google_callback_endpoint(
                 "role": user.role,
                 "avatar_url": user.avatar_url,
             },
-            redirect_to="/dashboard",
+            redirect_to="/",
         )
     except Exception as e:
         raise HTTPException(
@@ -647,7 +647,7 @@ async def handle_github_callback_endpoint(
                 "role": user.role,
                 "avatar_url": user.avatar_url,
             },
-            redirect_to="/dashboard",
+            redirect_to="/",
         )
     except Exception as e:
         raise HTTPException(
