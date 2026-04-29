@@ -31,6 +31,7 @@ router = APIRouter()
 
 
 @router.get("")
+@router.get("/")
 async def list_assets(
     db: AsyncSession = Depends(get_db),
     tenant: Tenant = Depends(get_current_tenant),
@@ -149,6 +150,343 @@ async def list_assets(
         "limit": limit,
     }
 
+
+@router.get("/stale")
+async def get_stale_assets(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    days: int = Query(30, ge=1, description="Assets not scanned in this many days are considered stale"),
+) -> Dict[str, Any]:
+    """
+    Return assets with last_scanned_at older than `days` days (or never scanned).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    query = select(Asset).where(
+        and_(
+            Asset.tenant_id == tenant.id,
+            or_(
+                Asset.last_scanned_at < cutoff,
+                Asset.last_scanned_at.is_(None),
+            ),
+        )
+    ).order_by(Asset.last_scanned_at.asc().nullsfirst(), Asset.name)
+
+    result = await db.execute(query)
+    assets = result.scalars().all()
+
+    def days_since(dt):
+        if dt is None:
+            return None
+        return (datetime.now(timezone.utc) - dt).days
+
+    return {
+        "assets": [
+            {
+                "id": str(a.id),
+                "name": a.name,
+                "identifier": a.identifier,
+                "type": a.type,
+                "environment": a.environment,
+                "criticality": a.criticality,
+                "risk_score": a.risk_score,
+                "last_scanned_at": a.last_scanned_at.isoformat() if a.last_scanned_at else None,
+                "days_since_scan": days_since(a.last_scanned_at),
+            }
+            for a in assets
+        ],
+        "total": len(assets),
+        "stale_days_threshold": days,
+    }
+
+
+@router.get("/groups")
+async def get_asset_groups(
+    group_by: str = Query("environment", description="Group by: environment, owner_team, criticality, patch_group"),
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Return assets grouped by a dimension with aggregate stats.
+    """
+    valid_groups = {"environment", "owner_team", "criticality", "patch_group"}
+    if group_by not in valid_groups:
+        raise HTTPException(status_code=400, detail=f"group_by must be one of {valid_groups}")
+
+    # Fetch all assets for the tenant
+    result = await db.execute(
+        select(Asset).where(Asset.tenant_id == tenant.id)
+    )
+    assets = result.scalars().all()
+
+    # Get vuln counts per asset
+    asset_ids = [a.id for a in assets]
+    vuln_totals: Dict[Any, int] = {}
+    vuln_patched: Dict[Any, int] = {}
+    if asset_ids:
+        pr = await db.execute(
+            select(
+                AssetVulnerability.asset_id,
+                func.count(AssetVulnerability.id).label("total"),
+            )
+            .where(AssetVulnerability.asset_id.in_(asset_ids))
+            .group_by(AssetVulnerability.asset_id)
+        )
+        for row in pr.all():
+            vuln_totals[row[0]] = row[1]
+
+        pp = await db.execute(
+            select(
+                AssetVulnerability.asset_id,
+                func.count(AssetVulnerability.id).label("patched"),
+            )
+            .where(
+                and_(
+                    AssetVulnerability.asset_id.in_(asset_ids),
+                    AssetVulnerability.status == "PATCHED",
+                )
+            )
+            .group_by(AssetVulnerability.asset_id)
+        )
+        for row in pp.all():
+            vuln_patched[row[0]] = row[1]
+
+    # Group assets
+    groups: Dict[str, Any] = {}
+    for asset in assets:
+        key = getattr(asset, group_by)
+        if key is None:
+            key = "(unset)"
+        key = str(key)
+        if key not in groups:
+            groups[key] = {"count": 0, "risk_score_sum": 0.0, "total_vulns": 0, "patched_vulns": 0, "asset_ids": []}
+        g = groups[key]
+        g["count"] += 1
+        g["risk_score_sum"] += asset.risk_score
+        g["total_vulns"] += vuln_totals.get(asset.id, 0)
+        g["patched_vulns"] += vuln_patched.get(asset.id, 0)
+        g["asset_ids"].append(str(asset.id))
+
+    result_groups = []
+    for name, g in sorted(groups.items()):
+        avg_risk = round(g["risk_score_sum"] / g["count"], 1) if g["count"] else 0
+        pct_patched = round(g["patched_vulns"] / g["total_vulns"] * 100, 1) if g["total_vulns"] else 0
+        result_groups.append({
+            "name": name,
+            "count": g["count"],
+            "avg_risk_score": avg_risk,
+            "total_vulns": g["total_vulns"],
+            "patched_vulns": g["patched_vulns"],
+            "pct_patched": pct_patched,
+            "asset_ids": g["asset_ids"],
+        })
+
+    return {"groups": result_groups, "group_by": group_by}
+
+
+@router.get("/coverage")
+async def get_patch_coverage(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    limit: int = Query(50, le=200),
+) -> Dict[str, Any]:
+    """
+    Return patch coverage by CVE — how many assets are affected, patched, and unpatched.
+    """
+    # Get all asset IDs for this tenant
+    asset_ids_result = await db.execute(
+        select(Asset.id).where(Asset.tenant_id == tenant.id)
+    )
+    asset_ids = [r[0] for r in asset_ids_result.all()]
+
+    if not asset_ids:
+        return {"coverage": [], "total": 0}
+
+    # Aggregate vuln coverage
+    total_q = await db.execute(
+        select(
+            AssetVulnerability.vulnerability_id,
+            func.count(AssetVulnerability.id).label("total"),
+        )
+        .where(AssetVulnerability.asset_id.in_(asset_ids))
+        .group_by(AssetVulnerability.vulnerability_id)
+        .order_by(func.count(AssetVulnerability.id).desc())
+        .limit(limit)
+    )
+    total_rows = total_q.all()
+
+    if not total_rows:
+        return {"coverage": [], "total": 0}
+
+    vuln_ids = [r[0] for r in total_rows]
+    total_map = {r[0]: r[1] for r in total_rows}
+
+    patched_q = await db.execute(
+        select(
+            AssetVulnerability.vulnerability_id,
+            func.count(AssetVulnerability.id).label("patched"),
+        )
+        .where(
+            and_(
+                AssetVulnerability.asset_id.in_(asset_ids),
+                AssetVulnerability.vulnerability_id.in_(vuln_ids),
+                AssetVulnerability.status == "PATCHED",
+            )
+        )
+        .group_by(AssetVulnerability.vulnerability_id)
+    )
+    patched_map = {r[0]: r[1] for r in patched_q.all()}
+
+    # Fetch vuln details
+    vuln_details_q = await db.execute(
+        select(Vulnerability).where(Vulnerability.id.in_(vuln_ids))
+    )
+    vuln_details = {v.id: v for v in vuln_details_q.scalars().all()}
+
+    coverage = []
+    for vid in vuln_ids:
+        v = vuln_details.get(vid)
+        if not v:
+            continue
+        total = total_map.get(vid, 0)
+        patched = patched_map.get(vid, 0)
+        unpatched = total - patched
+        pct = round(patched / total * 100, 1) if total else 0
+        coverage.append({
+            "vulnerability_id": str(vid),
+            "identifier": v.identifier,
+            "severity": v.severity,
+            "cvss_score": v.cvss_score,
+            "kev_listed": v.kev_listed,
+            "patch_available": v.patch_available,
+            "total_assets": total,
+            "patched_assets": patched,
+            "unpatched_assets": unpatched,
+            "coverage_pct": pct,
+        })
+
+    return {"coverage": coverage, "total": len(coverage)}
+
+
+@router.get("/tags")
+async def list_tags(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> Dict[str, Any]:
+    """
+    Get all unique tags used across the tenant's assets.
+    
+    Returns: {"tags": [{"name": "web-tier", "count": 4}, ...]}
+    """
+    # Query for all tags
+    query = select(Asset.tags).where(Asset.tenant_id == tenant.id)
+    result = await db.execute(query)
+    
+    # Aggregate tags
+    tag_counts = {}
+    for (tags,) in result.all():
+        if tags:
+            for tag in tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    
+    # Sort by count descending
+    sorted_tags = sorted(
+        [{"name": tag, "count": count} for tag, count in tag_counts.items()],
+        key=lambda x: (-x["count"], x["name"])
+    )
+    
+    return {"tags": sorted_tags}
+
+
+@router.get("/export")
+async def export_assets(
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(get_current_tenant),
+    type: Optional[str] = Query(None, description="Filter by asset type"),
+    platform: Optional[str] = Query(None, description="Filter by platform"),
+    environment: Optional[str] = Query(None, description="Filter by environment"),
+    criticality: Optional[int] = Query(None, ge=1, le=5, description="Filter by criticality"),
+    exposure: Optional[str] = Query(None, description="Filter by exposure level"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    patch_group: Optional[str] = Query(None, description="Filter by patch group"),
+) -> List[Dict[str, Any]]:
+    """
+    Export all matching assets with full detail.
+    
+    Returns JSON array of assets.
+    """
+    # Build query (same filters as list_assets)
+    query = select(Asset).where(Asset.tenant_id == tenant.id)
+    
+    filters = []
+    
+    if type:
+        filters.append(Asset.type == type)
+    
+    if platform:
+        filters.append(Asset.platform == platform)
+    
+    if environment:
+        filters.append(Asset.environment == environment)
+    
+    if criticality is not None:
+        filters.append(Asset.criticality == criticality)
+    
+    if exposure:
+        filters.append(Asset.exposure.ilike(f"%{exposure}%"))
+    
+    if tag:
+        filters.append(Asset.tags.op('@>')(func.cast([tag], JSONB)))
+    
+    if patch_group:
+        filters.append(Asset.patch_group == patch_group)
+    
+    if filters:
+        query = query.where(and_(*filters))
+    
+    # Order by criticality
+    query = query.order_by(Asset.criticality.desc(), Asset.name)
+    
+    # Execute query (no limit for export)
+    result = await db.execute(query)
+    assets = result.scalars().all()
+    
+    return [
+        {
+            "id": str(asset.id),
+            "identifier": asset.identifier,
+            "name": asset.name,
+            "type": asset.type,
+            "platform": asset.platform,
+            "environment": asset.environment,
+            "location": asset.location,
+            "owner_team": asset.owner_team,
+            "owner_email": asset.owner_email,
+            "business_unit": asset.business_unit,
+            "criticality": asset.criticality,
+            "exposure": asset.exposure,
+            "os_family": asset.os_family,
+            "os_version": asset.os_version,
+            "ip_addresses": asset.ip_addresses,
+            "fqdn": asset.fqdn,
+            "cloud_account_id": asset.cloud_account_id,
+            "cloud_region": asset.cloud_region,
+            "cloud_instance_type": asset.cloud_instance_type,
+            "cloud_tags": asset.cloud_tags,
+            "tags": asset.tags or [],
+            "installed_packages": asset.installed_packages,
+            "running_services": asset.running_services,
+            "open_ports": asset.open_ports,
+            "compliance_frameworks": asset.compliance_frameworks,
+            "compensating_controls": asset.compensating_controls,
+            "patch_group": asset.patch_group,
+            "maintenance_window": asset.maintenance_window,
+            "last_scanned_at": asset.last_scanned_at.isoformat() if asset.last_scanned_at else None,
+            "last_patched_at": asset.last_patched_at.isoformat() if asset.last_patched_at else None,
+            "created_at": asset.created_at.isoformat(),
+            "updated_at": asset.updated_at.isoformat(),
+        }
+        for asset in assets
+    ]
 
 @router.get("/{asset_id}")
 async def get_asset(
@@ -465,222 +803,6 @@ async def bulk_import_assets(
     }
 
 
-@router.get("/stale")
-async def get_stale_assets(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-    days: int = Query(30, ge=1, description="Assets not scanned in this many days are considered stale"),
-) -> Dict[str, Any]:
-    """
-    Return assets with last_scanned_at older than `days` days (or never scanned).
-    """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    query = select(Asset).where(
-        and_(
-            Asset.tenant_id == tenant.id,
-            or_(
-                Asset.last_scanned_at < cutoff,
-                Asset.last_scanned_at.is_(None),
-            ),
-        )
-    ).order_by(Asset.last_scanned_at.asc().nullsfirst(), Asset.name)
-
-    result = await db.execute(query)
-    assets = result.scalars().all()
-
-    def days_since(dt):
-        if dt is None:
-            return None
-        return (datetime.now(timezone.utc) - dt).days
-
-    return {
-        "assets": [
-            {
-                "id": str(a.id),
-                "name": a.name,
-                "identifier": a.identifier,
-                "type": a.type,
-                "environment": a.environment,
-                "criticality": a.criticality,
-                "risk_score": a.risk_score,
-                "last_scanned_at": a.last_scanned_at.isoformat() if a.last_scanned_at else None,
-                "days_since_scan": days_since(a.last_scanned_at),
-            }
-            for a in assets
-        ],
-        "total": len(assets),
-        "stale_days_threshold": days,
-    }
-
-
-@router.get("/groups")
-async def get_asset_groups(
-    group_by: str = Query("environment", description="Group by: environment, owner_team, criticality, patch_group"),
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-) -> Dict[str, Any]:
-    """
-    Return assets grouped by a dimension with aggregate stats.
-    """
-    valid_groups = {"environment", "owner_team", "criticality", "patch_group"}
-    if group_by not in valid_groups:
-        raise HTTPException(status_code=400, detail=f"group_by must be one of {valid_groups}")
-
-    # Fetch all assets for the tenant
-    result = await db.execute(
-        select(Asset).where(Asset.tenant_id == tenant.id)
-    )
-    assets = result.scalars().all()
-
-    # Get vuln counts per asset
-    asset_ids = [a.id for a in assets]
-    vuln_totals: Dict[Any, int] = {}
-    vuln_patched: Dict[Any, int] = {}
-    if asset_ids:
-        pr = await db.execute(
-            select(
-                AssetVulnerability.asset_id,
-                func.count(AssetVulnerability.id).label("total"),
-            )
-            .where(AssetVulnerability.asset_id.in_(asset_ids))
-            .group_by(AssetVulnerability.asset_id)
-        )
-        for row in pr.all():
-            vuln_totals[row[0]] = row[1]
-
-        pp = await db.execute(
-            select(
-                AssetVulnerability.asset_id,
-                func.count(AssetVulnerability.id).label("patched"),
-            )
-            .where(
-                and_(
-                    AssetVulnerability.asset_id.in_(asset_ids),
-                    AssetVulnerability.status == "PATCHED",
-                )
-            )
-            .group_by(AssetVulnerability.asset_id)
-        )
-        for row in pp.all():
-            vuln_patched[row[0]] = row[1]
-
-    # Group assets
-    groups: Dict[str, Any] = {}
-    for asset in assets:
-        key = getattr(asset, group_by)
-        if key is None:
-            key = "(unset)"
-        key = str(key)
-        if key not in groups:
-            groups[key] = {"count": 0, "risk_score_sum": 0.0, "total_vulns": 0, "patched_vulns": 0, "asset_ids": []}
-        g = groups[key]
-        g["count"] += 1
-        g["risk_score_sum"] += asset.risk_score
-        g["total_vulns"] += vuln_totals.get(asset.id, 0)
-        g["patched_vulns"] += vuln_patched.get(asset.id, 0)
-        g["asset_ids"].append(str(asset.id))
-
-    result_groups = []
-    for name, g in sorted(groups.items()):
-        avg_risk = round(g["risk_score_sum"] / g["count"], 1) if g["count"] else 0
-        pct_patched = round(g["patched_vulns"] / g["total_vulns"] * 100, 1) if g["total_vulns"] else 0
-        result_groups.append({
-            "name": name,
-            "count": g["count"],
-            "avg_risk_score": avg_risk,
-            "total_vulns": g["total_vulns"],
-            "patched_vulns": g["patched_vulns"],
-            "pct_patched": pct_patched,
-            "asset_ids": g["asset_ids"],
-        })
-
-    return {"groups": result_groups, "group_by": group_by}
-
-
-@router.get("/coverage")
-async def get_patch_coverage(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-    limit: int = Query(50, le=200),
-) -> Dict[str, Any]:
-    """
-    Return patch coverage by CVE — how many assets are affected, patched, and unpatched.
-    """
-    # Get all asset IDs for this tenant
-    asset_ids_result = await db.execute(
-        select(Asset.id).where(Asset.tenant_id == tenant.id)
-    )
-    asset_ids = [r[0] for r in asset_ids_result.all()]
-
-    if not asset_ids:
-        return {"coverage": [], "total": 0}
-
-    # Aggregate vuln coverage
-    total_q = await db.execute(
-        select(
-            AssetVulnerability.vulnerability_id,
-            func.count(AssetVulnerability.id).label("total"),
-        )
-        .where(AssetVulnerability.asset_id.in_(asset_ids))
-        .group_by(AssetVulnerability.vulnerability_id)
-        .order_by(func.count(AssetVulnerability.id).desc())
-        .limit(limit)
-    )
-    total_rows = total_q.all()
-
-    if not total_rows:
-        return {"coverage": [], "total": 0}
-
-    vuln_ids = [r[0] for r in total_rows]
-    total_map = {r[0]: r[1] for r in total_rows}
-
-    patched_q = await db.execute(
-        select(
-            AssetVulnerability.vulnerability_id,
-            func.count(AssetVulnerability.id).label("patched"),
-        )
-        .where(
-            and_(
-                AssetVulnerability.asset_id.in_(asset_ids),
-                AssetVulnerability.vulnerability_id.in_(vuln_ids),
-                AssetVulnerability.status == "PATCHED",
-            )
-        )
-        .group_by(AssetVulnerability.vulnerability_id)
-    )
-    patched_map = {r[0]: r[1] for r in patched_q.all()}
-
-    # Fetch vuln details
-    vuln_details_q = await db.execute(
-        select(Vulnerability).where(Vulnerability.id.in_(vuln_ids))
-    )
-    vuln_details = {v.id: v for v in vuln_details_q.scalars().all()}
-
-    coverage = []
-    for vid in vuln_ids:
-        v = vuln_details.get(vid)
-        if not v:
-            continue
-        total = total_map.get(vid, 0)
-        patched = patched_map.get(vid, 0)
-        unpatched = total - patched
-        pct = round(patched / total * 100, 1) if total else 0
-        coverage.append({
-            "vulnerability_id": str(vid),
-            "identifier": v.identifier,
-            "severity": v.severity,
-            "cvss_score": v.cvss_score,
-            "kev_listed": v.kev_listed,
-            "patch_available": v.patch_available,
-            "total_assets": total,
-            "patched_assets": patched,
-            "unpatched_assets": unpatched,
-            "coverage_pct": pct,
-        })
-
-    return {"coverage": coverage, "total": len(coverage)}
-
-
 @router.get("/{asset_id}/vulnerabilities")
 async def get_asset_vulnerabilities(
     asset_id: UUID,
@@ -898,36 +1020,6 @@ async def bulk_tag_assets(
     }
 
 
-@router.get("/tags")
-async def list_tags(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-) -> Dict[str, Any]:
-    """
-    Get all unique tags used across the tenant's assets.
-    
-    Returns: {"tags": [{"name": "web-tier", "count": 4}, ...]}
-    """
-    # Query for all tags
-    query = select(Asset.tags).where(Asset.tenant_id == tenant.id)
-    result = await db.execute(query)
-    
-    # Aggregate tags
-    tag_counts = {}
-    for (tags,) in result.all():
-        if tags:
-            for tag in tags:
-                tag_counts[tag] = tag_counts.get(tag, 0) + 1
-    
-    # Sort by count descending
-    sorted_tags = sorted(
-        [{"name": tag, "count": count} for tag, count in tag_counts.items()],
-        key=lambda x: (-x["count"], x["name"])
-    )
-    
-    return {"tags": sorted_tags}
-
-
 @router.post("/enrich")
 async def enrich_assets(
     enrich_data: Dict[str, Any],
@@ -1019,97 +1111,6 @@ async def enrich_assets(
         "updated": updated_count,
     }
 
-
-@router.get("/export")
-async def export_assets(
-    db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(get_current_tenant),
-    type: Optional[str] = Query(None, description="Filter by asset type"),
-    platform: Optional[str] = Query(None, description="Filter by platform"),
-    environment: Optional[str] = Query(None, description="Filter by environment"),
-    criticality: Optional[int] = Query(None, ge=1, le=5, description="Filter by criticality"),
-    exposure: Optional[str] = Query(None, description="Filter by exposure level"),
-    tag: Optional[str] = Query(None, description="Filter by tag"),
-    patch_group: Optional[str] = Query(None, description="Filter by patch group"),
-) -> List[Dict[str, Any]]:
-    """
-    Export all matching assets with full detail.
-    
-    Returns JSON array of assets.
-    """
-    # Build query (same filters as list_assets)
-    query = select(Asset).where(Asset.tenant_id == tenant.id)
-    
-    filters = []
-    
-    if type:
-        filters.append(Asset.type == type)
-    
-    if platform:
-        filters.append(Asset.platform == platform)
-    
-    if environment:
-        filters.append(Asset.environment == environment)
-    
-    if criticality is not None:
-        filters.append(Asset.criticality == criticality)
-    
-    if exposure:
-        filters.append(Asset.exposure.ilike(f"%{exposure}%"))
-    
-    if tag:
-        filters.append(Asset.tags.op('@>')(func.cast([tag], JSONB)))
-    
-    if patch_group:
-        filters.append(Asset.patch_group == patch_group)
-    
-    if filters:
-        query = query.where(and_(*filters))
-    
-    # Order by criticality
-    query = query.order_by(Asset.criticality.desc(), Asset.name)
-    
-    # Execute query (no limit for export)
-    result = await db.execute(query)
-    assets = result.scalars().all()
-    
-    return [
-        {
-            "id": str(asset.id),
-            "identifier": asset.identifier,
-            "name": asset.name,
-            "type": asset.type,
-            "platform": asset.platform,
-            "environment": asset.environment,
-            "location": asset.location,
-            "owner_team": asset.owner_team,
-            "owner_email": asset.owner_email,
-            "business_unit": asset.business_unit,
-            "criticality": asset.criticality,
-            "exposure": asset.exposure,
-            "os_family": asset.os_family,
-            "os_version": asset.os_version,
-            "ip_addresses": asset.ip_addresses,
-            "fqdn": asset.fqdn,
-            "cloud_account_id": asset.cloud_account_id,
-            "cloud_region": asset.cloud_region,
-            "cloud_instance_type": asset.cloud_instance_type,
-            "cloud_tags": asset.cloud_tags,
-            "tags": asset.tags or [],
-            "installed_packages": asset.installed_packages,
-            "running_services": asset.running_services,
-            "open_ports": asset.open_ports,
-            "compliance_frameworks": asset.compliance_frameworks,
-            "compensating_controls": asset.compensating_controls,
-            "patch_group": asset.patch_group,
-            "maintenance_window": asset.maintenance_window,
-            "last_scanned_at": asset.last_scanned_at.isoformat() if asset.last_scanned_at else None,
-            "last_patched_at": asset.last_patched_at.isoformat() if asset.last_patched_at else None,
-            "created_at": asset.created_at.isoformat(),
-            "updated_at": asset.updated_at.isoformat(),
-        }
-        for asset in assets
-    ]
 
 @router.get("/{asset_id}/risk-breakdown")
 async def get_asset_risk_breakdown(
