@@ -570,7 +570,7 @@ export default function HelpPage() {
                 </Link>
                 . Full setup instructions are in the{" "}
                 <a
-                  href="https://github.com/your-org/glasswatch/blob/main/docs/IMPLEMENTATION_GUIDE.md"
+                  href="https://github.com/jmckinley/glasswatch/blob/main/docs/IMPLEMENTATION_GUIDE.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:underline"
