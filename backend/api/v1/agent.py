@@ -51,11 +51,11 @@ class AgentChatResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 _INTENT_PATTERNS: List[Tuple[str, List[str]]] = [
-    ("attention", ["what needs attention", "urgent", "show critical", "priority", "what's urgent", "top issues"]),
+    ("attention", ["what needs my attention", "what needs attention", "needs attention", "urgent", "show critical", "critical kev", "priority", "what's urgent", "top issues"]),
     ("cve_lookup", ["find fixes for", "patch cve", "what fixes cve", "fixes for cve", "details for cve", "info on cve", "about cve"]),
     ("approve_bundle", ["approve bundle", "approve the bundle"]),
     ("show_bundles", ["show bundles", "pending approvals", "list bundles", "pending bundles", "what bundles"]),
-    ("create_rule", ["create rule", "add rule", "new rule", "block deployments on", "block all deployments"]),
+    ("create_rule", ["create a rule", "create rule", "add rule", "new rule", "block deployments on", "block all deployments", "blocking friday", "blocking monday", "blocking tuesday", "blocking wednesday", "blocking thursday", "blocking saturday", "blocking sunday"]),
     ("show_windows", ["show maintenance windows", "maintenance windows", "what windows", "list windows", "scheduled windows"]),
     ("add_window", ["add maintenance window", "create window", "new window", "add window", "schedule window"]),
     ("show_goals", ["show goals", "goal status", "goals progress", "list goals", "goals"]),
