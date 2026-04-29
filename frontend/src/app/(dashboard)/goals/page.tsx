@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { goalsApi } from "@/lib/api";
 import TagAutocomplete from "@/components/TagAutocomplete";
 
@@ -42,11 +42,16 @@ export default function GoalsPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const searchParams = useSearchParams();
 
   useEffect(() => { document.title = 'Goals | Glasswatch'; }, []);
 
   useEffect(() => {
     fetchGoals();
+    // Auto-open create modal when navigated from dashboard alert
+    if (searchParams.get("create") === "true") {
+      setShowCreateModal(true);
+    }
   }, []);
 
   const fetchGoals = async () => {

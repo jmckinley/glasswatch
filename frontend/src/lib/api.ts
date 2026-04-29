@@ -55,7 +55,16 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
         window.location.href = "/auth/login";
       }
     }
-    throw new ApiError(response.status, data.detail || "API Error", data);
+    const rawDetail = data.detail;
+    const detailMessage =
+      typeof rawDetail === "string"
+        ? rawDetail
+        : Array.isArray(rawDetail)
+        ? rawDetail.map((e: any) => e.msg || JSON.stringify(e)).join("; ")
+        : rawDetail
+        ? JSON.stringify(rawDetail)
+        : "API Error";
+    throw new ApiError(response.status, detailMessage, data);
   }
 
   return data;

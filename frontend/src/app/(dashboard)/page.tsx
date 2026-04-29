@@ -389,7 +389,7 @@ function RightNowPanel({
                 Patch These Now →
               </Link>
               <Link
-                href="/goals/new"
+                href="/goals?create=true"
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
               >
                 Create Goal
